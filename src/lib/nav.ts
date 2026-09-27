@@ -10,6 +10,15 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/members", label: "Members", perm: "members.view" },
+      { href: "/renewals", label: "Renewals", perm: "memberships.renew" },
+    ],
+  },
+  {
+    group: "Billing",
+    items: [
+      { href: "/invoices", label: "Invoices", perm: "invoices.view" },
+      { href: "/payments", label: "Payments", perm: "invoices.view" },
+      { href: "/receivables", label: "Receivables", perm: "invoices.view" },
     ],
   },
   {

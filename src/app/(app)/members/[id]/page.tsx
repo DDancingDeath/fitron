@@ -1,6 +1,9 @@
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
 import { getMember } from "@/lib/services/members";
+import { memberHistory } from "@/lib/services/billing";
+import { InvoiceStatusBadge } from "@/components/invoice-status";
+import Link from "next/link";
 import { Badge, Button, Card, LinkButton, PageHeader } from "@/components/ui";
 import { MemberStatus } from "@/components/status";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -21,6 +24,7 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
   const { id } = await params;
   const m = await getMember(u, id);
   if (!m) notFound();
+  const history = u.can("invoices.view") ? await memberHistory(u, m.id) : null;
   const address = [m.house, m.area, m.city, m.state, m.pin].filter(Boolean).join(", ");
 
   return (
@@ -34,6 +38,12 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
         }
         actions={
           <>
+            {u.can("memberships.renew") && (
+              <LinkButton href={`/members/${m.id}/sell`} variant="primary">
+                {m.latestEnd ? "Renew" : "Sell membership"}
+              </LinkButton>
+            )}
+            {u.can("invoices.create") && <LinkButton href={`/invoices/new?member=${m.id}`}>New invoice</LinkButton>}
             {u.can("members.edit") && <LinkButton href={`/members/${m.id}/edit`}>Edit</LinkButton>}
             {u.can("members.edit") && (
               <form action={toggleSuspend.bind(null, m.id, !m.suspended)}>
@@ -79,6 +89,66 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
           {m.notes && <p className="mt-4 text-sm"><span className="text-muted">Notes: </span>{m.notes}</p>}
           {m.staffNotes && <p className="mt-2 text-sm"><span className="text-muted">Staff notes: </span>{m.staffNotes}</p>}
         </Card>
+        {history && (
+          <>
+            <Card title="Memberships" className="md:col-span-3">
+              {history.memberships.length === 0 ? (
+                <p className="text-sm text-muted">No memberships yet.</p>
+              ) : (
+                <ul className="divide-y divide-line text-sm">
+                  {history.memberships.map((ms) => (
+                    <li key={ms.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                      <span>
+                        <span className="font-semibold">{ms.plan.name}</span> · {fmtDate(ms.startDate)} to {fmtDate(ms.endDate)}
+                        <span className="text-muted"> · {ms.type === "NEW" ? "New" : ms.type === "RENEWAL" ? "Renewal" : ms.type}</span>
+                      </span>
+                      <span className="flex items-center gap-2">
+                        {ms.status === "CANCELLED" && <Badge tone="alert">Cancelled</Badge>}
+                        <Link href={`/invoices/${ms.invoice.id}`} className="text-accent">
+                          {ms.invoice.number}
+                        </Link>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card title="Invoices" className="md:col-span-2">
+              {history.invoices.length === 0 ? (
+                <p className="text-sm text-muted">No invoices yet.</p>
+              ) : (
+                <ul className="divide-y divide-line text-sm">
+                  {history.invoices.map((inv) => (
+                    <li key={inv.id}>
+                      <Link href={`/invoices/${inv.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2 hover:text-accent">
+                        <span>
+                          <span className="font-semibold">{inv.number}</span> · {fmtDate(inv.date)} · {formatInr(inv.total)}
+                        </span>
+                        <InvoiceStatusBadge status={inv.status} overdueDays={inv.overdueDays} />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+            <Card title="Payments">
+              {history.payments.length === 0 ? (
+                <p className="text-sm text-muted">No payments yet.</p>
+              ) : (
+                <ul className="divide-y divide-line text-sm">
+                  {history.payments.map((p) => (
+                    <li key={p.id} className="flex justify-between gap-2 py-2">
+                      <span className={p.status === "REVERSED" ? "text-muted line-through" : ""}>
+                        {formatInr(p.amount)} · {p.method}
+                      </span>
+                      <span className="text-muted">{fmtDate(p.date)}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </>
+        )}
       </div>
     </>
   );
