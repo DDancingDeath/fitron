@@ -13,6 +13,7 @@ import { todayIso, toIso, fromIso } from "./time";
 import { getSetting } from "./settings";
 import { markLeadWon } from "./leads";
 import { eraseBiometrics } from "./biometric";
+import { assertBranchWritable } from "./saas";
 
 /** Members a user may see: their branches, and only assigned members for trainers. */
 export function memberScope(u: CurrentUser): Prisma.MemberWhereInput {
@@ -158,6 +159,7 @@ export async function createMember(u: CurrentUser, input: MemberInput, opts: { l
   try {
     return await db.$transaction(async (tx) => {
       await assertPhoneFree(tx, u.orgId, input.phone);
+      await assertBranchWritable(tx, u.orgId, branchId);
       const n = await nextNumber(tx, u.orgId, "member");
       const m = await tx.member.create({
         data: { ...toData(input), code: `${prefix}${n}`, orgId: u.orgId, branchId, createdById: u.id },

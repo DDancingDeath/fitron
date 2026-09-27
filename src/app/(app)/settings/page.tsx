@@ -35,6 +35,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         actions={
           <>
             <LinkButton href="/settings/import">Migrate &amp; import</LinkButton>
+            <LinkButton href="/settings/billing">Plan &amp; billing</LinkButton>
             <LinkButton href="/settings/devices">Door devices</LinkButton>
             <LinkButton href="/settings/jobs">Daily jobs</LinkButton>
           </>
@@ -177,6 +178,15 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Card>
         <Card title="Branches" className="lg:col-span-2">
           <div className="flex flex-col gap-6">
+            {branches.length >= 3 && (
+              <p className="text-sm text-muted">
+                Your plan includes 3 branches. Each one after that needs a paid slot from{" "}
+                <Link href="/settings/billing" className="text-accent">
+                  Plan &amp; billing
+                </Link>
+                .
+              </p>
+            )}
             {[...branches, null].map((b) => (
               <form key={b?.id ?? "new"} action={saveBranchAction.bind(null, b?.id ?? null)} className="grid gap-3 border-b border-line pb-6 last:border-0 last:pb-0 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1fr_1fr_auto] lg:items-end">
                 <Field label={b ? "Name" : "New branch name"}>

@@ -13,6 +13,7 @@ import { nextNumber } from "./sequence";
 import { getSetting } from "./settings";
 import { getTax, type TaxSetting } from "./tax";
 import { fromIso, toIso, todayIso } from "./time";
+import { assertBranchWritable } from "./saas";
 
 type Tx = Prisma.TransactionClient;
 
@@ -35,6 +36,7 @@ export async function writeInvoice(
   u: CurrentUser,
   a: { branchId: string; memberId: string; date: string; dueDate: string; lines: Line[]; prefix: string; tax: TaxSetting },
 ) {
+  await assertBranchWritable(tx, u.orgId, a.branchId);
   const tax = a.tax;
   const t = invoiceTotals(a.lines);
   const n = await nextNumber(tx, u.orgId, "invoice");

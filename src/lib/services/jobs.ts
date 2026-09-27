@@ -9,6 +9,7 @@ import { summarize } from "./members";
 import { notify } from "./notifications";
 import { computeRisk } from "./insights";
 import { syncDevices } from "./biometric";
+import { billingReminders } from "./saas";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
 import { getWaSettings, refreshQueued, sendTemplate } from "./whatsapp";
 
@@ -115,6 +116,11 @@ export const JOBS: Job[] = [
     name: "devices.sync",
     label: "Load members onto door devices, remove expired ones",
     run: (orgId, today) => syncDevices(orgId, today),
+  },
+  {
+    name: "billing.branches",
+    label: "Extra-branch plan reminders",
+    run: (orgId, today) => billingReminders(orgId, today),
   },
   {
     name: "whatsapp.refresh",

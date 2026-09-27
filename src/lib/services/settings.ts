@@ -1,4 +1,5 @@
 import "server-only";
+import { claimSlot } from "./saas";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import type { Prisma } from "@/generated/prisma/client";
@@ -32,6 +33,7 @@ export async function saveBranch(u: CurrentUser, id: string | null, v: { name: s
       await audit(tx, { orgId: u.orgId, userId: u.id, action: "branch.update", entity: "Branch", entityId: id, before, after });
     } else {
       const after = await tx.branch.create({ data: { ...v, gstin: v.gstin ?? null, orgId: u.orgId } });
+      await claimSlot(tx, u.orgId, after.id);
       await audit(tx, { orgId: u.orgId, userId: u.id, action: "branch.create", entity: "Branch", entityId: after.id, after });
     }
   });

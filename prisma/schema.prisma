@@ -963,3 +963,32 @@ model AccessLog {
   @@index([deviceId, at])
   @@index([memberId, at])
 }
+
+/// Fitron's own billing: an extra branch beyond the 3 the plan includes, paid to Fitron.
+model BranchSubscription {
+  id                String    @id @default(cuid())
+  orgId             String
+  /// null = paid for but not yet given to a branch
+  branchId          String?
+  /// MONTHLY | YEARLY
+  cycle             String
+  base              Int
+  gst               Int
+  total             Int
+  periodStart       DateTime? @db.Date
+  periodEnd         DateTime? @db.Date
+  /// PENDING | PAID | FAILED
+  status            String    @default("PENDING")
+  /// LIVE (Razorpay) | DEMO
+  mode              String
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?   @unique
+  /// Fitron's tax invoice number, set when paid
+  invoiceNo         String?   @unique
+  createdById       String
+  createdAt         DateTime  @default(now()) @db.Timestamptz
+  paidAt            DateTime? @db.Timestamptz
+
+  @@index([orgId, status])
+  @@index([branchId])
+}
