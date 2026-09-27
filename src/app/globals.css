@@ -1,21 +1,67 @@
 @import "tailwindcss";
 
-/* Fitron tokens, matching the prototype (see prototype/HANDOFF.md → Stack). */
+/* Fitron tokens from the prototype (prototype/Fitron Gym.dc.html). Dark is the default look. */
 :root {
-  --background: #f3f2f2; /* paper */
-  --foreground: #201e1d; /* ink */
+  --bg: #0e0d0a;
+  --surface: #181611;
+  --surface-2: #211e17;
+  --line: #2c281f;
+  --text: #f3ede0;
+  --muted: #a39a86;
+  --accent: #cfa94f;
+  --accent-ink: #1a1408;
+  --accent-soft: #2a2314;
+  --alert: #ff6fa3;
+  --alert-soft: #3a1322;
+  --ok: #7cc89a;
+  --ok-soft: #14291d;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f2ea;
+    --surface: #ffffff;
+    --surface-2: #f0ece2;
+    --line: #e4e0d8;
+    --text: #1f1b14;
+    --muted: #6d6556;
+    --accent: #8a6612;
+    --accent-ink: #ffffff;
+    --accent-soft: #f7eed6;
+    --alert: #c2185b;
+    --alert-soft: #fde7ef;
+    --ok: #1d7a45;
+    --ok-soft: #e3f4e9;
+    color-scheme: light;
+  }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-gold-500: #8a6612;
-  --color-alert: #d6006c;
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-fg: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-soft: var(--accent-soft);
+  --color-alert: var(--alert);
+  --color-alert-soft: var(--alert-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
   --font-serif: var(--font-source-serif);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font-source-serif), Georgia, serif;
+}
+
+input,
+select,
+textarea {
+  font-size: 16px; /* no zoom on iOS */
 }

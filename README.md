@@ -15,11 +15,32 @@ Gym management and accounting software for Indian gyms: members, plans and renew
 
 ```bash
 npm install            # also generates the Prisma client
-cp .env.example .env   # point DATABASE_URL at a Postgres database
+cp .env.example .env   # point DATABASE_URL at a Postgres database (or run `npx prisma dev` for a local one)
 npm run db:migrate     # create tables
+npm run db:seed        # demo gym: sign in as sumit@demo.fitron.in / fitron-demo
 npm run dev            # http://localhost:3000
 ```
 
-Checks: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
+Checks: `npm run lint`, `npm run typecheck`, `npm test` (database tests run when `DATABASE_URL` is set), `npm run build`.
+
+## Set up a real gym
+
+```bash
+npx prisma migrate deploy
+npm run setup -- --gym "Power Haus Gym" --branch "City Centre" --name "Owner Name" \
+  --email owner@example.com --phone 9876543210 --password 'a-long-password'
+```
+
+This creates the gym, its first branch, the default roles and the Super Admin account. Everything else (staff, plans, members) is added in the app.
+
+## What works so far
+
+- Sign-in with Argon2id passwords, server-side sessions, 30-minute idle sign-out, login rate limit.
+- Roles and permissions (Super Admin, Admin, Accountant, Receptionist, Trainer), enforced on every page and action. Trainers see only their assigned members.
+- Branch switcher; every query is limited to the branches a user may see.
+- Members: search and filters, add, edit, suspend, soft delete, profile with computed status and dues. Phone numbers are unique among active members.
+- Plans: create, edit (applies to new sales only), deactivate, delete only if never sold.
+- Staff: add, edit, reset password, deactivate (signs them out).
+- Every change is written to the audit log.
 
 Money is stored as integer paise. Invoice and membership status are computed, never stored.
