@@ -992,3 +992,28 @@ model BranchSubscription {
   @@index([orgId, status])
   @@index([branchId])
 }
+
+/// A file kept against a member (ID proof, medical form, waiver…). Replacing or deleting keeps the old row.
+model MemberDocument {
+  id            String    @id @default(cuid())
+  orgId         String
+  memberId      String
+  /// ID proof | Address proof | Medical | Waiver | Photo | Other
+  kind          String
+  title         String
+  fileName      String
+  mime          String
+  size          Int
+  storageKey    String    @unique
+  /// ACTIVE | REPLACED | DELETED
+  status        String    @default("ACTIVE")
+  /// The newer file that replaced this one
+  replacedById  String?
+  uploadedById  String
+  createdAt     DateTime  @default(now()) @db.Timestamptz
+  deletedAt     DateTime? @db.Timestamptz
+  deletedById   String?
+  deleteReason  String?
+
+  @@index([memberId, status])
+}

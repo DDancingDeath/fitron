@@ -4,11 +4,12 @@ import { getMember } from "@/lib/services/members";
 import { memberHistory } from "@/lib/services/billing";
 import { InvoiceStatusBadge } from "@/components/invoice-status";
 import Link from "next/link";
-import { Badge, Button, Card, LinkButton, Notice, PageHeader, Select } from "@/components/ui";
+import { Badge, Button, Card, Input, LinkButton, Notice, PageHeader, Select } from "@/components/ui";
 import { MemberStatus } from "@/components/status";
 import { ConfirmButton } from "@/components/confirm-button";
 import { fmtDate, formatInr, fmtStamp } from "@/lib/format";
-import { enrolBiometric, eraseBiometric, removeMember, toggleSuspend } from "../actions";
+import { deleteDocumentAction, enrolBiometric, eraseBiometric, removeMember, replaceDocumentAction, toggleSuspend, uploadDocumentAction } from "../actions";
+import { DOC_KINDS, listDocuments } from "@/lib/services/documents";
 import { memberBiometrics } from "@/lib/services/biometric";
 import { db } from "@/lib/db";
 import { memberVisits } from "@/lib/services/attendance";
@@ -50,6 +51,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
   const sp = await searchParams;
   const canBio = u.can("members.edit") && !m.walkIn;
   const [bio, devices] = canBio ? await Promise.all([memberBiometrics(m.id), db.device.findMany({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } })]) : [null, []];
+  const docs = u.can("documents.manage") && !m.walkIn ? await listDocuments(u, m.id) : null;
   const address = [m.house, m.area, m.city, m.state, m.pin].filter(Boolean).join(", ");
 
   return (
@@ -289,6 +291,81 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
                 ))}
               </ul>
             )}
+          </Card>
+        )}
+        {docs && (
+          <Card title="Documents" className="md:col-span-2">
+            <div id="documents" className="flex flex-col gap-3 text-sm">
+              {typeof sp.doc === "string" && <Notice tone="ok">{sp.doc}</Notice>}
+              {typeof sp.docError === "string" && <Notice tone="alert">{sp.docError}</Notice>}
+              {docs.filter((d) => d.status === "ACTIVE").length === 0 ? (
+                <p className="text-muted">No documents yet.</p>
+              ) : (
+                <ul className="divide-y divide-line">
+                  {docs
+                    .filter((d) => d.status === "ACTIVE")
+                    .map((d) => (
+                      <li key={d.id} className="flex flex-col gap-2 py-2">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <a href={`/documents/${d.id}`} target="_blank" rel="noopener" className="font-medium hover:text-accent">
+                            {d.title}
+                          </a>
+                          <span className="text-muted">
+                            {d.kind} · {fmtStamp(d.createdAt)} · {d.uploadedBy} · {Math.max(1, Math.round(d.size / 1024))} KB
+                          </span>
+                        </div>
+                        <details>
+                          <summary className="cursor-pointer text-muted">Replace or remove</summary>
+                          <div className="mt-2 flex flex-col gap-2">
+                            <form action={replaceDocumentAction.bind(null, m.id, d.id)} className="flex flex-wrap items-center gap-2">
+                              <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="New file" className="max-w-full text-sm" />
+                              <Button>Replace</Button>
+                            </form>
+                            <form action={deleteDocumentAction.bind(null, m.id, d.id)} className="flex flex-wrap items-center gap-2">
+                              <Input name="reason" required placeholder="Reason for removing" aria-label="Reason for removing" className="w-auto flex-1" />
+                              <Button variant="danger">Remove</Button>
+                            </form>
+                          </div>
+                        </details>
+                      </li>
+                    ))}
+                </ul>
+              )}
+              <form action={uploadDocumentAction.bind(null, m.id)} className="flex flex-col gap-2 border-t border-line pt-3">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <Select name="kind" aria-label="Kind of document" defaultValue="ID proof">
+                    {DOC_KINDS.map((k) => (
+                      <option key={k}>{k}</option>
+                    ))}
+                  </Select>
+                  <Input name="title" placeholder="Title, e.g. Aadhaar card" aria-label="Title" maxLength={80} />
+                </div>
+                <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="File" className="max-w-full text-sm" />
+                <div>
+                  <Button variant="primary">Upload</Button>
+                </div>
+                <p className="text-xs text-muted">PDF or photo, up to 10 MB. Files are private; every view is recorded in the audit log.</p>
+              </form>
+              {docs.some((d) => d.status !== "ACTIVE") && (
+                <details>
+                  <summary className="cursor-pointer text-muted">History ({docs.filter((d) => d.status !== "ACTIVE").length})</summary>
+                  <ul className="mt-2 divide-y divide-line">
+                    {docs
+                      .filter((d) => d.status !== "ACTIVE")
+                      .map((d) => (
+                        <li key={d.id} className="flex flex-wrap justify-between gap-2 py-2">
+                          <a href={`/documents/${d.id}`} target="_blank" rel="noopener" className="hover:text-accent">
+                            {d.title} · {d.fileName}
+                          </a>
+                          <span className="text-muted">
+                            {d.status === "REPLACED" ? "Replaced" : `Removed by ${d.deletedBy}: ${d.deleteReason}`} · uploaded {fmtStamp(d.createdAt)}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </details>
+              )}
+            </div>
           </Card>
         )}
         {bio && (
