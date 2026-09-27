@@ -16,6 +16,7 @@ export function MemberForm({ id, values = {}, trainers }: { id?: string; values?
   return (
     <form action={action} key={state?.nonce} className="flex flex-col gap-4">
       {state?.message && <Notice tone="alert">{state.message}</Notice>}
+      {values.leadId && <input type="hidden" name="leadId" value={values.leadId} />}
       <Card title="Personal">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Full name" error={e.name}>

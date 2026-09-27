@@ -14,19 +14,25 @@ datasource db {
 // ── Tenancy ────────────────────────────────────────────────────────────────
 
 model Organization {
-  id        String           @id @default(cuid())
-  name      String
-  branches  Branch[]
-  users     User[]
-  members   Member[]
-  plans     MembershipPlan[]
-  invoices  Invoice[]
-  payments  Payment[]
-  expenses  Expense[]
-  settings  Setting[]
-  sequences Sequence[]
-  auditLogs AuditLog[]
-  createdAt DateTime         @default(now()) @db.Timestamptz
+  id            String           @id @default(cuid())
+  name          String
+  branches      Branch[]
+  users         User[]
+  members       Member[]
+  plans         MembershipPlan[]
+  invoices      Invoice[]
+  payments      Payment[]
+  expenses      Expense[]
+  settings      Setting[]
+  sequences     Sequence[]
+  auditLogs     AuditLog[]
+  leads         Lead[]
+  classSlots    ClassSlot[]
+  products      Product[]
+  workoutPlans  WorkoutPlan[]
+  dietPlans     DietPlan[]
+  notifications Notification[]
+  createdAt     DateTime         @default(now()) @db.Timestamptz
 }
 
 model Branch {
@@ -44,6 +50,10 @@ model Branch {
   payments    Payment[]
   expenses    Expense[]
   monthLocks  MonthLock[]
+  attendance  Attendance[]
+  leads       Lead[]
+  classSlots  ClassSlot[]
+  products    Product[]
   createdAt   DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId])
@@ -122,17 +132,17 @@ model UserBranch {
 // ── Members, plans, memberships ────────────────────────────────────────────
 
 model Member {
-  id                String       @id @default(cuid())
+  id                String        @id @default(cuid())
   /// PHG-1001, unique per org
   code              String
   oldId             String?
   orgId             String
-  org               Organization @relation(fields: [orgId], references: [id])
+  org               Organization  @relation(fields: [orgId], references: [id])
   branchId          String
-  branch            Branch       @relation(fields: [branchId], references: [id])
+  branch            Branch        @relation(fields: [branchId], references: [id])
   name              String
   gender            String
-  dob               DateTime?    @db.Date
+  dob               DateTime?     @db.Date
   phone             String
   whatsapp          String?
   email             String?
@@ -152,18 +162,26 @@ model Member {
   photoKey          String?
   trainerId         String?
   workoutPlanId     String?
+  workoutPlan       WorkoutPlan?  @relation(fields: [workoutPlanId], references: [id])
   dietPlanId        String?
-  suspended         Boolean      @default(false)
+  dietPlan          DietPlan?     @relation(fields: [dietPlanId], references: [id])
+  suspended         Boolean       @default(false)
+  /// The per-branch "Walk-in customer" used for counter sales. Hidden from member lists.
+  walkIn            Boolean       @default(false)
   memberships       Membership[]
+  attendance        Attendance[]
+  bookings          Booking[]
+  progress          ProgressLog[]
+  lead              Lead?
   invoices          Invoice[]
   payments          Payment[]
   createdById       String
-  createdAt         DateTime     @default(now()) @db.Timestamptz
-  updatedAt         DateTime     @updatedAt @db.Timestamptz
-  deletedAt         DateTime?    @db.Timestamptz
+  createdAt         DateTime      @default(now()) @db.Timestamptz
+  updatedAt         DateTime      @updatedAt @db.Timestamptz
+  deletedAt         DateTime?     @db.Timestamptz
 
-  // Phone is unique among non-deleted members (rule 9). Enforce that with a
-  // partial unique index in a migration: WHERE "deletedAt" IS NULL.
+  // Phone is unique among non-deleted members (rule 9). Enforced by a partial
+  // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
   @@unique([orgId, code])
   @@index([orgId, phone])
   @@index([branchId])
@@ -398,4 +416,205 @@ model Sequence {
   next  Int
 
   @@id([orgId, name])
+}
+
+// ── Front desk: attendance, leads, classes ─────────────────────────────────
+
+model Attendance {
+  id          String    @id @default(cuid())
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  memberId    String?
+  member      Member?   @relation(fields: [memberId], references: [id])
+  guestName   String?
+  guestPhone  String?
+  /// MEMBER | GUEST
+  type        String
+  date        DateTime  @db.Date
+  checkIn     DateTime  @db.Timestamptz
+  checkOut    DateTime? @db.Timestamptz
+  /// Manual | QR | Face | Fingerprint | Card
+  method      String
+  deviceId    String?
+  /// Why staff let someone in despite a block (expired, dues…).
+  override    String?
+  autoOut     Boolean   @default(false)
+  createdById String?
+
+  @@index([branchId, date])
+  @@index([memberId, date])
+}
+
+model Lead {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id])
+  branchId   String
+  branch     Branch       @relation(fields: [branchId], references: [id])
+  name       String
+  phone      String
+  source     String
+  /// What they asked about, usually a plan name.
+  interest   String
+  /// New | Contacted | Trial booked | Trial done | Won | Lost
+  stage      String       @default("New")
+  followUpOn DateTime?    @db.Date
+  trialOn    DateTime?    @db.Date
+  ownerId    String
+  notes      String?
+  lostReason String?
+  memberId   String?      @unique
+  member     Member?      @relation(fields: [memberId], references: [id])
+  createdAt  DateTime     @default(now()) @db.Timestamptz
+  updatedAt  DateTime     @updatedAt @db.Timestamptz
+
+  @@index([branchId, stage])
+  @@index([followUpOn])
+}
+
+model ClassSlot {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  branchId    String
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  name        String
+  trainerId   String
+  /// 0 = Monday … 6 = Sunday
+  weekday     Int
+  /// HH:MM, 24-hour
+  startTime   String
+  durationMin Int
+  capacity    Int
+  room        String?
+  active      Boolean      @default(true)
+  bookings    Booking[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+
+  @@index([branchId, weekday])
+}
+
+model Booking {
+  id          String    @id @default(cuid())
+  classSlotId String
+  classSlot   ClassSlot @relation(fields: [classSlotId], references: [id])
+  date        DateTime  @db.Date
+  memberId    String
+  member      Member    @relation(fields: [memberId], references: [id])
+  /// Booked | Waitlist | Attended | No-show | Cancelled
+  status      String
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+
+  @@unique([classSlotId, date, memberId])
+  @@index([classSlotId, date])
+}
+
+// ── Counter sales ──────────────────────────────────────────────────────────
+
+model Product {
+  id            String          @id @default(cuid())
+  orgId         String
+  org           Organization    @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  sku           String
+  name          String
+  category      String
+  /// Selling price before GST, paise.
+  price         Int
+  /// Average cost, paise.
+  cost          Int
+  /// null for services (day pass) that don't track stock.
+  stock         Int?
+  reorderLevel  Int?
+  gstApplicable Boolean         @default(true)
+  active        Boolean         @default(true)
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now()) @db.Timestamptz
+
+  @@unique([branchId, sku])
+}
+
+model StockMovement {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  /// + received, − sold or written off
+  qty           Int
+  /// SALE | RESTOCK | ADJUST | RETURN
+  reason        String
+  note          String?
+  unitCost      Int?
+  invoiceItemId String?
+  expenseId     String?
+  createdById   String
+  createdAt     DateTime @default(now()) @db.Timestamptz
+
+  @@index([productId, createdAt])
+}
+
+// ── Programs ───────────────────────────────────────────────────────────────
+
+model WorkoutPlan {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  name      String
+  goal      String
+  level     String
+  weeks     Int
+  /// [{ name: "Day A", exercises: [{ name: "Goblet squat", sets: "3 × 12" }] }]
+  days      Json
+  active    Boolean      @default(true)
+  members   Member[]
+  createdAt DateTime     @default(now()) @db.Timestamptz
+}
+
+model DietPlan {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  name      String
+  kcal      Int
+  protein   Int
+  /// [{ name: "Breakfast", food: "Besan chilla (2)…" }]
+  meals     Json
+  active    Boolean      @default(true)
+  members   Member[]
+  createdAt DateTime     @default(now()) @db.Timestamptz
+}
+
+model ProgressLog {
+  id          String   @id @default(cuid())
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  date        DateTime @db.Date
+  weightKg    Decimal? @db.Decimal(5, 1)
+  bodyFat     Decimal? @db.Decimal(4, 1)
+  waistCm     Decimal? @db.Decimal(5, 1)
+  notes       String?
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([memberId, date])
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+/// In-app alerts for staff: low stock, waitlist moves, overridden check-ins…
+model Notification {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  branchId  String?
+  /// null = everyone in the branch who can see this type
+  userId    String?
+  type      String
+  text      String
+  link      String?
+  readAt    DateTime?    @db.Timestamptz
+  createdAt DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId, createdAt])
 }

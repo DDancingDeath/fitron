@@ -11,7 +11,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps<"/invoi
   const u = await requirePermission("invoices.create");
   const { member } = await searchParams;
   const [members, tax] = await Promise.all([
-    db.member.findMany({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, phone: true } }),
+    db.member.findMany({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null, walkIn: false }, orderBy: { name: "asc" }, select: { id: true, name: true, code: true, phone: true } }),
     getTax(u.orgId),
   ]);
   return (

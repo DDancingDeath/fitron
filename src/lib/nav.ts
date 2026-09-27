@@ -11,6 +11,17 @@ export const NAV: NavGroup[] = [
       { href: "/dashboard", label: "Dashboard" },
       { href: "/members", label: "Members", perm: "members.view" },
       { href: "/renewals", label: "Renewals", perm: "memberships.renew" },
+      { href: "/attendance", label: "Attendance", perm: "attendance.manage" },
+      { href: "/leads", label: "Leads", perm: "leads.manage" },
+      { href: "/classes", label: "Classes", perm: "classes.manage" },
+      { href: "/programs", label: "Workouts & diets", perm: "programs.manage" },
+    ],
+  },
+  {
+    group: "Shop",
+    items: [
+      { href: "/pos", label: "Counter sale", perm: "pos.sell" },
+      { href: "/products", label: "Products & stock", perm: "products.manage" },
     ],
   },
   {

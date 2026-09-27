@@ -11,6 +11,7 @@ import { nextNumber } from "./sequence";
 import { isUniqueViolation, UserError } from "./errors";
 import { todayIso, toIso, fromIso } from "./time";
 import { getSetting } from "./settings";
+import { markLeadWon } from "./leads";
 
 /** Members a user may see: their branches, and only assigned members for trainers. */
 export function memberScope(u: CurrentUser): Prisma.MemberWhereInput {
@@ -83,6 +84,7 @@ export async function listMembers(
   const q = f.q?.trim();
   const where: Prisma.MemberWhereInput = {
     ...memberScope(u),
+    walkIn: false,
     ...(f.gender ? { gender: f.gender } : {}),
     ...(q
       ? {
@@ -142,13 +144,13 @@ const toData = (i: MemberInput) => ({
 
 async function assertPhoneFree(tx: Prisma.TransactionClient, orgId: string, phone: string, exceptId?: string) {
   const clash = await tx.member.findFirst({
-    where: { orgId, phone, deletedAt: null, ...(exceptId ? { id: { not: exceptId } } : {}) },
+    where: { orgId, phone, deletedAt: null, walkIn: false, ...(exceptId ? { id: { not: exceptId } } : {}) },
     select: { code: true, name: true },
   });
   if (clash) throw new UserError(`This phone number already belongs to ${clash.name} (${clash.code}).`, "phone");
 }
 
-export async function createMember(u: CurrentUser, input: MemberInput) {
+export async function createMember(u: CurrentUser, input: MemberInput, opts: { leadId?: string } = {}) {
   const branchId = writeBranch(u);
   if (!branchId) throw new UserError("Pick a branch first.");
   const prefix = (await getSetting<{ memberPrefix?: string }>(u.orgId, "numbering"))?.memberPrefix ?? "FT-";
@@ -160,6 +162,7 @@ export async function createMember(u: CurrentUser, input: MemberInput) {
         data: { ...toData(input), code: `${prefix}${n}`, orgId: u.orgId, branchId, createdById: u.id },
       });
       await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.create", entity: "Member", entityId: m.id, after: m });
+      if (opts.leadId) await markLeadWon(tx, u, opts.leadId, m.id);
       return m;
     });
   } catch (e) {
@@ -201,4 +204,17 @@ export async function deleteMember(u: CurrentUser, id: string) {
     const after = await tx.member.update({ where: { id }, data: { deletedAt: new Date() } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.delete", entity: "Member", entityId: id, before, after });
   });
+}
+
+/** Options for a member picker: "PHG-1001 · Asha Verma". */
+export async function memberOptions(u: CurrentUser) {
+  const ms = await db.member.findMany({ where: { ...memberScope(u), walkIn: false }, select: { id: true, code: true, name: true, phone: true }, orderBy: { name: "asc" } });
+  return ms.map((m) => ({ id: m.id, label: `${m.code} · ${m.name} · ${m.phone}` }));
+}
+
+/** Resolves what was typed in a member picker (the option label, or just the member ID). */
+export async function resolveMemberRef(u: CurrentUser, text: string) {
+  const code = text.trim().split(/\s+/)[0] ?? "";
+  if (!code) return null;
+  return db.member.findFirst({ where: { ...memberScope(u), walkIn: false, code: { equals: code, mode: "insensitive" } }, select: { id: true, name: true } });
 }

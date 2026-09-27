@@ -5,7 +5,7 @@ import { getInvoice } from "@/lib/services/billing";
 import { todayIso } from "@/lib/services/time";
 import { Badge, Card, LinkButton, Notice, PageHeader } from "@/components/ui";
 import { InvoiceStatusBadge } from "@/components/invoice-status";
-import { fmtDate, formatInr } from "@/lib/format";
+import { fmtDate, formatInr, fmtStamp } from "@/lib/format";
 import { CancelInvoice, CollectForm, ReversePayment } from "./invoice-forms";
 
 export const metadata = { title: "Invoice · Fitron" };
@@ -44,7 +44,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
       {cancelled && (
         <div className="mb-4">
           <Notice tone="alert">
-            Cancelled on {fmtDate(inv.cancelledAt)} by {inv.staffName(inv.cancelledById ?? "")}: {inv.cancelReason}
+            Cancelled on {fmtStamp(inv.cancelledAt)} by {inv.staffName(inv.cancelledById ?? "")}: {inv.cancelReason}
           </Notice>
         </div>
       )}

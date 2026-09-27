@@ -17,3 +17,16 @@ export const initials = (name: string) =>
     .slice(0, 2)
     .map((w) => w[0]!.toUpperCase())
     .join("");
+
+/** A timestamp as Indian clock time, "6:05 pm". */
+export const fmtTime = (d: Date | null | undefined) =>
+  d ? d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }) : "—";
+
+/** "18:30" → "6:30 pm" */
+export function fmtClock(hhmm: string) {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${((h! + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h! < 12 ? "am" : "pm"}`;
+}
+
+/** The Indian calendar date of a timestamp, "28 Sep 2026" (fmtDate reads @db.Date columns as-is). */
+export const fmtStamp = (d: Date | null | undefined) => (d ? fmtDate(new Date(d.getTime() + 330 * 60_000)) : "—");

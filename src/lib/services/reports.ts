@@ -163,7 +163,7 @@ export const REPORTS: Record<string, Def> = {
     perm: "members.view",
     usesPeriod: true,
     async run(u, p) {
-      const g = await db.member.groupBy({ by: ["source"], where: { ...branchScope(u), deletedAt: null, createdAt: { gte: fromIso(p.from), lt: new Date(fromIso(p.to).getTime() + 86_400_000) } }, _count: { _all: true } });
+      const g = await db.member.groupBy({ by: ["source"], where: { ...branchScope(u), deletedAt: null, walkIn: false, createdAt: { gte: fromIso(p.from), lt: new Date(fromIso(p.to).getTime() + 86_400_000) } }, _count: { _all: true } });
       const rows = g.map((x) => ({ source: x.source, members: x._count._all })).sort((a, b) => b.members - a.members);
       return { columns: [{ key: "source", label: "Source" }, { key: "members", label: "New members" }], rows, totals: { members: sumCol(rows, "members") } };
     },

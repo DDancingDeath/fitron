@@ -6,6 +6,7 @@ import * as z from "zod";
 import { requirePermission } from "@/lib/auth/current";
 import { putSetting, saveBranch } from "@/lib/services/settings";
 import { branchInput, gymInput, numberingInput, taxInput } from "@/lib/validation/settings";
+import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
 
 const back = (params: Record<string, string>) => redirect(`/settings?${new URLSearchParams(params)}`);
@@ -49,5 +50,12 @@ export async function saveBranchAction(id: string | null, fd: FormData) {
   const u = await requirePermission("settings.manage");
   await save(branchInput, fd, "branches", async (v) => {
     await saveBranch(u, id, v);
+  });
+}
+
+export async function saveAccess(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  await save(accessInput, fd, "access", async (v) => {
+    await putSetting(u, "access", v);
   });
 }

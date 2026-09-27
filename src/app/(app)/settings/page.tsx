@@ -3,18 +3,20 @@ import { db } from "@/lib/db";
 import { getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
 import { Button, Card, Field, Input, Notice, PageHeader, Select } from "@/components/ui";
-import { saveBranchAction, saveGym, saveNumbering, saveTax } from "./actions";
+import { saveAccess, saveBranchAction, saveGym, saveNumbering, saveTax } from "./actions";
+import { getAccessRules } from "@/lib/services/attendance";
 
 export const metadata = { title: "Settings · Fitron" };
 
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const u = await requirePermission("settings.manage");
   const sp = await searchParams;
-  const [gym, tax, numbering, branches] = await Promise.all([
+  const [gym, tax, numbering, branches, access] = await Promise.all([
     getSetting<{ name?: string }>(u.orgId, "gym"),
     getTax(u.orgId),
     getSetting<{ memberPrefix?: string; invoicePrefix?: string; paymentPrefix?: string }>(u.orgId, "numbering"),
     db.branch.findMany({ where: { orgId: u.orgId }, orderBy: { createdAt: "asc" } }),
+    getAccessRules(u.orgId),
   ]);
 
   return (
@@ -72,6 +74,25 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               </Field>
             </div>
             <p className="text-xs text-muted">Numbers keep counting from where they are; only the prefix changes.</p>
+            <div>
+              <Button variant="primary">Save</Button>
+            </div>
+          </form>
+        </Card>
+        <Card title="Entry rules">
+          <form action={saveAccess} className="flex flex-col gap-3 text-sm">
+            <p className="text-muted">Who the front desk (and later the door device) turns away. Staff can still let someone in with a reason, which is logged.</p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="blockSuspended" defaultChecked={access.blockSuspended} className="size-4" /> Block suspended members
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="blockExpired" defaultChecked={access.blockExpired} className="size-4" /> Block expired memberships after
+              <Input name="graceDays" type="number" min={0} max={60} defaultValue={access.graceDays} className="w-20!" aria-label="Grace days" /> days
+            </label>
+            <label className="flex flex-wrap items-center gap-2">
+              <input type="checkbox" name="blockDues" defaultChecked={access.blockDues} className="size-4" /> Block when dues are over ₹
+              <Input name="duesLimit" inputMode="decimal" defaultValue={access.duesLimit / 100} className="w-28!" aria-label="Dues limit" />
+            </label>
             <div>
               <Button variant="primary">Save</Button>
             </div>

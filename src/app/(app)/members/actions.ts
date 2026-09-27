@@ -27,7 +27,7 @@ export async function saveMember(id: string | null, _: FormState, fd: FormData):
   let newId = id;
   const res = await handle(fd, async () => {
     if (id) await updateMember(u, id, parsed.data);
-    else newId = (await createMember(u, parsed.data)).id;
+    else newId = (await createMember(u, parsed.data, { leadId: (fd.get("leadId") as string) || undefined })).id;
   });
   if (!res?.ok) return res;
   revalidatePath("/members");

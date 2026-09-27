@@ -16,9 +16,9 @@ import { fromIso, toIso, todayIso } from "./time";
 
 type Tx = Prisma.TransactionClient;
 
-type Line = InvoiceLine & { description: string; category: string; planId?: string | null };
+export type Line = InvoiceLine & { description: string; category: string; planId?: string | null; productId?: string | null };
 
-async function prefixes(orgId: string) {
+export async function prefixes(orgId: string) {
   const n = (await getSetting<{ invoicePrefix?: string; paymentPrefix?: string }>(orgId, "numbering")) ?? {};
   return { invoice: n.invoicePrefix ?? "INV-", payment: n.paymentPrefix ?? "PAY-" };
 }
@@ -30,7 +30,7 @@ async function findMember(u: CurrentUser, memberId: string) {
 }
 
 /** Writes an invoice with its lines. Totals are computed here and stored once (rule 3). */
-async function writeInvoice(
+export async function writeInvoice(
   tx: Tx,
   u: CurrentUser,
   a: { branchId: string; memberId: string; date: string; dueDate: string; lines: Line[]; prefix: string; tax: TaxSetting },
@@ -64,14 +64,16 @@ async function writeInvoice(
             amount: net,
             category: l.category,
             planId: l.planId ?? null,
+            productId: l.productId ?? null,
           };
         }),
       },
     },
+    include: { items: true },
   });
 }
 
-async function writePayment(
+export async function writePayment(
   tx: Tx,
   u: CurrentUser,
   a: { branchId: string; memberId: string; invoiceId: string; date: string; amount: number; method: string; txnRef?: string; notes?: string; prefix: string },
@@ -255,6 +257,12 @@ export async function cancelInvoice(u: CurrentUser, invoiceId: string, reason: s
       data: { status: "REVERSED", reversedById: u.id, reversedAt: now, reverseReason: `Invoice cancelled: ${reason}` },
     });
     if (before.membership) await tx.membership.update({ where: { id: before.membership.id }, data: { status: "CANCELLED" } });
+    // Counter-sale items go back on the shelf.
+    const sold = await tx.stockMovement.findMany({ where: { reason: "SALE", invoiceItemId: { in: (await tx.invoiceItem.findMany({ where: { invoiceId }, select: { id: true } })).map((i) => i.id) } } });
+    for (const m of sold) {
+      await tx.product.updateMany({ where: { id: m.productId, stock: { not: null } }, data: { stock: { increment: -m.qty } } });
+      await tx.stockMovement.create({ data: { productId: m.productId, qty: -m.qty, reason: "RETURN", invoiceItemId: m.invoiceItemId, note: `Invoice cancelled: ${reason}`, createdById: u.id } });
+    }
     const after = await tx.invoice.update({ where: { id: invoiceId }, data: { status: "CANCELLED", cancelReason: reason, cancelledById: u.id, cancelledAt: now } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "invoice.cancel", entity: "Invoice", entityId: invoiceId, before, after });
   });

@@ -6,9 +6,11 @@ import { MobileNav } from "@/components/mobile-nav";
 import { BranchSwitcher } from "@/components/branch-switcher";
 import { logout } from "@/app/login/actions";
 import { Logo } from "@/components/logo";
+import { unreadCount } from "@/lib/services/notifications";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
+  const unread = await unreadCount(u);
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || u.can(i.perm)) })).filter((g) => g.items.length);
 
   return (
@@ -27,6 +29,13 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             <BranchSwitcher branches={u.branches} value={u.branch} />
           </div>
           <div className="flex items-center gap-3">
+            <Link href="/notifications" className="relative flex min-h-9 items-center rounded-md border border-line px-3 text-sm" aria-label={unread ? `${unread} unread alerts` : "Alerts"}>
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+              </svg>
+              {unread > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-alert px-1 text-center text-[11px] font-semibold leading-5 text-bg">{unread > 99 ? "99+" : unread}</span>}
+            </Link>
             <div className="hidden text-right text-sm leading-tight sm:block">
               <div className="font-semibold">{u.name}</div>
               <div className="text-muted">{u.role}</div>
