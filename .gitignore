@@ -46,3 +46,4 @@ session/
 
 !.env.example
 /storage/
+/deploy/backups/

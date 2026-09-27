@@ -23,7 +23,11 @@ npm run dev            # http://localhost:3000
 
 Checks: `npm run lint`, `npm run typecheck`, `npm test` (database tests run when `DATABASE_URL` is set), `npm run build`.
 
-## Set up a real gym
+## Go live
+
+To run Fitron for real on a free Oracle Cloud server (app, database, HTTPS, daily jobs and nightly backups in one command), follow [deploy/README.md](deploy/README.md).
+
+## Set up a real gym (by hand)
 
 ```bash
 npx prisma migrate deploy
