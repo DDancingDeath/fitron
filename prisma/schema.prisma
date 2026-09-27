@@ -139,62 +139,66 @@ model UserBranch {
 // ── Members, plans, memberships ────────────────────────────────────────────
 
 model Member {
-  id                String            @id @default(cuid())
+  id                 String            @id @default(cuid())
   /// PHG-1001, unique per org
-  code              String
-  oldId             String?
-  orgId             String
-  org               Organization      @relation(fields: [orgId], references: [id])
-  branchId          String
-  branch            Branch            @relation(fields: [branchId], references: [id])
-  name              String
-  gender            String
-  dob               DateTime?         @db.Date
-  phone             String
-  whatsapp          String?
-  email             String?
-  occupation        String?
-  house             String?
-  area              String?
-  city              String?
-  state             String?
-  pin               String?
-  emergencyName     String?
-  emergencyRelation String?
-  emergencyPhone    String?
-  source            String
-  notes             String?
-  staffNotes        String?
-  tags              String[]
-  photoKey          String?
-  trainerId         String?
-  workoutPlanId     String?
-  workoutPlan       WorkoutPlan?      @relation(fields: [workoutPlanId], references: [id])
-  dietPlanId        String?
-  dietPlan          DietPlan?         @relation(fields: [dietPlanId], references: [id])
-  suspended         Boolean           @default(false)
+  code               String
+  oldId              String?
+  orgId              String
+  org                Organization      @relation(fields: [orgId], references: [id])
+  branchId           String
+  branch             Branch            @relation(fields: [branchId], references: [id])
+  name               String
+  gender             String
+  dob                DateTime?         @db.Date
+  phone              String
+  whatsapp           String?
+  email              String?
+  occupation         String?
+  house              String?
+  area               String?
+  city               String?
+  state              String?
+  pin                String?
+  emergencyName      String?
+  emergencyRelation  String?
+  emergencyPhone     String?
+  source             String
+  notes              String?
+  staffNotes         String?
+  tags               String[]
+  photoKey           String?
+  trainerId          String?
+  workoutPlanId      String?
+  workoutPlan        WorkoutPlan?      @relation(fields: [workoutPlanId], references: [id])
+  dietPlanId         String?
+  dietPlan           DietPlan?         @relation(fields: [dietPlanId], references: [id])
+  suspended          Boolean           @default(false)
   /// The per-branch "Walk-in customer" used for counter sales. Hidden from member lists.
-  walkIn            Boolean           @default(false)
+  walkIn             Boolean           @default(false)
   /// Churn risk 0–100, recomputed each night.
-  riskScore         Int?
-  riskReasons       String[]          @default([])
-  memberships       Membership[]
-  attendance        Attendance[]
-  bookings          Booking[]
-  progress          ProgressLog[]
-  lead              Lead?
-  waMessages        WhatsAppMessage[]
-  mandates          AutopayMandate[]
-  invoices          Invoice[]
-  payments          Payment[]
-  createdById       String
-  createdAt         DateTime          @default(now()) @db.Timestamptz
-  updatedAt         DateTime          @updatedAt @db.Timestamptz
-  deletedAt         DateTime?         @db.Timestamptz
+  riskScore          Int?
+  riskReasons        String[]          @default([])
+  /// User PIN on biometric devices, given at enrolment.
+  devicePin          String?
+  biometricConsentAt DateTime?         @db.Timestamptz
+  memberships        Membership[]
+  attendance         Attendance[]
+  bookings           Booking[]
+  progress           ProgressLog[]
+  lead               Lead?
+  waMessages         WhatsAppMessage[]
+  mandates           AutopayMandate[]
+  invoices           Invoice[]
+  payments           Payment[]
+  createdById        String
+  createdAt          DateTime          @default(now()) @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @db.Timestamptz
+  deletedAt          DateTime?         @db.Timestamptz
 
   // Phone is unique among non-deleted members (rule 9). Enforced by a partial
   // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
   @@unique([orgId, code])
+  @@unique([orgId, devicePin])
   @@index([orgId, phone])
   @@index([branchId])
   @@index([name])
@@ -876,4 +880,86 @@ model AiProposal {
   doneAt    DateTime? @db.Timestamptz
 
   @@index([orgId, userId, createdAt])
+}
+
+// ── Biometric devices (ZKTeco / eSSL ADMS push) ────────────────────────────
+
+model Device {
+  id           String          @id @default(cuid())
+  /// null until someone approves it; unknown serials that call in are held for approval
+  orgId        String?
+  branchId     String?
+  serial       String          @unique
+  model        String?
+  name         String?
+  ip           String?
+  approved     Boolean         @default(false)
+  /// Seconds the door relay stays open
+  relaySeconds Int             @default(5)
+  lastSeenAt   DateTime?       @db.Timestamptz
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+  commands     DeviceCommand[]
+  users        DeviceUser[]
+}
+
+model DeviceCommand {
+  id         String    @id @default(cuid())
+  deviceId   String
+  device     Device    @relation(fields: [deviceId], references: [id])
+  /// The number the device echoes back when it reports the result
+  cmdNo      Int
+  command    String
+  /// PENDING | SENT | DONE | FAILED
+  status     String    @default("PENDING")
+  returnCode String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  sentAt     DateTime? @db.Timestamptz
+  ackAt      DateTime? @db.Timestamptz
+
+  @@unique([deviceId, cmdNo])
+  @@index([deviceId, status])
+}
+
+/// Whether a member is currently loaded on a device (allowed in) or removed from it (blocked).
+model DeviceUser {
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id])
+  memberId  String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@id([deviceId, memberId])
+}
+
+/// Sensitive personal data (DPDP): encrypted at rest, never shown or exported, deleted when the member leaves.
+model BiometricTemplate {
+  id        String   @id @default(cuid())
+  memberId  String
+  /// FP | FACE
+  type      String
+  /// Finger index or face slot
+  slot      Int
+  deviceId  String?
+  /// AES-256-GCM of the device's template record
+  data      Bytes
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@unique([memberId, type, slot])
+}
+
+model AccessLog {
+  id       String   @id @default(cuid())
+  deviceId String
+  branchId String?
+  memberId String?
+  pin      String
+  /// Fingerprint | Face | Card | Password
+  method   String
+  /// ALLOWED | DENIED | UNKNOWN
+  result   String
+  reason   String?
+  at       DateTime @db.Timestamptz
+
+  @@index([deviceId, at])
+  @@index([memberId, at])
 }

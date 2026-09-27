@@ -4,11 +4,13 @@ import { getMember } from "@/lib/services/members";
 import { memberHistory } from "@/lib/services/billing";
 import { InvoiceStatusBadge } from "@/components/invoice-status";
 import Link from "next/link";
-import { Badge, Button, Card, LinkButton, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, LinkButton, Notice, PageHeader, Select } from "@/components/ui";
 import { MemberStatus } from "@/components/status";
 import { ConfirmButton } from "@/components/confirm-button";
 import { fmtDate, formatInr, fmtStamp } from "@/lib/format";
-import { removeMember, toggleSuspend } from "../actions";
+import { enrolBiometric, eraseBiometric, removeMember, toggleSuspend } from "../actions";
+import { memberBiometrics } from "@/lib/services/biometric";
+import { db } from "@/lib/db";
 import { memberVisits } from "@/lib/services/attendance";
 import { memberBookings } from "@/lib/services/classes";
 import { listDiets, listWorkouts, progressFor } from "@/lib/services/programs";
@@ -27,7 +29,7 @@ const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
   </div>
 );
 
-export default async function MemberPage({ params }: PageProps<"/members/[id]">) {
+export default async function MemberPage({ params, searchParams }: PageProps<"/members/[id]">) {
   const u = await requirePermission("members.view");
   const { id } = await params;
   const m = await getMember(u, id);
@@ -45,6 +47,9 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
   const [templates, messages] = canWa ? await Promise.all([listTemplates(u.orgId), listMessages(u, { memberId: m.id })]) : [[], null];
   const workout = workouts.find((w) => w.id === m.workoutPlanId);
   const diet = diets.find((d) => d.id === m.dietPlanId);
+  const sp = await searchParams;
+  const canBio = u.can("members.edit") && !m.walkIn;
+  const [bio, devices] = canBio ? await Promise.all([memberBiometrics(m.id), db.device.findMany({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } })]) : [null, []];
   const address = [m.house, m.area, m.city, m.state, m.pin].filter(Boolean).join(", ");
 
   return (
@@ -284,6 +289,57 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
                 ))}
               </ul>
             )}
+          </Card>
+        )}
+        {bio && (
+          <Card title="Biometric entry" className="md:col-span-2">
+            <div id="biometric" className="flex flex-col gap-3 text-sm">
+              {typeof sp.bio === "string" && <Notice tone="ok">{sp.bio}</Notice>}
+              {typeof sp.bioError === "string" && <Notice tone="alert">{sp.bioError}</Notice>}
+              <p>
+                {m.devicePin ? `Device PIN ${m.devicePin}` : "Not on any device yet"}
+                {bio.fingerprints || bio.faces ? ` · ${bio.fingerprints} fingerprint${bio.fingerprints === 1 ? "" : "s"}, ${bio.faces} face${bio.faces === 1 ? "" : "s"} stored (encrypted)` : ""}
+                {bio.devices.length ? ` · on ${bio.devices.map((d) => `${d.device.name ?? d.device.serial}${d.allowed ? "" : " (removed, plan not active)"}`).join(", ")}` : ""}
+              </p>
+              {m.biometricConsentAt && <p className="text-muted">Consent recorded {fmtStamp(m.biometricConsentAt)}.</p>}
+              {devices.length === 0 ? (
+                <p className="text-muted">
+                  No door device yet. {u.can("settings.manage") ? <Link href="/settings/devices" className="text-accent">Add one in Settings.</Link> : "Ask a Super Admin to add one."}
+                </p>
+              ) : (
+                <form action={enrolBiometric.bind(null, m.id)} className="flex flex-col gap-2">
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Select name="deviceId" aria-label="Device">
+                      {devices.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name ?? d.serial}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select name="kind" aria-label="What to enrol">
+                      <option value="FP">Fingerprint</option>
+                      <option value="FACE">Face</option>
+                    </Select>
+                  </div>
+                  {!m.biometricConsentAt && (
+                    <label className="flex items-start gap-2">
+                      <input type="checkbox" name="consent" className="mt-0.5 size-4" />
+                      <span>The member has given written consent to store their fingerprint or face for gym entry, and knows they can ask for it to be deleted.</span>
+                    </label>
+                  )}
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="primary">Enrol on device</Button>
+                  </div>
+                </form>
+              )}
+              {(m.devicePin || m.biometricConsentAt) && (
+                <form action={eraseBiometric.bind(null, m.id)}>
+                  <ConfirmButton variant="danger" confirm="Delete this member's fingerprints and face data here and on every device?">
+                    Delete biometric data
+                  </ConfirmButton>
+                </form>
+              )}
+            </div>
           </Card>
         )}
         {bookings && (

@@ -7,6 +7,7 @@ import { memberInput } from "@/lib/validation/member";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { createMember, deleteMember, setSuspended, updateMember } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
+import { enrol, eraseBiometrics } from "@/lib/services/biometric";
 
 const read = (fd: FormData) => Object.fromEntries([...fd.keys()].map((k) => [k, fd.get(k)]));
 
@@ -45,4 +46,25 @@ export async function removeMember(id: string) {
   await deleteMember(u, id);
   revalidatePath("/members");
   redirect("/members");
+}
+
+export async function enrolBiometric(id: string, fd: FormData) {
+  const u = await requirePermission("members.edit");
+  const kind = fd.get("kind") === "FACE" ? "FACE" : "FP";
+  let error = "";
+  try {
+    await enrol(u, id, String(fd.get("deviceId") ?? ""), kind, fd.get("consent") === "on");
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    error = e.message;
+  }
+  revalidatePath(`/members/${id}`);
+  redirect(`/members/${id}?${new URLSearchParams(error ? { bioError: error } : { bio: kind === "FP" ? "Ask the member to place their finger on the device three times." : "Ask the member to look at the device." })}#biometric`);
+}
+
+export async function eraseBiometric(id: string) {
+  const u = await requirePermission("members.edit");
+  await eraseBiometrics(u, id);
+  revalidatePath(`/members/${id}`);
+  redirect(`/members/${id}?${new URLSearchParams({ bio: "Biometric data deleted here and removed from every device." })}#biometric`);
 }

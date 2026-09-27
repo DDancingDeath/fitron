@@ -12,6 +12,7 @@ import { isUniqueViolation, UserError } from "./errors";
 import { todayIso, toIso, fromIso } from "./time";
 import { getSetting } from "./settings";
 import { markLeadWon } from "./leads";
+import { eraseBiometrics } from "./biometric";
 
 /** Members a user may see: their branches, and only assigned members for trainers. */
 export function memberScope(u: CurrentUser): Prisma.MemberWhereInput {
@@ -201,6 +202,8 @@ export async function deleteMember(u: CurrentUser, id: string) {
   const before = await db.member.findFirst({ where: { ...memberScope(u), id } });
   if (!before) throw new UserError("Member not found.");
   await db.$transaction(async (tx) => {
+    // Biometric data doesn't outlive the member (DPDP).
+    await eraseBiometrics(u, id, tx);
     const after = await tx.member.update({ where: { id }, data: { deletedAt: new Date() } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.delete", entity: "Member", entityId: id, before, after });
   });

@@ -8,6 +8,7 @@ import { isUniqueViolation } from "./errors";
 import { summarize } from "./members";
 import { notify } from "./notifications";
 import { computeRisk } from "./insights";
+import { syncDevices } from "./biometric";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
 import { getWaSettings, refreshQueued, sendTemplate } from "./whatsapp";
 
@@ -109,6 +110,11 @@ export const JOBS: Job[] = [
       }
       return { branches: due.length, leads: due.reduce((a, b) => a + b._count._all, 0) };
     },
+  },
+  {
+    name: "devices.sync",
+    label: "Load members onto door devices, remove expired ones",
+    run: (orgId, today) => syncDevices(orgId, today),
   },
   {
     name: "whatsapp.refresh",

@@ -35,6 +35,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         actions={
           <>
             <LinkButton href="/settings/import">Migrate &amp; import</LinkButton>
+            <LinkButton href="/settings/devices">Door devices</LinkButton>
             <LinkButton href="/settings/jobs">Daily jobs</LinkButton>
           </>
         }
