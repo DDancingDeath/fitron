@@ -175,6 +175,9 @@ model Member {
   suspended         Boolean           @default(false)
   /// The per-branch "Walk-in customer" used for counter sales. Hidden from member lists.
   walkIn            Boolean           @default(false)
+  /// Churn risk 0–100, recomputed each night.
+  riskScore         Int?
+  riskReasons       String[]          @default([])
   memberships       Membership[]
   attendance        Attendance[]
   bookings          Booking[]
@@ -852,4 +855,25 @@ model VendorPayment {
   createdAt   DateTime @default(now()) @db.Timestamptz
 
   @@index([purchaseId])
+}
+
+// ── Fitron AI ──────────────────────────────────────────────────────────────
+
+/// An action the assistant suggested. Nothing happens until a staff member confirms it.
+model AiProposal {
+  id        String    @id @default(cuid())
+  orgId     String
+  userId    String
+  /// WHATSAPP
+  kind      String
+  memberIds String[]
+  body      String
+  summary   String
+  /// PENDING | DONE | DISMISSED
+  status    String    @default("PENDING")
+  result    String?
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  doneAt    DateTime? @db.Timestamptz
+
+  @@index([orgId, userId, createdAt])
 }

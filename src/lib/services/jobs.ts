@@ -7,6 +7,7 @@ import { runAutopayDay } from "./autopay";
 import { isUniqueViolation } from "./errors";
 import { summarize } from "./members";
 import { notify } from "./notifications";
+import { computeRisk } from "./insights";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
 import { getWaSettings, refreshQueued, sendTemplate } from "./whatsapp";
 
@@ -19,6 +20,11 @@ const EXPIRY_KEY: Record<number, string> = { 7: "exp7", 3: "exp3", 1: "exp1", 0:
 const reachable = (orgId: string) => db.member.findMany({ where: { orgId, deletedAt: null, walkIn: false, suspended: false }, select: { id: true, dob: true } });
 
 export const JOBS: Job[] = [
+  {
+    name: "members.risk",
+    label: "Churn risk for every member",
+    run: (orgId, today) => computeRisk(orgId, today),
+  },
   {
     name: "attendance.close",
     label: "Check out visits left open on earlier days",

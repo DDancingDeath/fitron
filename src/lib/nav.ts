@@ -9,6 +9,7 @@ export const NAV: NavGroup[] = [
     group: "Front desk",
     items: [
       { href: "/dashboard", label: "Dashboard" },
+      { href: "/ai", label: "Fitron AI", perm: "ai.use" },
       { href: "/members", label: "Members", perm: "members.view" },
       { href: "/renewals", label: "Renewals", perm: "memberships.renew" },
       { href: "/attendance", label: "Attendance", perm: "attendance.manage" },
