@@ -1,0 +1,385 @@
+// Fitron core schema, from prototype/HANDOFF.md.
+// Money is integer paise. Dates are @db.Date, timestamps are timestamptz.
+// Financial rows (Invoice, Payment, Expense) are never deleted: cancel, reverse or void with a reason.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Tenancy ────────────────────────────────────────────────────────────────
+
+model Organization {
+  id        String           @id @default(cuid())
+  name      String
+  branches  Branch[]
+  users     User[]
+  members   Member[]
+  plans     MembershipPlan[]
+  invoices  Invoice[]
+  payments  Payment[]
+  expenses  Expense[]
+  settings  Setting[]
+  sequences Sequence[]
+  auditLogs AuditLog[]
+  createdAt DateTime         @default(now()) @db.Timestamptz
+}
+
+model Branch {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  name        String
+  address     String
+  phone       String
+  gstin       String?
+  users       UserBranch[]
+  members     Member[]
+  memberships Membership[]
+  invoices    Invoice[]
+  payments    Payment[]
+  expenses    Expense[]
+  monthLocks  MonthLock[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId])
+}
+
+// ── Staff and roles ────────────────────────────────────────────────────────
+
+model User {
+  id           String       @id @default(cuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  name         String
+  email        String       @unique
+  phone        String
+  passwordHash String
+  roleId       String
+  role         Role         @relation(fields: [roleId], references: [id])
+  branches     UserBranch[]
+  ptRate       Int          @default(0)
+  shift        String?
+  active       Boolean      @default(true)
+  lastLoginAt  DateTime?    @db.Timestamptz
+  createdAt    DateTime     @default(now()) @db.Timestamptz
+  updatedAt    DateTime     @updatedAt @db.Timestamptz
+  deletedAt    DateTime?    @db.Timestamptz
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  permissions RolePermission[]
+  users       User[]
+}
+
+/// e.g. members.create, payments.reverse, months.unlock
+model Permission {
+  id    String           @id @default(cuid())
+  key   String           @unique
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model UserBranch {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  @@id([userId, branchId])
+}
+
+// ── Members, plans, memberships ────────────────────────────────────────────
+
+model Member {
+  id                String       @id @default(cuid())
+  /// PHG-1001, unique per org
+  code              String
+  oldId             String?
+  orgId             String
+  org               Organization @relation(fields: [orgId], references: [id])
+  branchId          String
+  branch            Branch       @relation(fields: [branchId], references: [id])
+  name              String
+  gender            String
+  dob               DateTime?    @db.Date
+  phone             String
+  whatsapp          String?
+  email             String?
+  occupation        String?
+  house             String?
+  area              String?
+  city              String?
+  state             String?
+  pin               String?
+  emergencyName     String?
+  emergencyRelation String?
+  emergencyPhone    String?
+  source            String
+  notes             String?
+  staffNotes        String?
+  tags              String[]
+  photoKey          String?
+  trainerId         String?
+  workoutPlanId     String?
+  dietPlanId        String?
+  suspended         Boolean      @default(false)
+  memberships       Membership[]
+  invoices          Invoice[]
+  payments          Payment[]
+  createdById       String
+  createdAt         DateTime     @default(now()) @db.Timestamptz
+  updatedAt         DateTime     @updatedAt @db.Timestamptz
+  deletedAt         DateTime?    @db.Timestamptz
+
+  // Phone is unique among non-deleted members (rule 9). Enforce that with a
+  // partial unique index in a migration: WHERE "deletedAt" IS NULL.
+  @@unique([orgId, code])
+  @@index([orgId, phone])
+  @@index([branchId])
+  @@index([name])
+}
+
+model MembershipPlan {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  name          String
+  months        Int
+  price         Int
+  regFee        Int
+  discount      Int          @default(0)
+  gstApplicable Boolean      @default(true)
+  kind          String
+  description   String?
+  features      String[]
+  /// ACTIVE | INACTIVE. Plans in use are deactivated, never deleted.
+  status        String       @default("ACTIVE")
+  prices        PlanPrice[]
+  memberships   Membership[]
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @db.Timestamptz
+}
+
+/// Category prices: Female, Student, Couple…
+model PlanPrice {
+  planId   String
+  plan     MembershipPlan @relation(fields: [planId], references: [id])
+  category String
+  price    Int
+
+  @@id([planId, category])
+}
+
+model Membership {
+  id              String         @id @default(cuid())
+  /// MS-…
+  code            String
+  memberId        String
+  member          Member         @relation(fields: [memberId], references: [id])
+  planId          String
+  plan            MembershipPlan @relation(fields: [planId], references: [id])
+  branchId        String
+  branch          Branch         @relation(fields: [branchId], references: [id])
+  /// NEW | RENEWAL | AUTOPAY | IMPORT
+  type            String
+  startDate       DateTime       @db.Date
+  endDate         DateTime       @db.Date
+  price           Int
+  discount        Int
+  pricingCategory String
+  offerCode       String?
+  invoiceId       String         @unique
+  invoice         Invoice        @relation(fields: [invoiceId], references: [id])
+  /// VALID | CANCELLED
+  status          String         @default("VALID")
+  createdAt       DateTime       @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+  @@index([endDate])
+}
+
+// ── Billing ────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(cuid())
+  /// INV-1024
+  number        String
+  orgId         String
+  org           Organization  @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  memberId      String
+  member        Member        @relation(fields: [memberId], references: [id])
+  date          DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  /// Denormalised, written once at issue.
+  subtotal      Int
+  discount      Int
+  tax           Int
+  total         Int
+  gstType       String?
+  gstRate       Decimal?      @db.Decimal(5, 2)
+  /// ISSUED | CANCELLED. Paid state is computed from payments, never stored.
+  status        String
+  cancelReason  String?
+  cancelledById String?
+  cancelledAt   DateTime?     @db.Timestamptz
+  pdfKey        String?
+  createdById   String
+  createdAt     DateTime      @default(now()) @db.Timestamptz
+  items         InvoiceItem[]
+  payments      Payment[]
+  membership    Membership?
+
+  @@unique([orgId, number])
+  @@index([memberId])
+  @@index([date])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  qty         Int
+  rate        Int
+  discount    Int
+  taxRate     Decimal @db.Decimal(5, 2)
+  taxAmount   Int
+  amount      Int
+  category    String
+  planId      String?
+  productId   String?
+  trainerId   String?
+}
+
+model Payment {
+  id            String       @id @default(cuid())
+  /// PAY-5001
+  code          String
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch       @relation(fields: [branchId], references: [id])
+  invoiceId     String
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id])
+  memberId      String
+  member        Member       @relation(fields: [memberId], references: [id])
+  date          DateTime     @db.Date
+  amount        Int
+  method        String
+  txnRef        String?
+  notes         String?
+  /// SUCCESS | REVERSED
+  status        String       @default("SUCCESS")
+  receivedById  String
+  reversedById  String?
+  reversedAt    DateTime?    @db.Timestamptz
+  reverseReason String?
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([invoiceId])
+  @@index([date])
+  @@index([txnRef])
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  code          String
+  orgId         String
+  org           Organization    @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  date          DateTime        @db.Date
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description   String
+  vendor        String?
+  amount        Int
+  method        String
+  billNo        String?
+  attachmentKey String?
+  notes         String?
+  createdById   String
+  /// ACTIVE | VOID
+  status        String          @default("ACTIVE")
+  voidReason    String?
+  createdAt     DateTime        @default(now()) @db.Timestamptz
+
+  @@index([branchId, date])
+}
+
+/// Rent, Utilities, Salaries…
+model ExpenseCategory {
+  id       String    @id @default(cuid())
+  name     String
+  group    String
+  expenses Expense[]
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        BigInt       @id @default(autoincrement())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  userId    String?
+  actorType String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId, createdAt])
+  @@index([entity, entityId])
+}
+
+model MonthLock {
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  /// YYYY-MM
+  month      String
+  lockedById String
+  lockedAt   DateTime @db.Timestamptz
+
+  @@id([branchId, month])
+}
+
+model Setting {
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+  key   String
+  value Json
+
+  @@id([orgId, key])
+}
+
+/// Gap-free numbering: member, invoice, payment, expense…
+model Sequence {
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+  name  String
+  next  Int
+
+  @@id([orgId, name])
+}

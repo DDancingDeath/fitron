@@ -4,8 +4,22 @@ Gym management and accounting software for Indian gyms: members, plans and renew
 
 ## What's here
 
-- `prototype/` — the working browser prototype. Open `prototype/Fitron Gym.dc.html` in a browser (serve the folder over HTTP, e.g. `npx serve prototype`). Data lives in the browser's localStorage; WhatsApp and UPI Autopay are simulated.
-- `prototype/HANDOFF.md` — the production build spec: stack, Prisma schema, business rules, REST API, scheduled jobs, security and acceptance tests.
-- `prototype/connector/` — Node service for linked-device WhatsApp sending and Razorpay UPI Autopay. See its README.
+- **The production app** (repo root): Next.js (App Router) + TypeScript + Tailwind, Postgres via Prisma. Being built from `prototype/HANDOFF.md`.
+  - `prisma/schema.prisma`: core schema (tenancy, staff and roles, members, plans, memberships, invoices, payments, expenses, audit log, month locks, settings, sequences).
+  - `src/lib/domain/`: business rules with unit tests (invoice totals and GST, computed invoice status, membership status, date maths).
+- **`prototype/`**: the working browser prototype. Serve the folder (`npx serve prototype`) and open `Fitron Gym.dc.html`. Data lives in localStorage; WhatsApp and UPI Autopay are simulated.
+  - `prototype/HANDOFF.md`: the production build spec.
+  - `prototype/connector/`: WhatsApp linked-device and Razorpay UPI Autopay service.
 
-The production app described in `HANDOFF.md` has not been built yet.
+## Develop
+
+```bash
+npm install            # also generates the Prisma client
+cp .env.example .env   # point DATABASE_URL at a Postgres database
+npm run db:migrate     # create tables
+npm run dev            # http://localhost:3000
+```
+
+Checks: `npm run lint`, `npm run typecheck`, `npm test`, `npm run build`.
+
+Money is stored as integer paise. Invoice and membership status are computed, never stored.
