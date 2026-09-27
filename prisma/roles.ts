@@ -18,3 +18,30 @@ export async function ensureRoles(db: PrismaClient) {
   }
   return roles;
 }
+
+export const EXPENSE_CATEGORIES: [string, string][] = [
+  ["Rent", "Rent"],
+  ["Electricity", "Utilities"],
+  ["Water", "Utilities"],
+  ["Internet", "Utilities"],
+  ["Staff Salary", "Salaries"],
+  ["Trainer Salary", "Salaries"],
+  ["Equipment Purchase", "Equipment"],
+  ["Equipment Maintenance", "Maintenance"],
+  ["Repairs", "Maintenance"],
+  ["Cleaning", "Operating"],
+  ["Software", "Operating"],
+  ["Office Expenses", "Operating"],
+  ["Marketing", "Marketing"],
+  ["Advertising", "Marketing"],
+  ["Inventory", "Inventory"],
+  ["Miscellaneous", "Other"],
+];
+
+/** Shared expense categories, keyed by a stable slug. */
+export async function ensureExpenseCategories(db: PrismaClient) {
+  for (const [name, group] of EXPENSE_CATEGORIES) {
+    const id = name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    await db.expenseCategory.upsert({ where: { id }, create: { id, name, group }, update: { name, group } });
+  }
+}

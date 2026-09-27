@@ -22,10 +22,20 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
+    group: "Accounts",
+    items: [
+      { href: "/expenses", label: "Expenses", perm: "expenses.manage" },
+      { href: "/accounting", label: "Accounting", perm: "accounting.view" },
+      { href: "/reports", label: "Reports", perm: "invoices.view" },
+    ],
+  },
+  {
     group: "Admin",
     items: [
       { href: "/plans", label: "Plans & offers", perm: "plans.manage" },
       { href: "/staff", label: "Staff & roles", perm: "staff.manage" },
+      { href: "/audit", label: "Audit log", perm: "audit.view" },
+      { href: "/settings", label: "Settings", perm: "settings.manage" },
     ],
   },
 ];

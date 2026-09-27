@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
+import { ReasonForm } from "@/components/reason-form";
 import { cancel, collect, reverse } from "../../billing-actions";
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
 import { METHODS } from "@/lib/validation/billing";
@@ -33,41 +34,6 @@ export function CollectForm({ invoiceId, balance, today }: { invoiceId: string; 
       <div>
         <Button variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Record payment"}
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-function ReasonForm({ action: act, label, confirm, done }: { action: (s: unknown, fd: FormData) => Promise<{ ok?: boolean; message?: string; errors?: Record<string, string[] | undefined> } | undefined>; label: string; confirm: string; done?: boolean }) {
-  const [open, setOpen] = useState(false);
-  const [state, action, pending] = useActionState(act, undefined);
-  if (state?.ok) return <Notice tone="ok">{state.message}</Notice>;
-  if (done) return null;
-  if (!open)
-    return (
-      <Button type="button" variant="danger" onClick={() => setOpen(true)}>
-        {label}
-      </Button>
-    );
-  return (
-    <form
-      action={action}
-      onSubmit={(ev) => {
-        if (!window.confirm(confirm)) ev.preventDefault();
-      }}
-      className="flex flex-col gap-2 sm:flex-row sm:items-end"
-    >
-      <Field label="Reason" error={state?.errors?.reason} className="flex-1">
-        <Input name="reason" required minLength={3} autoFocus />
-      </Field>
-      {state?.message && <Notice tone="alert">{state.message}</Notice>}
-      <div className="flex gap-2">
-        <Button variant="danger" disabled={pending}>
-          {label}
-        </Button>
-        <Button type="button" onClick={() => setOpen(false)}>
-          Keep
         </Button>
       </div>
     </form>

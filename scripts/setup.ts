@@ -3,7 +3,7 @@
 //     --email owner@example.com --phone 9876543210 --password 'a-long-password'
 import { parseArgs } from "node:util";
 import { makeClient } from "../prisma/client";
-import { ensureRoles } from "../prisma/roles";
+import { ensureExpenseCategories, ensureRoles } from "../prisma/roles";
 import { hashPassword } from "../src/lib/auth/password";
 
 const { values: a } = parseArgs({
@@ -25,6 +25,7 @@ async function main() {
   if (a.password!.length < 10) throw new Error("Use a password of at least 10 characters.");
   const db = makeClient();
   const roles = await ensureRoles(db);
+  await ensureExpenseCategories(db);
   const org = await db.organization.create({ data: { name: a.gym! } });
   const branch = await db.branch.create({ data: { orgId: org.id, name: a.branch!, address: a.address!, phone: a.phone! } });
   await db.setting.create({ data: { orgId: org.id, key: "gym", value: { name: a.gym } } });

@@ -1,7 +1,7 @@
 // Demo gym for development and previews. Sign in with any demo email and the
 // password "fitron-demo". Never run this against a production database.
 import { makeClient } from "./client";
-import { ensureRoles } from "./roles";
+import { ensureExpenseCategories, ensureRoles } from "./roles";
 import { hashPassword } from "../src/lib/auth/password";
 import { invoiceTotals } from "../src/lib/domain/billing";
 import { addDays, addMonths } from "../src/lib/domain/dates";
@@ -26,12 +26,14 @@ const METHODS = ["UPI", "Cash", "Card", "UPI", "UPI"];
 
 async function main() {
   if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed demo data in production.");
+  // Roles and categories are refreshed every run, so older databases pick up new ones.
+  const roles = await ensureRoles(db);
+  await ensureExpenseCategories(db);
   const existing = await db.organization.findFirst({ where: { name: "Power Haus Gym (demo)" } });
   if (existing) {
-    console.log("Demo gym already exists; nothing to do.");
+    console.log("Demo gym already exists; roles and categories refreshed.");
     return;
   }
-  const roles = await ensureRoles(db);
   const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
   const [city, chas] = await Promise.all([
     db.branch.create({ data: { orgId: org.id, name: "City Centre", address: "C-7, Sector 4, City Centre, Bokaro", phone: "7319742490", gstin: "20ABCDE1234F1Z5" } }),

@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import { DEFAULT_ROLES, type Permission } from "@/lib/auth/permissions";
-import { ensureRoles } from "../../prisma/roles";
+import { ensureExpenseCategories, ensureRoles } from "../../prisma/roles";
 
 export const hasDb = !!process.env.DATABASE_URL;
 
 /** A fresh gym with two branches, so tests don't see each other's data. */
 export async function makeGym() {
   const roles = await ensureRoles(db);
+  await ensureExpenseCategories(db);
   const org = await db.organization.create({ data: { name: `Test gym ${randomUUID().slice(0, 8)}` } });
   const a = await db.branch.create({ data: { orgId: org.id, name: "A", address: "", phone: "" } });
   const b = await db.branch.create({ data: { orgId: org.id, name: "B", address: "", phone: "" } });
