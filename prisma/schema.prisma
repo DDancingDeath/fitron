@@ -1,0 +1,994 @@
+// Fitron core schema, from prototype/HANDOFF.md.
+// Money is integer paise. Dates are @db.Date, timestamps are timestamptz.
+// Financial rows (Invoice, Payment, Expense) are never deleted: cancel, reverse or void with a reason.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ── Tenancy ────────────────────────────────────────────────────────────────
+
+model Organization {
+  id                String             @id @default(cuid())
+  name              String
+  branches          Branch[]
+  users             User[]
+  members           Member[]
+  plans             MembershipPlan[]
+  invoices          Invoice[]
+  payments          Payment[]
+  expenses          Expense[]
+  settings          Setting[]
+  sequences         Sequence[]
+  auditLogs         AuditLog[]
+  leads             Lead[]
+  classSlots        ClassSlot[]
+  products          Product[]
+  workoutPlans      WorkoutPlan[]
+  dietPlans         DietPlan[]
+  notifications     Notification[]
+  createdAt         DateTime           @default(now()) @db.Timestamptz
+  whatsAppTemplates WhatsAppTemplate[]
+  whatsAppMessages  WhatsAppMessage[]
+  autopayMandates   AutopayMandate[]
+  assets            Asset[]
+  purchases         Purchase[]
+}
+
+model Branch {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  name        String
+  address     String
+  phone       String
+  gstin       String?
+  users       UserBranch[]
+  members     Member[]
+  memberships Membership[]
+  invoices    Invoice[]
+  payments    Payment[]
+  expenses    Expense[]
+  monthLocks  MonthLock[]
+  attendance  Attendance[]
+  leads       Lead[]
+  classSlots  ClassSlot[]
+  products    Product[]
+  assets      Asset[]
+  purchases   Purchase[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId])
+}
+
+// ── Staff and roles ────────────────────────────────────────────────────────
+
+model User {
+  id           String       @id @default(cuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  name         String
+  email        String       @unique
+  phone        String
+  passwordHash String
+  roleId       String
+  role         Role         @relation(fields: [roleId], references: [id])
+  branches     UserBranch[]
+  sessions     Session[]
+  ptRate       Int          @default(0)
+  shift        String?
+  active       Boolean      @default(true)
+  lastLoginAt  DateTime?    @db.Timestamptz
+  createdAt    DateTime     @default(now()) @db.Timestamptz
+  updatedAt    DateTime     @updatedAt @db.Timestamptz
+  deletedAt    DateTime?    @db.Timestamptz
+}
+
+/// Server-side session. `id` is the SHA-256 of the cookie token, so a leaked
+/// database row can't be replayed as a cookie.
+model Session {
+  id         String   @id
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime @db.Timestamptz
+  lastSeenAt DateTime @default(now()) @db.Timestamptz
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime @default(now()) @db.Timestamptz
+
+  @@index([userId])
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  permissions RolePermission[]
+  users       User[]
+}
+
+/// e.g. members.create, payments.reverse, months.unlock
+model Permission {
+  id    String           @id @default(cuid())
+  key   String           @unique
+  roles RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  role         Role       @relation(fields: [roleId], references: [id])
+  permissionId String
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model UserBranch {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id])
+
+  @@id([userId, branchId])
+}
+
+// ── Members, plans, memberships ────────────────────────────────────────────
+
+model Member {
+  id                 String            @id @default(cuid())
+  /// PHG-1001, unique per org
+  code               String
+  oldId              String?
+  orgId              String
+  org                Organization      @relation(fields: [orgId], references: [id])
+  branchId           String
+  branch             Branch            @relation(fields: [branchId], references: [id])
+  name               String
+  gender             String
+  dob                DateTime?         @db.Date
+  phone              String
+  whatsapp           String?
+  email              String?
+  occupation         String?
+  house              String?
+  area               String?
+  city               String?
+  state              String?
+  pin                String?
+  emergencyName      String?
+  emergencyRelation  String?
+  emergencyPhone     String?
+  source             String
+  notes              String?
+  staffNotes         String?
+  tags               String[]
+  photoKey           String?
+  trainerId          String?
+  workoutPlanId      String?
+  workoutPlan        WorkoutPlan?      @relation(fields: [workoutPlanId], references: [id])
+  dietPlanId         String?
+  dietPlan           DietPlan?         @relation(fields: [dietPlanId], references: [id])
+  suspended          Boolean           @default(false)
+  /// The per-branch "Walk-in customer" used for counter sales. Hidden from member lists.
+  walkIn             Boolean           @default(false)
+  /// Churn risk 0–100, recomputed each night.
+  riskScore          Int?
+  riskReasons        String[]          @default([])
+  /// User PIN on biometric devices, given at enrolment.
+  devicePin          String?
+  biometricConsentAt DateTime?         @db.Timestamptz
+  memberships        Membership[]
+  attendance         Attendance[]
+  bookings           Booking[]
+  progress           ProgressLog[]
+  lead               Lead?
+  waMessages         WhatsAppMessage[]
+  mandates           AutopayMandate[]
+  invoices           Invoice[]
+  payments           Payment[]
+  createdById        String
+  createdAt          DateTime          @default(now()) @db.Timestamptz
+  updatedAt          DateTime          @updatedAt @db.Timestamptz
+  deletedAt          DateTime?         @db.Timestamptz
+
+  // Phone is unique among non-deleted members (rule 9). Enforced by a partial
+  // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
+  @@unique([orgId, code])
+  @@unique([orgId, devicePin])
+  @@index([orgId, phone])
+  @@index([branchId])
+  @@index([name])
+}
+
+model MembershipPlan {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  name          String
+  months        Int
+  price         Int
+  regFee        Int
+  discount      Int          @default(0)
+  gstApplicable Boolean      @default(true)
+  kind          String
+  description   String?
+  features      String[]
+  /// ACTIVE | INACTIVE. Plans in use are deactivated, never deleted.
+  status        String       @default("ACTIVE")
+  prices        PlanPrice[]
+  memberships   Membership[]
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+  updatedAt     DateTime     @updatedAt @db.Timestamptz
+}
+
+/// Category prices: Female, Student, Couple…
+model PlanPrice {
+  planId   String
+  plan     MembershipPlan @relation(fields: [planId], references: [id])
+  category String
+  price    Int
+
+  @@id([planId, category])
+}
+
+model Membership {
+  id              String         @id @default(cuid())
+  /// MS-…
+  code            String
+  memberId        String
+  member          Member         @relation(fields: [memberId], references: [id])
+  planId          String
+  plan            MembershipPlan @relation(fields: [planId], references: [id])
+  branchId        String
+  branch          Branch         @relation(fields: [branchId], references: [id])
+  /// NEW | RENEWAL | AUTOPAY | IMPORT
+  type            String
+  startDate       DateTime       @db.Date
+  endDate         DateTime       @db.Date
+  price           Int
+  discount        Int
+  pricingCategory String
+  offerCode       String?
+  invoiceId       String         @unique
+  invoice         Invoice        @relation(fields: [invoiceId], references: [id])
+  /// VALID | CANCELLED
+  status          String         @default("VALID")
+  createdAt       DateTime       @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+  @@index([endDate])
+}
+
+// ── Billing ────────────────────────────────────────────────────────────────
+
+model Invoice {
+  id            String        @id @default(cuid())
+  /// INV-1024
+  number        String
+  orgId         String
+  org           Organization  @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch        @relation(fields: [branchId], references: [id])
+  memberId      String
+  member        Member        @relation(fields: [memberId], references: [id])
+  date          DateTime      @db.Date
+  dueDate       DateTime      @db.Date
+  /// Denormalised, written once at issue.
+  subtotal      Int
+  discount      Int
+  tax           Int
+  total         Int
+  gstType       String?
+  gstRate       Decimal?      @db.Decimal(5, 2)
+  /// ISSUED | CANCELLED. Paid state is computed from payments, never stored.
+  status        String
+  cancelReason  String?
+  cancelledById String?
+  cancelledAt   DateTime?     @db.Timestamptz
+  pdfKey        String?
+  createdById   String
+  createdAt     DateTime      @default(now()) @db.Timestamptz
+  items         InvoiceItem[]
+  payments      Payment[]
+  membership    Membership?
+
+  @@unique([orgId, number])
+  @@index([memberId])
+  @@index([date])
+}
+
+model InvoiceItem {
+  id          String  @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  description String
+  qty         Int
+  rate        Int
+  discount    Int
+  taxRate     Decimal @db.Decimal(5, 2)
+  taxAmount   Int
+  amount      Int
+  category    String
+  planId      String?
+  productId   String?
+  trainerId   String?
+}
+
+model Payment {
+  id            String       @id @default(cuid())
+  /// PAY-5001
+  code          String
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch       @relation(fields: [branchId], references: [id])
+  invoiceId     String
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id])
+  memberId      String
+  member        Member       @relation(fields: [memberId], references: [id])
+  date          DateTime     @db.Date
+  amount        Int
+  method        String
+  txnRef        String?
+  notes         String?
+  /// SUCCESS | REVERSED
+  status        String       @default("SUCCESS")
+  receivedById  String
+  reversedById  String?
+  reversedAt    DateTime?    @db.Timestamptz
+  reverseReason String?
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([invoiceId])
+  @@index([date])
+  @@index([txnRef])
+}
+
+model Expense {
+  id            String          @id @default(cuid())
+  code          String
+  orgId         String
+  org           Organization    @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  date          DateTime        @db.Date
+  categoryId    String
+  category      ExpenseCategory @relation(fields: [categoryId], references: [id])
+  description   String
+  vendor        String?
+  amount        Int
+  method        String
+  billNo        String?
+  attachmentKey String?
+  notes         String?
+  createdById   String
+  /// ACTIVE | VOID
+  status        String          @default("ACTIVE")
+  voidReason    String?
+  /// Capital spend (an asset purchase): in the cash book, not in P&L.
+  capital       Boolean         @default(false)
+  assetId       String?
+  purchaseId    String?
+  purchase      Purchase?       @relation(fields: [purchaseId], references: [id])
+  createdAt     DateTime        @default(now()) @db.Timestamptz
+
+  @@index([branchId, date])
+  @@index([purchaseId])
+}
+
+/// Rent, Utilities, Salaries…
+model ExpenseCategory {
+  id       String    @id @default(cuid())
+  name     String
+  group    String
+  expenses Expense[]
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        BigInt       @id @default(autoincrement())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  userId    String?
+  actorType String
+  action    String
+  entity    String
+  entityId  String
+  before    Json?
+  after     Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId, createdAt])
+  @@index([entity, entityId])
+}
+
+model MonthLock {
+  branchId   String
+  branch     Branch   @relation(fields: [branchId], references: [id])
+  /// YYYY-MM
+  month      String
+  lockedById String
+  lockedAt   DateTime @db.Timestamptz
+
+  @@id([branchId, month])
+}
+
+model Setting {
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+  key   String
+  value Json
+
+  @@id([orgId, key])
+}
+
+/// Gap-free numbering: member, invoice, payment, expense…
+model Sequence {
+  orgId String
+  org   Organization @relation(fields: [orgId], references: [id])
+  name  String
+  next  Int
+
+  @@id([orgId, name])
+}
+
+// ── Front desk: attendance, leads, classes ─────────────────────────────────
+
+model Attendance {
+  id          String    @id @default(cuid())
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id])
+  memberId    String?
+  member      Member?   @relation(fields: [memberId], references: [id])
+  guestName   String?
+  guestPhone  String?
+  /// MEMBER | GUEST
+  type        String
+  date        DateTime  @db.Date
+  checkIn     DateTime  @db.Timestamptz
+  checkOut    DateTime? @db.Timestamptz
+  /// Manual | QR | Face | Fingerprint | Card
+  method      String
+  deviceId    String?
+  /// Why staff let someone in despite a block (expired, dues…).
+  override    String?
+  autoOut     Boolean   @default(false)
+  createdById String?
+
+  @@index([branchId, date])
+  @@index([memberId, date])
+}
+
+model Lead {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id])
+  branchId   String
+  branch     Branch       @relation(fields: [branchId], references: [id])
+  name       String
+  phone      String
+  source     String
+  /// What they asked about, usually a plan name.
+  interest   String
+  /// New | Contacted | Trial booked | Trial done | Won | Lost
+  stage      String       @default("New")
+  followUpOn DateTime?    @db.Date
+  trialOn    DateTime?    @db.Date
+  ownerId    String
+  notes      String?
+  lostReason String?
+  memberId   String?      @unique
+  member     Member?      @relation(fields: [memberId], references: [id])
+  createdAt  DateTime     @default(now()) @db.Timestamptz
+  updatedAt  DateTime     @updatedAt @db.Timestamptz
+
+  @@index([branchId, stage])
+  @@index([followUpOn])
+}
+
+model ClassSlot {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  branchId    String
+  branch      Branch       @relation(fields: [branchId], references: [id])
+  name        String
+  trainerId   String
+  /// 0 = Monday … 6 = Sunday
+  weekday     Int
+  /// HH:MM, 24-hour
+  startTime   String
+  durationMin Int
+  capacity    Int
+  room        String?
+  active      Boolean      @default(true)
+  bookings    Booking[]
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+
+  @@index([branchId, weekday])
+}
+
+model Booking {
+  id          String    @id @default(cuid())
+  classSlotId String
+  classSlot   ClassSlot @relation(fields: [classSlotId], references: [id])
+  date        DateTime  @db.Date
+  memberId    String
+  member      Member    @relation(fields: [memberId], references: [id])
+  /// Booked | Waitlist | Attended | No-show | Cancelled
+  status      String
+  createdAt   DateTime  @default(now()) @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @db.Timestamptz
+
+  @@unique([classSlotId, date, memberId])
+  @@index([classSlotId, date])
+}
+
+// ── Counter sales ──────────────────────────────────────────────────────────
+
+model Product {
+  id            String          @id @default(cuid())
+  orgId         String
+  org           Organization    @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch          @relation(fields: [branchId], references: [id])
+  sku           String
+  name          String
+  category      String
+  /// Selling price before GST, paise.
+  price         Int
+  /// Average cost, paise.
+  cost          Int
+  /// null for services (day pass) that don't track stock.
+  stock         Int?
+  reorderLevel  Int?
+  gstApplicable Boolean         @default(true)
+  active        Boolean         @default(true)
+  movements     StockMovement[]
+  createdAt     DateTime        @default(now()) @db.Timestamptz
+
+  @@unique([branchId, sku])
+}
+
+model StockMovement {
+  id            String   @id @default(cuid())
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  /// + received, − sold or written off
+  qty           Int
+  /// SALE | RESTOCK | ADJUST | RETURN
+  reason        String
+  note          String?
+  unitCost      Int?
+  invoiceItemId String?
+  expenseId     String?
+  createdById   String
+  createdAt     DateTime @default(now()) @db.Timestamptz
+
+  @@index([productId, createdAt])
+}
+
+// ── Programs ───────────────────────────────────────────────────────────────
+
+model WorkoutPlan {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  name      String
+  goal      String
+  level     String
+  weeks     Int
+  /// [{ name: "Day A", exercises: [{ name: "Goblet squat", sets: "3 × 12" }] }]
+  days      Json
+  active    Boolean      @default(true)
+  members   Member[]
+  createdAt DateTime     @default(now()) @db.Timestamptz
+}
+
+model DietPlan {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  name      String
+  kcal      Int
+  protein   Int
+  /// [{ name: "Breakfast", food: "Besan chilla (2)…" }]
+  meals     Json
+  active    Boolean      @default(true)
+  members   Member[]
+  createdAt DateTime     @default(now()) @db.Timestamptz
+}
+
+model ProgressLog {
+  id          String   @id @default(cuid())
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  date        DateTime @db.Date
+  weightKg    Decimal? @db.Decimal(5, 1)
+  bodyFat     Decimal? @db.Decimal(4, 1)
+  waistCm     Decimal? @db.Decimal(5, 1)
+  notes       String?
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([memberId, date])
+}
+
+// ── Notifications ──────────────────────────────────────────────────────────
+
+/// In-app alerts for staff: low stock, waitlist moves, overridden check-ins…
+model Notification {
+  id        String       @id @default(cuid())
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id])
+  branchId  String?
+  /// null = everyone in the branch who can see this type
+  userId    String?
+  type      String
+  text      String
+  link      String?
+  readAt    DateTime?    @db.Timestamptz
+  createdAt DateTime     @default(now()) @db.Timestamptz
+
+  @@index([orgId, createdAt])
+}
+
+// ── WhatsApp ───────────────────────────────────────────────────────────────
+
+model WhatsAppTemplate {
+  id               String       @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id])
+  /// welcome, payment, invoice, due, exp7, exp3, exp1, expired, renewal, autopay, mandate, class, birthday, campaign
+  key              String
+  name             String
+  trigger          String
+  body             String
+  /// Approved template name in Meta Business Manager (Cloud API). Without it, Cloud API can only reply inside 24 h.
+  metaTemplateName String?
+  language         String       @default("en")
+  /// Sent automatically when its trigger happens.
+  autoSend         Boolean      @default(true)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz
+
+  @@unique([orgId, key])
+}
+
+model WhatsAppMessage {
+  id                String       @id @default(cuid())
+  orgId             String
+  org               Organization @relation(fields: [orgId], references: [id])
+  memberId          String?
+  member            Member?      @relation(fields: [memberId], references: [id])
+  templateKey       String
+  toNumber          String
+  body              String
+  /// e.g. invoice:<id> when a PDF was attached
+  attachment        String?
+  /// demo | cloud | connector
+  provider          String
+  providerMessageId String?
+  /// Logged (demo, not sent) | Queued | Sent | Delivered | Read | Failed
+  status            String
+  error             String?
+  sentById          String?
+  sentAt            DateTime     @default(now()) @db.Timestamptz
+  deliveredAt       DateTime?    @db.Timestamptz
+  readAt            DateTime?    @db.Timestamptz
+
+  @@index([memberId, templateKey, sentAt])
+  @@index([orgId, sentAt])
+  @@index([providerMessageId])
+}
+
+// ── UPI Autopay ────────────────────────────────────────────────────────────
+
+model AutopayMandate {
+  id             String         @id @default(cuid())
+  /// MD-1001
+  code           String
+  orgId          String
+  org            Organization   @relation(fields: [orgId], references: [id])
+  branchId       String
+  memberId       String
+  member         Member         @relation(fields: [memberId], references: [id])
+  planId         String
+  /// Debited each cycle, paise (plan price incl. GST).
+  amount         Int
+  months         Int
+  /// demo | live
+  mode           String
+  subscriptionId String?        @unique
+  shortUrl       String?
+  /// Pending | Active | Paused | Failed | Halted | Cancelled
+  status         String         @default("Pending")
+  nextDebitOn    DateTime?      @db.Date
+  retries        Int            @default(0)
+  lastResult     String?
+  createdById    String
+  createdAt      DateTime       @default(now()) @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @db.Timestamptz
+  events         AutopayEvent[]
+
+  @@unique([orgId, code])
+  @@index([status, nextDebitOn])
+}
+
+/// Every webhook we accept, once. The provider event id makes replays harmless.
+model AutopayEvent {
+  id        String          @id @default(cuid())
+  eventId   String          @unique
+  mandateId String?
+  mandate   AutopayMandate? @relation(fields: [mandateId], references: [id])
+  type      String
+  payload   Json
+  result    String?
+  createdAt DateTime        @default(now()) @db.Timestamptz
+}
+
+// ── Scheduled jobs ─────────────────────────────────────────────────────────
+
+/// One row per job per org per day, so a job that is triggered twice runs once.
+model JobRun {
+  id         String    @id @default(cuid())
+  orgId      String
+  name       String
+  /// YYYY-MM-DD, Indian date
+  day        String
+  startedAt  DateTime  @default(now()) @db.Timestamptz
+  finishedAt DateTime? @db.Timestamptz
+  result     Json?
+  error      String?
+
+  @@unique([orgId, name, day])
+}
+
+// ── Fixed assets and purchases ─────────────────────────────────────────────
+
+/// Rule 12. Depreciation is computed from these rows, never stored.
+model Asset {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch       @relation(fields: [branchId], references: [id])
+  code          String
+  name          String
+  category      String
+  qty           Int          @default(1)
+  vendor        String?
+  purchaseDate  DateTime     @db.Date
+  /// paise
+  cost          Int
+  salvage       Int          @default(0)
+  /// WDV | SLM
+  method        String
+  /// WDV rate, % a year
+  rate          Decimal?     @db.Decimal(5, 2)
+  /// SLM life, years
+  life          Int?
+  serial        String?
+  billNo        String?
+  /// How it was paid when a cash-book expense was written; null when not paid from the gym's books.
+  payMethod     String?
+  expenseId     String?
+  purchaseId    String?
+  /// Imported assets: depreciation charged before Fitron, and the month to continue from (YYYY-MM).
+  accDepCarried Int          @default(0)
+  depFrom       String?
+  /// IN_USE | SOLD | SCRAPPED
+  status        String       @default("IN_USE")
+  disposedOn    DateTime?    @db.Date
+  disposedFor   Int?
+  disposeMethod String?
+  disposeNote   String?
+  notes         String?
+  createdById   String
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+  deletedAt     DateTime?    @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([branchId])
+}
+
+/// Rule 13. A supplier bill; lines post to stock, the asset register or expenses.
+model Purchase {
+  id           String          @id @default(cuid())
+  orgId        String
+  org          Organization    @relation(fields: [orgId], references: [id])
+  branchId     String
+  branch       Branch          @relation(fields: [branchId], references: [id])
+  code         String
+  date         DateTime        @db.Date
+  vendor       String
+  billNo       String?
+  notes        String?
+  /// GST-inclusive, paise
+  total        Int
+  /// ACTIVE | CANCELLED
+  status       String          @default("ACTIVE")
+  cancelReason String?
+  lines        PurchaseLine[]
+  payments     VendorPayment[]
+  expenses     Expense[]
+  createdById  String
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([branchId, date])
+}
+
+model PurchaseLine {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  /// STOCK | ASSET | EXPENSE
+  type        String
+  description String
+  /// Expense category id, or asset category name
+  category    String?
+  productId   String?
+  assetId     String?
+  expenseId   String?
+  qty         Int
+  /// ex-GST, paise
+  rate        Int
+  gstPct      Decimal  @db.Decimal(5, 2)
+  /// GST-inclusive, paise (the cost booked)
+  amount      Int
+}
+
+model VendorPayment {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  code        String
+  date        DateTime @db.Date
+  amount      Int
+  method      String
+  reference   String?
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([purchaseId])
+}
+
+// ── Fitron AI ──────────────────────────────────────────────────────────────
+
+/// An action the assistant suggested. Nothing happens until a staff member confirms it.
+model AiProposal {
+  id        String    @id @default(cuid())
+  orgId     String
+  userId    String
+  /// WHATSAPP
+  kind      String
+  memberIds String[]
+  body      String
+  summary   String
+  /// PENDING | DONE | DISMISSED
+  status    String    @default("PENDING")
+  result    String?
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  doneAt    DateTime? @db.Timestamptz
+
+  @@index([orgId, userId, createdAt])
+}
+
+// ── Biometric devices (ZKTeco / eSSL ADMS push) ────────────────────────────
+
+model Device {
+  id           String          @id @default(cuid())
+  /// null until someone approves it; unknown serials that call in are held for approval
+  orgId        String?
+  branchId     String?
+  serial       String          @unique
+  model        String?
+  name         String?
+  ip           String?
+  approved     Boolean         @default(false)
+  /// Seconds the door relay stays open
+  relaySeconds Int             @default(5)
+  lastSeenAt   DateTime?       @db.Timestamptz
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+  commands     DeviceCommand[]
+  users        DeviceUser[]
+}
+
+model DeviceCommand {
+  id         String    @id @default(cuid())
+  deviceId   String
+  device     Device    @relation(fields: [deviceId], references: [id])
+  /// The number the device echoes back when it reports the result
+  cmdNo      Int
+  command    String
+  /// PENDING | SENT | DONE | FAILED
+  status     String    @default("PENDING")
+  returnCode String?
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  sentAt     DateTime? @db.Timestamptz
+  ackAt      DateTime? @db.Timestamptz
+
+  @@unique([deviceId, cmdNo])
+  @@index([deviceId, status])
+}
+
+/// Whether a member is currently loaded on a device (allowed in) or removed from it (blocked).
+model DeviceUser {
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id])
+  memberId  String
+  allowed   Boolean
+  updatedAt DateTime @updatedAt @db.Timestamptz
+
+  @@id([deviceId, memberId])
+}
+
+/// Sensitive personal data (DPDP): encrypted at rest, never shown or exported, deleted when the member leaves.
+model BiometricTemplate {
+  id        String   @id @default(cuid())
+  memberId  String
+  /// FP | FACE
+  type      String
+  /// Finger index or face slot
+  slot      Int
+  deviceId  String?
+  /// AES-256-GCM of the device's template record
+  data      Bytes
+  createdAt DateTime @default(now()) @db.Timestamptz
+
+  @@unique([memberId, type, slot])
+}
+
+model AccessLog {
+  id       String   @id @default(cuid())
+  deviceId String
+  branchId String?
+  memberId String?
+  pin      String
+  /// Fingerprint | Face | Card | Password
+  method   String
+  /// ALLOWED | DENIED | UNKNOWN
+  result   String
+  reason   String?
+  at       DateTime @db.Timestamptz
+
+  @@index([deviceId, at])
+  @@index([memberId, at])
+}
+
+/// Fitron's own billing: an extra branch beyond the 3 the plan includes, paid to Fitron.
+model BranchSubscription {
+  id                String    @id @default(cuid())
+  orgId             String
+  /// null = paid for but not yet given to a branch
+  branchId          String?
+  /// MONTHLY | YEARLY
+  cycle             String
+  base              Int
+  gst               Int
+  total             Int
+  periodStart       DateTime? @db.Date
+  periodEnd         DateTime? @db.Date
+  /// PENDING | PAID | FAILED
+  status            String    @default("PENDING")
+  /// LIVE (Razorpay) | DEMO
+  mode              String
+  razorpayOrderId   String?   @unique
+  razorpayPaymentId String?   @unique
+  /// Fitron's tax invoice number, set when paid
+  invoiceNo         String?   @unique
+  createdById       String
+  createdAt         DateTime  @default(now()) @db.Timestamptz
+  paidAt            DateTime? @db.Timestamptz
+
+  @@index([orgId, status])
+  @@index([branchId])
+}
