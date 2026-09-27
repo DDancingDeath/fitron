@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
-import { Button, Card, Field, Input, Notice, PageHeader, Select } from "@/components/ui";
+import { Button, Card, Field, Input, LinkButton, Notice, PageHeader, Select } from "@/components/ui";
 import { saveAccess, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveTax, saveWhatsApp } from "./actions";
 import { getWaSettings } from "@/lib/services/whatsapp";
 import { getAutopayMode } from "@/lib/services/autopay";
@@ -30,7 +30,15 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
   return (
     <>
-      <PageHeader title="Settings" />
+      <PageHeader
+        title="Settings"
+        actions={
+          <>
+            <LinkButton href="/settings/import">Migrate &amp; import</LinkButton>
+            <LinkButton href="/settings/jobs">Daily jobs</LinkButton>
+          </>
+        }
+      />
       {typeof sp.saved === "string" && <div className="mb-4"><Notice tone="ok">Saved.</Notice></div>}
       {typeof sp.error === "string" && <div className="mb-4"><Notice tone="alert">{sp.error}</Notice></div>}
       <div className="grid gap-4 lg:grid-cols-2">

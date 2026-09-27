@@ -126,7 +126,8 @@ async function ProfitLoss({ u, period }: { u: Awaited<ReturnType<typeof requireP
 async function Ledger({ u, period, method }: { u: Awaited<ReturnType<typeof requirePermission>>; period: { from: string; to: string }; method: string }) {
   const l = await ledger(u, method, period);
   return (
-    <Card title={`${method} book`} action={<span className="text-sm">In {formatInr(l.totalIn)} · Out {formatInr(l.totalOut)} · Net {formatInr(l.totalIn - l.totalOut)}</span>}>
+    <Card title={`${method} book`} action={<span className="text-sm">In {formatInr(l.totalIn)} · Out {formatInr(l.totalOut)} · Closing {formatInr(l.closing)}</span>}>
+      {l.broughtForward !== null && <p className="mb-2 text-sm">Brought forward on {fmtDate(period.from)}: {formatInr(l.broughtForward)}</p>}
       {l.rows.length === 0 ? (
         <p className="text-sm text-muted">No {method} movements in this period.</p>
       ) : (

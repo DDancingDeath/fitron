@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    // Data import sends up to 5,000 CSV rows to a server action.
+    serverActions: { bodySizeLimit: "5mb" },
+  },
   // The invoice PDF reads its font from disk; ship it with the server build.
   outputFileTracingIncludes: {
     "/invoices/[id]/pdf": ["./node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf", "./node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"],

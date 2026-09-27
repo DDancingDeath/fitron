@@ -4,6 +4,7 @@ import type { CurrentUser } from "@/lib/auth/current";
 import { addDays, addMonths } from "@/lib/domain/dates";
 import { audit } from "./audit";
 import { UserError } from "./errors";
+import { getSetting } from "./settings";
 import { fromIso, todayIso } from "./time";
 import { depreciationIn, disposalsIn } from "@/lib/domain/assets";
 import { assetsFor, toLike } from "./assets";
@@ -69,6 +70,28 @@ export async function profitAndLoss(u: CurrentUser, p: Period) {
  * Out: expenses (capital ones included), except those on supplier bills, where the supplier payments are the cash that moved.
  */
 export async function ledger(u: CurrentUser, method: string, p: Period) {
+  const rows = await movements(u, method, p);
+  // The cash and bank books start from the balances entered when the gym switched to Fitron.
+  const opening = method === "Cash" || method === "Bank Transfer" ? await getSetting<{ cash?: number; bank?: number; asOf?: string }>(u.orgId, "opening") : null;
+  let bal = 0;
+  let broughtForward: number | null = null;
+  if (opening?.asOf && opening.asOf <= p.to) {
+    const amount = (method === "Cash" ? opening.cash : opening.bank) ?? 0;
+    if (opening.asOf < p.from) {
+      const before = await movements(u, method, { from: opening.asOf, to: addDays(p.from, -1) });
+      broughtForward = amount + before.reduce((s, r) => s + r.in - r.out, 0);
+      bal = broughtForward;
+    } else {
+      rows.push({ date: fromIso(opening.asOf), ref: "OPENING", text: "Opening balance", link: null, in: Math.max(amount, 0), out: Math.max(-amount, 0) });
+      rows.sort((a, b) => a.date.getTime() - b.date.getTime() || (a.ref === "OPENING" ? -1 : b.ref === "OPENING" ? 1 : a.ref.localeCompare(b.ref)));
+    }
+  }
+  const withBal = rows.map((r) => ((bal += r.in - r.out), { ...r, balance: bal }));
+  const moves = rows.filter((r) => r.ref !== "OPENING");
+  return { rows: withBal, broughtForward, closing: bal, totalIn: moves.reduce((s, r) => s + r.in, 0), totalOut: moves.reduce((s, r) => s + r.out, 0) };
+}
+
+async function movements(u: CurrentUser, method: string, p: Period) {
   const range = { gte: fromIso(p.from), lte: fromIso(p.to) };
   const [payments, expenses, vendorPays, sales] = await Promise.all([
     db.payment.findMany({
@@ -87,15 +110,12 @@ export async function ledger(u: CurrentUser, method: string, p: Period) {
       where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null, status: "SOLD", disposeMethod: method, disposedOn: range, disposedFor: { gt: 0 } },
     }),
   ]);
-  const rows = [
+  return [
     ...payments.map((x) => ({ date: x.date, ref: x.code, text: `${x.member.name} · ${x.invoice.number}`, link: `/invoices/${x.invoice.id}`, in: x.amount, out: 0 })),
     ...expenses.map((x) => ({ date: x.date, ref: x.code, text: `${x.category.name} · ${x.description}`, link: (x.assetId ? `/assets/${x.assetId}` : null) as string | null, in: 0, out: x.amount })),
     ...vendorPays.map((x) => ({ date: x.date, ref: x.code, text: `${x.purchase.vendor} · ${x.purchase.code}`, link: `/purchases/${x.purchase.id}` as string | null, in: 0, out: x.amount })),
     ...sales.map((x) => ({ date: x.disposedOn!, ref: x.code, text: `Sale of ${x.name}`, link: `/assets/${x.id}` as string | null, in: x.disposedFor!, out: 0 })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime() || a.ref.localeCompare(b.ref));
-  let bal = 0;
-  const withBal = rows.map((r) => ((bal += r.in - r.out), { ...r, balance: bal }));
-  return { rows: withBal, totalIn: rows.reduce((s, r) => s + r.in, 0), totalOut: rows.reduce((s, r) => s + r.out, 0) };
 }
 
 /** Last 12 months with P&L headline and lock state for the picked branch(es). */

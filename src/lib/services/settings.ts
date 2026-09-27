@@ -11,7 +11,7 @@ export async function getSetting<T>(orgId: string, key: string): Promise<T | nul
 }
 
 /** Settings a Super Admin may change from the app. */
-export const EDITABLE_SETTINGS = ["gym", "tax", "numbering", "access", "whatsapp", "autopay"] as const;
+export const EDITABLE_SETTINGS = ["gym", "tax", "numbering", "access", "whatsapp", "autopay", "migration", "opening"] as const;
 export type EditableSetting = (typeof EDITABLE_SETTINGS)[number];
 
 export async function putSetting(u: CurrentUser, key: EditableSetting, value: Record<string, unknown>) {
