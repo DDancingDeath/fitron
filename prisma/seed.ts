@@ -32,7 +32,8 @@ async function main() {
   const existing = await db.organization.findFirst({ where: { name: "Power Haus Gym (demo)" } });
   if (existing) {
     const added = await seedFrontDesk(existing.id);
-    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}.`);
+    const assets = await seedAssets(existing.id);
+    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}.`);
     return;
   }
   const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
@@ -199,6 +200,7 @@ async function main() {
     ],
   });
   await seedFrontDesk(org.id);
+  await seedAssets(org.id);
   console.log(`Seeded the demo gym. Sign in as sumit@demo.fitron.in with password "${DEMO_PASSWORD}".`);
 }
 
@@ -309,6 +311,66 @@ async function seedFrontDesk(orgId: string) {
         lostReason: stage === "Lost" ? "Joined a gym closer to home" : null,
       },
     });
+  }
+  return true;
+}
+
+async function seqNext(orgId: string, name: string, start: number) {
+  const rows = await db.$queryRaw<{ next: number }[]>`
+    INSERT INTO "Sequence" ("orgId", "name", "next") VALUES (${orgId}, ${name}, ${start + 1})
+    ON CONFLICT ("orgId", "name") DO UPDATE SET "next" = "Sequence"."next" + 1
+    RETURNING "next" - 1 AS "next"`;
+  return Number(rows[0]!.next);
+}
+
+const ASSETS: [string, string, number, number, number, "WDV" | "SLM", number, string | null][] = [
+  // name, category, qty, months ago, cost (₹), method, rate % or life years, paid by (null = before Fitron)
+  ["Commercial treadmill", "Cardio equipment", 4, 14, 480000, "WDV", 15, "Bank Transfer"],
+  ["Power rack with bench", "Strength equipment", 2, 14, 180000, "WDV", 15, "Bank Transfer"],
+  ["Dumbbell set 2.5–40 kg", "Free weights", 1, 13, 95000, "WDV", 15, "UPI"],
+  ["Split AC 2 ton", "Air conditioning", 3, 20, 135000, "WDV", 15, null],
+  ["Front desk PC and printer", "Electronics & computers", 1, 5, 62000, "SLM", 3, "Card"],
+  ["Reception furniture", "Furniture & fixtures", 1, 26, 70000, "WDV", 10, null],
+];
+
+/** A small asset register and two supplier bills. Runs once per demo gym. */
+async function seedAssets(orgId: string) {
+  if (await db.asset.count({ where: { orgId } })) return false;
+  const main = (await db.branch.findFirst({ where: { orgId }, orderBy: { createdAt: "asc" } }))!;
+  const owner = (await db.user.findFirst({ where: { orgId, role: { name: "Super Admin" } } }))!;
+  const expense = async (date: string, categoryId: string, description: string, vendor: string, amount: number, method: string, extra: object = {}) =>
+    db.expense.create({ data: { code: `EXP-${await seqNext(orgId, "expense", 1)}`, orgId, branchId: main.id, date: d(date), categoryId, description, vendor, amount, method, createdById: owner.id, ...extra } });
+
+  for (const [name, category, qty, ago, cost, method, x, paidBy] of ASSETS) {
+    const date = addMonths(today, -ago).slice(0, 8) + "10";
+    const a = await db.asset.create({
+      data: { orgId, branchId: main.id, code: `AST-${await seqNext(orgId, "asset", 1001)}`, name, category, qty, vendor: pick(["Cybex India", "Croma", "Fitness World Ranchi", "Decathlon"]), purchaseDate: d(date), cost: cost * 100, method, rate: method === "WDV" ? x : null, life: method === "SLM" ? x : null, payMethod: paidBy, createdById: owner.id },
+    });
+    if (paidBy) {
+      const e = await expense(date, "equipment-purchase", `Capital purchase · ${name}${qty > 1 ? ` ×${qty}` : ""}`, a.vendor!, a.cost, paidBy, { capital: true, assetId: a.id, notes: `Capitalised as ${a.code}` });
+      await db.asset.update({ where: { id: a.id }, data: { expenseId: e.id } });
+    }
+  }
+
+  // A settled stock bill last month, and one this month with a balance still owed.
+  const products = await db.product.findMany({ where: { branchId: main.id, sku: { in: ["WHEY-2", "CREA-250", "SHAKER"] } } });
+  const bills: [number, string, string, number][] = [[35, "Nutri Hub Ranchi", "NH/2291", 1], [9, "Nutri Hub Ranchi", "NH/2378", 0.4]];
+  for (const [ago, vendor, billNo, paidShare] of bills) {
+    const date = addDays(today, -ago);
+    const lines = products.map((p) => ({ p, qty: p.sku === "SHAKER" ? 20 : 6, rate: Math.round(p.cost / 1.18 / 100) * 100 }));
+    const total = lines.reduce((s, l) => s + Math.round(l.qty * Math.round(l.rate) * 1.18), 0);
+    const paid = Math.round((total * paidShare) / 100) * 100;
+    const method = paid >= total ? "Bank Transfer" : "Credit";
+    const pur = await db.purchase.create({ data: { orgId, branchId: main.id, code: `PUR-${await seqNext(orgId, "purchase", 1001)}`, date: d(date), vendor, billNo, total, createdById: owner.id } });
+    for (const l of lines) {
+      const rate = Math.round(l.rate);
+      const amount = Math.round(l.qty * rate * 1.18);
+      const e = await expense(date, "inventory", `Purchase · ${l.p.name} × ${l.qty}`, vendor, amount, method, { purchaseId: pur.id, notes: pur.code, billNo });
+      await db.product.update({ where: { id: l.p.id }, data: { stock: { increment: l.qty } } });
+      await db.stockMovement.create({ data: { productId: l.p.id, qty: l.qty, reason: "RESTOCK", unitCost: Math.round(amount / l.qty), note: `${pur.code} · ${vendor}`, expenseId: e.id, createdById: owner.id } });
+      await db.purchaseLine.create({ data: { purchaseId: pur.id, type: "STOCK", description: l.p.name, productId: l.p.id, expenseId: e.id, qty: l.qty, rate, gstPct: 18, amount } });
+    }
+    if (paid > 0) await db.vendorPayment.create({ data: { purchaseId: pur.id, code: `VP-${await seqNext(orgId, "vendorPayment", 1001)}`, date: d(date), amount: paid, method: "Bank Transfer", createdById: owner.id } });
   }
   return true;
 }

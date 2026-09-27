@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
 import { listCategories, listExpenses } from "@/lib/services/expenses";
 import { todayIso } from "@/lib/services/time";
@@ -55,8 +56,18 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                   </span>
                 </span>
                 {r.status === "VOID" && <Badge tone="alert">Void</Badge>}
+                {r.capital && <Badge>Capital · not in P&amp;L</Badge>}
+                {r.purchaseId ? (
+                  <Link href={`/purchases/${r.purchaseId}`} className="text-sm text-accent">
+                    Purchase bill
+                  </Link>
+                ) : r.assetId ? (
+                  <Link href={`/assets/${r.assetId}`} className="text-sm text-accent">
+                    Asset
+                  </Link>
+                ) : null}
                 <span className="w-28 text-right font-semibold">{formatInr(r.amount)}</span>
-                {r.status === "ACTIVE" && u.can("expenses.void") && <VoidExpense id={r.id} />}
+                {r.status === "ACTIVE" && !r.purchaseId && !r.assetId && u.can("expenses.void") && <VoidExpense id={r.id} />}
               </li>
             ))}
           </ul>

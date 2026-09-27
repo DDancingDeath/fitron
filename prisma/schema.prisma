@@ -36,6 +36,8 @@ model Organization {
   whatsAppTemplates WhatsAppTemplate[]
   whatsAppMessages  WhatsAppMessage[]
   autopayMandates   AutopayMandate[]
+  assets            Asset[]
+  purchases         Purchase[]
 }
 
 model Branch {
@@ -57,6 +59,8 @@ model Branch {
   leads       Lead[]
   classSlots  ClassSlot[]
   products    Product[]
+  assets      Asset[]
+  purchases   Purchase[]
   createdAt   DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId])
@@ -359,9 +363,15 @@ model Expense {
   /// ACTIVE | VOID
   status        String          @default("ACTIVE")
   voidReason    String?
+  /// Capital spend (an asset purchase): in the cash book, not in P&L.
+  capital       Boolean         @default(false)
+  assetId       String?
+  purchaseId    String?
+  purchase      Purchase?       @relation(fields: [purchaseId], references: [id])
   createdAt     DateTime        @default(now()) @db.Timestamptz
 
   @@index([branchId, date])
+  @@index([purchaseId])
 }
 
 /// Rent, Utilities, Salaries…
@@ -732,4 +742,114 @@ model JobRun {
   error      String?
 
   @@unique([orgId, name, day])
+}
+
+// ── Fixed assets and purchases ─────────────────────────────────────────────
+
+/// Rule 12. Depreciation is computed from these rows, never stored.
+model Asset {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id])
+  branchId      String
+  branch        Branch       @relation(fields: [branchId], references: [id])
+  code          String
+  name          String
+  category      String
+  qty           Int          @default(1)
+  vendor        String?
+  purchaseDate  DateTime     @db.Date
+  /// paise
+  cost          Int
+  salvage       Int          @default(0)
+  /// WDV | SLM
+  method        String
+  /// WDV rate, % a year
+  rate          Decimal?     @db.Decimal(5, 2)
+  /// SLM life, years
+  life          Int?
+  serial        String?
+  billNo        String?
+  /// How it was paid when a cash-book expense was written; null when not paid from the gym's books.
+  payMethod     String?
+  expenseId     String?
+  purchaseId    String?
+  /// Imported assets: depreciation charged before Fitron, and the month to continue from (YYYY-MM).
+  accDepCarried Int          @default(0)
+  depFrom       String?
+  /// IN_USE | SOLD | SCRAPPED
+  status        String       @default("IN_USE")
+  disposedOn    DateTime?    @db.Date
+  disposedFor   Int?
+  disposeMethod String?
+  disposeNote   String?
+  notes         String?
+  createdById   String
+  createdAt     DateTime     @default(now()) @db.Timestamptz
+  deletedAt     DateTime?    @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([branchId])
+}
+
+/// Rule 13. A supplier bill; lines post to stock, the asset register or expenses.
+model Purchase {
+  id           String          @id @default(cuid())
+  orgId        String
+  org          Organization    @relation(fields: [orgId], references: [id])
+  branchId     String
+  branch       Branch          @relation(fields: [branchId], references: [id])
+  code         String
+  date         DateTime        @db.Date
+  vendor       String
+  billNo       String?
+  notes        String?
+  /// GST-inclusive, paise
+  total        Int
+  /// ACTIVE | CANCELLED
+  status       String          @default("ACTIVE")
+  cancelReason String?
+  lines        PurchaseLine[]
+  payments     VendorPayment[]
+  expenses     Expense[]
+  createdById  String
+  createdAt    DateTime        @default(now()) @db.Timestamptz
+
+  @@unique([orgId, code])
+  @@index([branchId, date])
+}
+
+model PurchaseLine {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  /// STOCK | ASSET | EXPENSE
+  type        String
+  description String
+  /// Expense category id, or asset category name
+  category    String?
+  productId   String?
+  assetId     String?
+  expenseId   String?
+  qty         Int
+  /// ex-GST, paise
+  rate        Int
+  gstPct      Decimal  @db.Decimal(5, 2)
+  /// GST-inclusive, paise (the cost booked)
+  amount      Int
+}
+
+model VendorPayment {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id])
+  code        String
+  date        DateTime @db.Date
+  amount      Int
+  method      String
+  reference   String?
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([purchaseId])
 }

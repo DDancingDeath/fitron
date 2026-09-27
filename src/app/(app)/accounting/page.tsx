@@ -85,7 +85,7 @@ async function ProfitLoss({ u, period }: { u: Awaited<ReturnType<typeof requireP
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           ["Revenue", pl.totalRevenue],
-          ["Expenses", pl.totalExpenses],
+          ["Expenses", pl.totalExpenses + pl.depreciation + pl.disposalLoss],
           ["Net profit", pl.net],
           ["Collected", pl.collected],
         ].map(([k, v]) => (
@@ -101,14 +101,23 @@ async function ProfitLoss({ u, period }: { u: Awaited<ReturnType<typeof requireP
           <p className="mt-2 text-sm text-muted">GST collected on these invoices: {formatInr(pl.gstCollected)}</p>
         </Card>
         <Card title="Expenses">
-          <Rows items={pl.expenseGroups} total={pl.totalExpenses} label="Total expenses" />
+          <Rows
+            items={[
+              ...pl.expenseGroups,
+              ...(pl.depreciation ? [{ key: "Depreciation", amount: pl.depreciation }] : []),
+              ...(pl.disposalLoss ? [{ key: "Loss on disposal of assets", amount: pl.disposalLoss }] : []),
+            ]}
+            total={pl.totalExpenses + pl.depreciation + pl.disposalLoss}
+            label="Total expenses"
+          />
+          {pl.disposalGain > 0 && <p className="mt-2 text-sm">Gain on sale of assets: {formatInr(pl.disposalGain)} (added to net profit)</p>}
         </Card>
         <Card title="Collections by method" className="md:col-span-2">
           <Rows items={pl.collectedByMethod} total={pl.collected} label="Total collected" />
         </Card>
       </div>
       <p className="mt-4 text-sm text-muted">
-        {fmtDate(period.from)} to {fmtDate(period.to)}. Revenue is counted on the invoice date; collections on the payment date. Cancelled invoices and voided expenses are left out.
+        {fmtDate(period.from)} to {fmtDate(period.to)}. Revenue is counted on the invoice date; collections on the payment date. Cancelled invoices and voided expenses are left out. Equipment bought is not an expense here; its depreciation from the <Link href="/assets" className="text-accent">asset register</Link> is.
       </p>
     </>
   );

@@ -5,6 +5,8 @@ import { addDays, addMonths } from "@/lib/domain/dates";
 import { audit } from "./audit";
 import { UserError } from "./errors";
 import { fromIso, todayIso } from "./time";
+import { depreciationIn, disposalsIn } from "@/lib/domain/assets";
+import { assetsFor, toLike } from "./assets";
 
 export type Period = { from: string; to: string };
 
@@ -13,21 +15,23 @@ export const monthPeriod = (ym: string): Period => ({ from: `${ym}-01`, to: addD
 /**
  * Rule 11: P&L comes from invoice items and expenses, never stored totals.
  * Revenue is the net of each line (after discount, before GST) on non-cancelled invoices dated in the period.
+ * Rule 12: capital spend stays out; depreciation and disposal gains or losses come from the asset register.
  */
 export async function profitAndLoss(u: CurrentUser, p: Period) {
-  const [items, expenses, payments] = await Promise.all([
+  const [items, expenses, payments, assets] = await Promise.all([
     db.invoiceItem.findMany({
       where: { invoice: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ISSUED", date: { gte: fromIso(p.from), lte: fromIso(p.to) } } },
       select: { category: true, amount: true, taxAmount: true },
     }),
     db.expense.findMany({
-      where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", date: { gte: fromIso(p.from), lte: fromIso(p.to) } },
+      where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: false, date: { gte: fromIso(p.from), lte: fromIso(p.to) } },
       select: { amount: true, category: { select: { name: true, group: true } } },
     }),
     db.payment.findMany({
       where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "SUCCESS", date: { gte: fromIso(p.from), lte: fromIso(p.to) } },
       select: { amount: true, method: true },
     }),
+    assetsFor(u.orgId, u.branchIds),
   ]);
   const sumBy = <T>(xs: T[], key: (x: T) => string, val: (x: T) => number) => {
     const m = new Map<string, number>();
@@ -41,38 +45,57 @@ export async function profitAndLoss(u: CurrentUser, p: Period) {
   const totalExpenses = expenseGroups.reduce((s, r) => s + r.amount, 0);
   const gstCollected = items.reduce((s, i) => s + i.taxAmount, 0);
   const collected = payments.reduce((s, x) => s + x.amount, 0);
+  const like = assets.map(toLike);
+  const depreciation = depreciationIn(like, p.from.slice(0, 7), p.to.slice(0, 7));
+  const disposals = disposalsIn(like, p.from, p.to);
   return {
     revenue,
     expenseGroups,
     expenseCats,
     totalRevenue,
     totalExpenses,
-    net: totalRevenue - totalExpenses,
+    depreciation,
+    disposalGain: disposals.gain,
+    disposalLoss: disposals.loss,
+    net: totalRevenue + disposals.gain - totalExpenses - depreciation - disposals.loss,
     gstCollected,
     collected,
     collectedByMethod: sumBy(payments, (x) => x.method, (x) => x.amount),
   };
 }
 
-/** Money in (payments) and out (expenses) per payment method, the cash book view. */
+/**
+ * Money in and out per payment method, the cash book view. In: member payments and asset sale proceeds.
+ * Out: expenses (capital ones included), except those on supplier bills, where the supplier payments are the cash that moved.
+ */
 export async function ledger(u: CurrentUser, method: string, p: Period) {
-  const [payments, expenses] = await Promise.all([
+  const range = { gte: fromIso(p.from), lte: fromIso(p.to) };
+  const [payments, expenses, vendorPays, sales] = await Promise.all([
     db.payment.findMany({
       where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "SUCCESS", method, date: { gte: fromIso(p.from), lte: fromIso(p.to) } },
       include: { member: { select: { name: true } }, invoice: { select: { number: true, id: true } } },
     }),
     db.expense.findMany({
-      where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", method, date: { gte: fromIso(p.from), lte: fromIso(p.to) } },
+      where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", purchaseId: null, method, date: range },
       include: { category: { select: { name: true } } },
+    }),
+    db.vendorPayment.findMany({
+      where: { method, date: range, purchase: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE" } },
+      include: { purchase: { select: { id: true, code: true, vendor: true } } },
+    }),
+    db.asset.findMany({
+      where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null, status: "SOLD", disposeMethod: method, disposedOn: range, disposedFor: { gt: 0 } },
     }),
   ]);
   const rows = [
     ...payments.map((x) => ({ date: x.date, ref: x.code, text: `${x.member.name} · ${x.invoice.number}`, link: `/invoices/${x.invoice.id}`, in: x.amount, out: 0 })),
-    ...expenses.map((x) => ({ date: x.date, ref: x.code, text: `${x.category.name} · ${x.description}`, link: null as string | null, in: 0, out: x.amount })),
+    ...expenses.map((x) => ({ date: x.date, ref: x.code, text: `${x.category.name} · ${x.description}`, link: (x.assetId ? `/assets/${x.assetId}` : null) as string | null, in: 0, out: x.amount })),
+    ...vendorPays.map((x) => ({ date: x.date, ref: x.code, text: `${x.purchase.vendor} · ${x.purchase.code}`, link: `/purchases/${x.purchase.id}` as string | null, in: 0, out: x.amount })),
+    ...sales.map((x) => ({ date: x.disposedOn!, ref: x.code, text: `Sale of ${x.name}`, link: `/assets/${x.id}` as string | null, in: x.disposedFor!, out: 0 })),
   ].sort((a, b) => a.date.getTime() - b.date.getTime() || a.ref.localeCompare(b.ref));
   let bal = 0;
   const withBal = rows.map((r) => ((bal += r.in - r.out), { ...r, balance: bal }));
-  return { rows: withBal, totalIn: payments.reduce((s, x) => s + x.amount, 0), totalOut: expenses.reduce((s, x) => s + x.amount, 0) };
+  return { rows: withBal, totalIn: rows.reduce((s, r) => s + r.in, 0), totalOut: rows.reduce((s, r) => s + r.out, 0) };
 }
 
 /** Last 12 months with P&L headline and lock state for the picked branch(es). */
@@ -85,7 +108,7 @@ export async function monthOverview(u: CurrentUser, months = 12) {
   for (const ym of list) {
     const pl = await profitAndLoss(u, monthPeriod(ym));
     const locked = u.branchIds.filter((b) => locks.some((l) => l.branchId === b && l.month === ym));
-    out.push({ month: ym, revenue: pl.totalRevenue, expenses: pl.totalExpenses, net: pl.net, collected: pl.collected, lockedBranches: locked.length, branches: u.branchIds.length });
+    out.push({ month: ym, revenue: pl.totalRevenue, expenses: pl.totalExpenses + pl.depreciation + pl.disposalLoss, net: pl.net, collected: pl.collected, lockedBranches: locked.length, branches: u.branchIds.length });
   }
   return out;
 }

@@ -38,6 +38,8 @@ export const NAV: NavGroup[] = [
     group: "Accounts",
     items: [
       { href: "/expenses", label: "Expenses", perm: "expenses.manage" },
+      { href: "/purchases", label: "Purchases", perm: "purchases.manage" },
+      { href: "/assets", label: "Fixed assets", perm: "assets.manage" },
       { href: "/accounting", label: "Accounting", perm: "accounting.view" },
       { href: "/reports", label: "Reports", perm: "invoices.view" },
     ],
