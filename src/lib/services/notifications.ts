@@ -11,6 +11,9 @@ export const NOTIFICATION_PERMS = {
   WAITLIST: "classes.manage",
   CHECKIN_OVERRIDE: "attendance.manage",
   LEAD_FOLLOW_UP: "leads.manage",
+  WA_FAILED: "whatsapp.send",
+  AUTOPAY: "autopay.manage",
+  JOB_FAILED: "settings.manage",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_PERMS;
 

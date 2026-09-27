@@ -5,8 +5,10 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { invoiceInput, paymentInput, reasonInput, sellInput } from "@/lib/validation/billing";
-import { cancelInvoice, collectPayment, createInvoice, reversePayment, sellMembership } from "@/lib/services/billing";
+import { cancelInvoice, collectPayment, createInvoice, getInvoice, reversePayment, sellMembership } from "@/lib/services/billing";
 import { UserError } from "@/lib/services/errors";
+import { sendLater } from "@/lib/services/whatsapp";
+import { rupeesText } from "@/lib/domain/whatsapp";
 
 const read = (fd: FormData) => Object.fromEntries([...new Set(fd.keys())].map((k) => [k, fd.get(k)]));
 
@@ -21,7 +23,11 @@ export async function sell(memberId: string, _: FormState, fd: FormData): Promis
   if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
   let invoiceId: string;
   try {
-    invoiceId = (await sellMembership(u, memberId, parsed.data)).invoice.id;
+    const r = await sellMembership(u, memberId, parsed.data);
+    invoiceId = r.invoice.id;
+    const vars = { invoice_number: r.invoice.number, amount: rupeesText(r.invoice.total) };
+    if (r.membership.type === "NEW") sendLater({ orgId: u.orgId, memberId, key: "welcome", userId: u.id, vars });
+    else sendLater({ orgId: u.orgId, memberId, key: "renewal", userId: u.id, vars, invoiceId });
   } catch (e) {
     return userError(fd, e);
   }
@@ -49,7 +55,9 @@ export async function newInvoice(_: FormState, fd: FormData): Promise<FormState>
   }
   let id: string;
   try {
-    id = (await createInvoice(u, parsed.data)).id;
+    const inv = await createInvoice(u, parsed.data);
+    id = inv.id;
+    sendLater({ orgId: u.orgId, memberId: inv.memberId, key: "invoice", userId: u.id, vars: { invoice_number: inv.number, amount: rupeesText(inv.total) }, invoiceId: inv.id });
   } catch (e) {
     return userError(fd, e);
   }
@@ -62,7 +70,9 @@ export async function collect(invoiceId: string, _: FormState, fd: FormData): Pr
   const parsed = paymentInput.safeParse(read(fd));
   if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
   try {
-    await collectPayment(u, invoiceId, parsed.data);
+    const p = await collectPayment(u, invoiceId, parsed.data);
+    const inv = await getInvoice(u, invoiceId);
+    sendLater({ orgId: u.orgId, memberId: p.memberId, key: "payment", userId: u.id, vars: { amount: rupeesText(p.amount), invoice_number: inv?.number ?? "", pending_amount: rupeesText(inv?.balance ?? 0) } });
   } catch (e) {
     return userError(fd, e);
   }

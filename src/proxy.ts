@@ -10,5 +10,6 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!login|_next/|favicon.ico|fitron-mark.png|api/health).*)"],
+  // Webhooks and the job runner authenticate with their own signatures and secrets.
+  matcher: ["/((?!login|_next/|favicon.ico|fitron-mark.png|api/health|api/webhooks/|api/jobs/).*)"],
 };

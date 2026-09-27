@@ -108,7 +108,7 @@ export async function suggestedStart(memberId: string, today = todayIso()) {
  * Rule 1: a sale or renewal always creates a new Membership + Invoice (+ Payment if collected now),
  * in one transaction. Nothing is overwritten.
  */
-export async function sellMembership(u: CurrentUser, memberId: string, input: SellInput) {
+export async function sellMembership(u: CurrentUser, memberId: string, input: SellInput, opts: { type?: "AUTOPAY" } = {}) {
   const member = await findMember(u, memberId);
   const plan = await db.membershipPlan.findFirst({ where: { orgId: u.orgId, id: input.planId, status: "ACTIVE" } });
   if (!plan) throw new UserError("Pick an active plan.", "planId");
@@ -139,7 +139,7 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
         memberId,
         planId: plan.id,
         branchId: member.branchId,
-        type: isNew ? "NEW" : "RENEWAL",
+        type: opts.type ?? (isNew ? "NEW" : "RENEWAL"),
         startDate: fromIso(input.startDate),
         endDate: fromIso(endDate),
         price: plan.price,

@@ -59,3 +59,28 @@ export async function saveAccess(fd: FormData) {
     await putSetting(u, "access", v);
   });
 }
+
+const waInput = z.object({
+  mode: z.enum(["demo", "cloud", "connector"]),
+  dedupDays: z.coerce.number().int().min(0).max(30),
+  expiryDays: z.preprocess((v) => (Array.isArray(v) ? v : v == null ? [] : [v]), z.array(z.coerce.number().int().refine((n) => [0, 1, 3, 7].includes(n)))),
+  dueEveryDays: z.coerce.number().int().min(0).max(30),
+  birthdays: z.preprocess((v) => v === "on", z.boolean()),
+});
+
+export async function saveWhatsApp(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  const raw = { ...Object.fromEntries(fd), expiryDays: fd.getAll("expiryDays") };
+  const parsed = waInput.safeParse(raw);
+  if (!parsed.success) back({ error: firstError(parsed.error), section: "whatsapp" });
+  await putSetting(u, "whatsapp", parsed.data!);
+  revalidatePath("/", "layout");
+  back({ saved: "whatsapp" });
+}
+
+export async function saveAutopay(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  await save(z.object({ mode: z.enum(["demo", "live"]) }), fd, "autopay", async (v) => {
+    await putSetting(u, "autopay", v);
+  });
+}

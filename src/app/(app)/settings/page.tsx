@@ -3,7 +3,12 @@ import { db } from "@/lib/db";
 import { getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
 import { Button, Card, Field, Input, Notice, PageHeader, Select } from "@/components/ui";
-import { saveAccess, saveBranchAction, saveGym, saveNumbering, saveTax } from "./actions";
+import { saveAccess, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveTax, saveWhatsApp } from "./actions";
+import { getWaSettings } from "@/lib/services/whatsapp";
+import { getAutopayMode } from "@/lib/services/autopay";
+import { providerStatus } from "@/lib/integrations/whatsapp";
+import { razorpayReady } from "@/lib/integrations/razorpay";
+import Link from "next/link";
 import { getAccessRules } from "@/lib/services/attendance";
 
 export const metadata = { title: "Settings · Fitron" };
@@ -11,13 +16,17 @@ export const metadata = { title: "Settings · Fitron" };
 export default async function SettingsPage({ searchParams }: PageProps<"/settings">) {
   const u = await requirePermission("settings.manage");
   const sp = await searchParams;
-  const [gym, tax, numbering, branches, access] = await Promise.all([
+  const [gym, tax, numbering, branches, access, wa, autopayMode] = await Promise.all([
     getSetting<{ name?: string }>(u.orgId, "gym"),
     getTax(u.orgId),
     getSetting<{ memberPrefix?: string; invoicePrefix?: string; paymentPrefix?: string }>(u.orgId, "numbering"),
     db.branch.findMany({ where: { orgId: u.orgId }, orderBy: { createdAt: "asc" } }),
     getAccessRules(u.orgId),
+    getWaSettings(u.orgId),
+    getAutopayMode(u.orgId),
   ]);
+  const waStatus = await providerStatus(wa.mode);
+  const rzpMissing = razorpayReady();
 
   return (
     <>
@@ -95,6 +104,65 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             </label>
             <div>
               <Button variant="primary">Save</Button>
+            </div>
+          </form>
+        </Card>
+        <Card title="WhatsApp" className="scroll-mt-20" >
+          <form action={saveWhatsApp} className="flex flex-col gap-3 text-sm" id="whatsapp">
+            <Field label="How messages are sent">
+              <Select name="mode" defaultValue={wa.mode}>
+                <option value="demo">Demo: log only, send nothing</option>
+                <option value="cloud">WhatsApp Cloud API (official)</option>
+                <option value="connector">Linked gym phone (connector)</option>
+              </Select>
+            </Field>
+            <p className={waStatus.ok ? "text-ok" : "text-alert"}>{waStatus.text}</p>
+            {waStatus.qr && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={waStatus.qr} alt="WhatsApp link QR code" className="size-48 rounded bg-white p-2" />
+            )}
+            <fieldset className="flex flex-wrap items-center gap-3">
+              <legend className="mb-1 text-muted">Expiry reminders</legend>
+              {[7, 3, 1, 0].map((d) => (
+                <label key={d} className="flex items-center gap-1.5">
+                  <input type="checkbox" name="expiryDays" value={d} defaultChecked={wa.expiryDays.includes(d)} className="size-4" /> {d === 0 ? "On the day" : `${d} day${d > 1 ? "s" : ""} before`}
+                </label>
+              ))}
+            </fieldset>
+            <label className="flex flex-wrap items-center gap-2">
+              Remind about dues every
+              <Input name="dueEveryDays" type="number" min={0} max={30} defaultValue={wa.dueEveryDays} className="w-20!" aria-label="Dues reminder interval" /> days (0 = off)
+            </label>
+            <label className="flex flex-wrap items-center gap-2">
+              Don&apos;t repeat a reminder within
+              <Input name="dedupDays" type="number" min={0} max={30} defaultValue={wa.dedupDays} className="w-20!" aria-label="De-duplication days" /> days
+            </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" name="birthdays" defaultChecked={wa.birthdays} className="size-4" /> Send birthday wishes
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary">Save</Button>
+              <Link href="/whatsapp/templates" className="inline-flex min-h-10 items-center rounded-md border border-line px-4">
+                Edit templates
+              </Link>
+            </div>
+          </form>
+        </Card>
+        <Card title="UPI Autopay">
+          <form action={saveAutopay} className="flex flex-col gap-3 text-sm">
+            <Field label="Mode">
+              <Select name="mode" defaultValue={autopayMode}>
+                <option value="demo">Demo: simulate approvals and debits</option>
+                <option value="live">Live: Razorpay Subscriptions</option>
+              </Select>
+            </Field>
+            <p className={rzpMissing ? "text-muted" : "text-ok"}>{rzpMissing ? `Live mode needs ${rzpMissing.replace(" are not set on the server.", "")} on the server, and a Razorpay webhook to /api/webhooks/razorpay.` : "Razorpay keys are set on the server."}</p>
+            <p className="text-muted">Existing mandates keep the mode they were created in.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="primary">Save</Button>
+              <Link href="/settings/jobs" className="inline-flex min-h-10 items-center rounded-md border border-line px-4">
+                Daily jobs
+              </Link>
             </div>
           </form>
         </Card>

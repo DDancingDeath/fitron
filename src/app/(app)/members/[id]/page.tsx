@@ -15,6 +15,8 @@ import { listDiets, listWorkouts, progressFor } from "@/lib/services/programs";
 import { todayIso } from "@/lib/services/time";
 import { fmtTime } from "@/lib/format";
 import { AssignForm, ProgressForm } from "./fitness";
+import { SendOneForm } from "../../whatsapp/wa-forms";
+import { listMessages, listTemplates } from "@/lib/services/whatsapp";
 
 export const metadata = { title: "Member · Fitron" };
 
@@ -39,6 +41,8 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
     listDiets(u),
     progressFor(m.id),
   ]);
+  const canWa = u.can("whatsapp.send");
+  const [templates, messages] = canWa ? await Promise.all([listTemplates(u.orgId), listMessages(u, { memberId: m.id })]) : [[], null];
   const workout = workouts.find((w) => w.id === m.workoutPlanId);
   const diet = diets.find((d) => d.id === m.dietPlanId);
   const address = [m.house, m.area, m.city, m.state, m.pin].filter(Boolean).join(", ");
@@ -232,6 +236,34 @@ export default async function MemberPage({ params }: PageProps<"/members/[id]">)
           )}
           {canPrograms ? <ProgressForm memberId={m.id} today={todayIso()} /> : progress.length === 0 && <p className="text-sm text-muted">No measurements yet.</p>}
         </Card>
+        {canWa && (
+          <Card title="WhatsApp" className="md:col-span-3">
+            <div className="grid gap-6 md:grid-cols-2">
+              <SendOneForm
+                memberId={m.id}
+                templates={templates.map((t) => ({ key: t.key, name: t.name, body: t.body }))}
+                invoices={(history?.invoices ?? []).filter((i) => i.status !== "CANCELLED").map((i) => ({ id: i.id, number: i.number }))}
+              />
+              <div>
+                <p className="mb-2 text-sm text-muted">Recent messages</p>
+                {!messages?.rows.length ? (
+                  <p className="text-sm text-muted">None yet.</p>
+                ) : (
+                  <ul className="divide-y divide-line text-sm">
+                    {messages.rows.slice(0, 8).map((x) => (
+                      <li key={x.id} className="flex justify-between gap-2 py-1.5">
+                        <span className="truncate">{templates.find((t) => t.key === x.templateKey)?.name ?? x.templateKey}</span>
+                        <span className={x.status === "Failed" ? "text-alert" : "text-muted"}>
+                          {x.status} · {fmtDate(x.sentAt.toISOString().slice(0, 10))}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          </Card>
+        )}
         {visits && (
           <Card title="Recent visits" className="md:col-span-2">
             {visits.length === 0 ? (

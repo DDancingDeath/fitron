@@ -14,25 +14,28 @@ datasource db {
 // ── Tenancy ────────────────────────────────────────────────────────────────
 
 model Organization {
-  id            String           @id @default(cuid())
-  name          String
-  branches      Branch[]
-  users         User[]
-  members       Member[]
-  plans         MembershipPlan[]
-  invoices      Invoice[]
-  payments      Payment[]
-  expenses      Expense[]
-  settings      Setting[]
-  sequences     Sequence[]
-  auditLogs     AuditLog[]
-  leads         Lead[]
-  classSlots    ClassSlot[]
-  products      Product[]
-  workoutPlans  WorkoutPlan[]
-  dietPlans     DietPlan[]
-  notifications Notification[]
-  createdAt     DateTime         @default(now()) @db.Timestamptz
+  id                String             @id @default(cuid())
+  name              String
+  branches          Branch[]
+  users             User[]
+  members           Member[]
+  plans             MembershipPlan[]
+  invoices          Invoice[]
+  payments          Payment[]
+  expenses          Expense[]
+  settings          Setting[]
+  sequences         Sequence[]
+  auditLogs         AuditLog[]
+  leads             Lead[]
+  classSlots        ClassSlot[]
+  products          Product[]
+  workoutPlans      WorkoutPlan[]
+  dietPlans         DietPlan[]
+  notifications     Notification[]
+  createdAt         DateTime           @default(now()) @db.Timestamptz
+  whatsAppTemplates WhatsAppTemplate[]
+  whatsAppMessages  WhatsAppMessage[]
+  autopayMandates   AutopayMandate[]
 }
 
 model Branch {
@@ -132,17 +135,17 @@ model UserBranch {
 // ── Members, plans, memberships ────────────────────────────────────────────
 
 model Member {
-  id                String        @id @default(cuid())
+  id                String            @id @default(cuid())
   /// PHG-1001, unique per org
   code              String
   oldId             String?
   orgId             String
-  org               Organization  @relation(fields: [orgId], references: [id])
+  org               Organization      @relation(fields: [orgId], references: [id])
   branchId          String
-  branch            Branch        @relation(fields: [branchId], references: [id])
+  branch            Branch            @relation(fields: [branchId], references: [id])
   name              String
   gender            String
-  dob               DateTime?     @db.Date
+  dob               DateTime?         @db.Date
   phone             String
   whatsapp          String?
   email             String?
@@ -162,23 +165,25 @@ model Member {
   photoKey          String?
   trainerId         String?
   workoutPlanId     String?
-  workoutPlan       WorkoutPlan?  @relation(fields: [workoutPlanId], references: [id])
+  workoutPlan       WorkoutPlan?      @relation(fields: [workoutPlanId], references: [id])
   dietPlanId        String?
-  dietPlan          DietPlan?     @relation(fields: [dietPlanId], references: [id])
-  suspended         Boolean       @default(false)
+  dietPlan          DietPlan?         @relation(fields: [dietPlanId], references: [id])
+  suspended         Boolean           @default(false)
   /// The per-branch "Walk-in customer" used for counter sales. Hidden from member lists.
-  walkIn            Boolean       @default(false)
+  walkIn            Boolean           @default(false)
   memberships       Membership[]
   attendance        Attendance[]
   bookings          Booking[]
   progress          ProgressLog[]
   lead              Lead?
+  waMessages        WhatsAppMessage[]
+  mandates          AutopayMandate[]
   invoices          Invoice[]
   payments          Payment[]
   createdById       String
-  createdAt         DateTime      @default(now()) @db.Timestamptz
-  updatedAt         DateTime      @updatedAt @db.Timestamptz
-  deletedAt         DateTime?     @db.Timestamptz
+  createdAt         DateTime          @default(now()) @db.Timestamptz
+  updatedAt         DateTime          @updatedAt @db.Timestamptz
+  deletedAt         DateTime?         @db.Timestamptz
 
   // Phone is unique among non-deleted members (rule 9). Enforced by a partial
   // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
@@ -617,4 +622,114 @@ model Notification {
   createdAt DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId, createdAt])
+}
+
+// ── WhatsApp ───────────────────────────────────────────────────────────────
+
+model WhatsAppTemplate {
+  id               String       @id @default(cuid())
+  orgId            String
+  org              Organization @relation(fields: [orgId], references: [id])
+  /// welcome, payment, invoice, due, exp7, exp3, exp1, expired, renewal, autopay, mandate, class, birthday, campaign
+  key              String
+  name             String
+  trigger          String
+  body             String
+  /// Approved template name in Meta Business Manager (Cloud API). Without it, Cloud API can only reply inside 24 h.
+  metaTemplateName String?
+  language         String       @default("en")
+  /// Sent automatically when its trigger happens.
+  autoSend         Boolean      @default(true)
+  updatedAt        DateTime     @updatedAt @db.Timestamptz
+
+  @@unique([orgId, key])
+}
+
+model WhatsAppMessage {
+  id                String       @id @default(cuid())
+  orgId             String
+  org               Organization @relation(fields: [orgId], references: [id])
+  memberId          String?
+  member            Member?      @relation(fields: [memberId], references: [id])
+  templateKey       String
+  toNumber          String
+  body              String
+  /// e.g. invoice:<id> when a PDF was attached
+  attachment        String?
+  /// demo | cloud | connector
+  provider          String
+  providerMessageId String?
+  /// Logged (demo, not sent) | Queued | Sent | Delivered | Read | Failed
+  status            String
+  error             String?
+  sentById          String?
+  sentAt            DateTime     @default(now()) @db.Timestamptz
+  deliveredAt       DateTime?    @db.Timestamptz
+  readAt            DateTime?    @db.Timestamptz
+
+  @@index([memberId, templateKey, sentAt])
+  @@index([orgId, sentAt])
+  @@index([providerMessageId])
+}
+
+// ── UPI Autopay ────────────────────────────────────────────────────────────
+
+model AutopayMandate {
+  id             String         @id @default(cuid())
+  /// MD-1001
+  code           String
+  orgId          String
+  org            Organization   @relation(fields: [orgId], references: [id])
+  branchId       String
+  memberId       String
+  member         Member         @relation(fields: [memberId], references: [id])
+  planId         String
+  /// Debited each cycle, paise (plan price incl. GST).
+  amount         Int
+  months         Int
+  /// demo | live
+  mode           String
+  subscriptionId String?        @unique
+  shortUrl       String?
+  /// Pending | Active | Paused | Failed | Halted | Cancelled
+  status         String         @default("Pending")
+  nextDebitOn    DateTime?      @db.Date
+  retries        Int            @default(0)
+  lastResult     String?
+  createdById    String
+  createdAt      DateTime       @default(now()) @db.Timestamptz
+  updatedAt      DateTime       @updatedAt @db.Timestamptz
+  events         AutopayEvent[]
+
+  @@unique([orgId, code])
+  @@index([status, nextDebitOn])
+}
+
+/// Every webhook we accept, once. The provider event id makes replays harmless.
+model AutopayEvent {
+  id        String          @id @default(cuid())
+  eventId   String          @unique
+  mandateId String?
+  mandate   AutopayMandate? @relation(fields: [mandateId], references: [id])
+  type      String
+  payload   Json
+  result    String?
+  createdAt DateTime        @default(now()) @db.Timestamptz
+}
+
+// ── Scheduled jobs ─────────────────────────────────────────────────────────
+
+/// One row per job per org per day, so a job that is triggered twice runs once.
+model JobRun {
+  id         String    @id @default(cuid())
+  orgId      String
+  name       String
+  /// YYYY-MM-DD, Indian date
+  day        String
+  startedAt  DateTime  @default(now()) @db.Timestamptz
+  finishedAt DateTime? @db.Timestamptz
+  result     Json?
+  error      String?
+
+  @@unique([orgId, name, day])
 }

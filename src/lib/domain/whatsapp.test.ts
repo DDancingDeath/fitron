@@ -1,0 +1,26 @@
+import { describe, expect, it } from "vitest";
+import { DEFAULT_TEMPLATES, placeholders, render, rupeesText, waNumber } from "./whatsapp";
+
+describe("whatsapp templates", () => {
+  it("fills variables and blanks unknown ones", () => {
+    expect(render("Hi {{member_name}}, {{ amount }} {{nope}}.", { member_name: "Asha", amount: "4,720" })).toBe("Hi Asha, 4,720 .");
+  });
+  it("lists placeholders once, in order, for Cloud API parameters", () => {
+    expect(placeholders("{{a}} {{b}} {{a}} {{ c }}")).toEqual(["a", "b", "c"]);
+  });
+  it("every default template only uses known variables", () => {
+    const known = new Set(["member_name", "member_id", "plan_name", "start_date", "expiry_date", "amount", "pending_amount", "invoice_number", "gym_name", "link", "class_name", "class_time"]);
+    for (const t of DEFAULT_TEMPLATES) for (const v of placeholders(t.body)) expect(known.has(v), `${t.key}: ${v}`).toBe(true);
+  });
+  it("normalises Indian mobiles", () => {
+    expect(waNumber("98765 43210")).toBe("919876543210");
+    expect(waNumber("+91-9876543210")).toBe("919876543210");
+    expect(waNumber("09876543210")).toBe("919876543210");
+    expect(waNumber("12345")).toBeNull();
+    expect(waNumber("")).toBeNull();
+  });
+  it("formats rupees", () => {
+    expect(rupeesText(472000)).toBe("4,720");
+    expect(rupeesText(472050)).toBe("4,720.50");
+  });
+});

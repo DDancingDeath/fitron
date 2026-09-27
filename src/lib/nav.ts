@@ -15,6 +15,7 @@ export const NAV: NavGroup[] = [
       { href: "/leads", label: "Leads", perm: "leads.manage" },
       { href: "/classes", label: "Classes", perm: "classes.manage" },
       { href: "/programs", label: "Workouts & diets", perm: "programs.manage" },
+      { href: "/whatsapp", label: "WhatsApp", perm: "whatsapp.send" },
     ],
   },
   {
@@ -30,6 +31,7 @@ export const NAV: NavGroup[] = [
       { href: "/invoices", label: "Invoices", perm: "invoices.view" },
       { href: "/payments", label: "Payments", perm: "invoices.view" },
       { href: "/receivables", label: "Receivables", perm: "invoices.view" },
+      { href: "/autopay", label: "UPI Autopay", perm: "autopay.manage" },
     ],
   },
   {
