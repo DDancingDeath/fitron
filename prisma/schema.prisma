@@ -1017,3 +1017,27 @@ model MemberDocument {
 
   @@index([memberId, status])
 }
+
+// ── fitron.in website ───────────────────────────────────────────────────────
+
+/// Trial requests and contact messages from the public website. Not tied to a gym.
+model Enquiry {
+  id        String    @id @default(cuid())
+  /// TRIAL | CONTACT | SALES | PARTNER
+  kind      String
+  /// Plan key from the pricing page (e.g. professional, ai-pro), if one was picked
+  plan      String?
+  /// MONTHLY | YEARLY
+  cycle     String?
+  name      String
+  email     String
+  phone     String?
+  business  String?
+  city      String?
+  message   String?
+  createdAt DateTime  @default(now()) @db.Timestamptz
+  /// When the team followed up
+  handledAt DateTime? @db.Timestamptz
+
+  @@index([createdAt])
+}

@@ -28,9 +28,9 @@ fi
 
 if [ ! -f .env ]; then
   say "Your web address"
-  echo "The domain that points to this server, e.g. app.yourgym.in or yourgym.duckdns.org"
+  echo "The domain that points to this server, e.g. fitron.in, app.yourgym.in or yourgym.duckdns.org"
   read -r -p "Domain: " DOMAIN
-  DOMAIN=${DOMAIN#https://}; DOMAIN=${DOMAIN#http://}; DOMAIN=${DOMAIN%%/*}
+  DOMAIN=${DOMAIN#https://}; DOMAIN=${DOMAIN#http://}; DOMAIN=${DOMAIN%%/*}; DOMAIN=${DOMAIN#www.}
   [ -n "$DOMAIN" ] || { echo "A domain is needed for HTTPS."; exit 1; }
   # Every setting from .env.example, blank, then the ones we can generate.
   grep -E '^[A-Z_]+=' ../.env.example | grep -v '^DATABASE_URL=' | sed -E 's/=.*/=/' > .env

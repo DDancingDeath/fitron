@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/invoices/[id]/pdf": ["./node_modules/dejavu-fonts-ttf/ttf/DejaVuSans.ttf", "./node_modules/dejavu-fonts-ttf/ttf/DejaVuSans-Bold.ttf"],
   },
+  // fitron.in itself is the static marketing site in public/site; the console lives under its own paths.
+  async rewrites() {
+    return { beforeFiles: [{ source: "/", destination: "/site/index.html" }], afterFiles: [], fallback: [] };
+  },
   async headers() {
     return [
       {

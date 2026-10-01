@@ -1,0 +1,48 @@
+import { Logo } from "@/components/logo";
+
+// Public pages of fitron.in that sit next to the static home page.
+// The home page is a static file, so links to it are plain <a>, not <Link>.
+
+const legal = [
+  ["/privacy", "Privacy Policy"],
+  ["/terms", "Terms & Conditions"],
+  ["/refund", "Refund Policy"],
+  ["/privacy#cookies", "Cookie Policy"],
+  ["/privacy#grievance", "Grievance Officer"],
+  ["/contact", "Contact us"],
+] as const;
+
+export default function SiteLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(ellipse_at_top_left,var(--accent-soft),transparent_55%)]">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-5">
+        <a href="/" aria-label="FITRON home">
+          <Logo size={36} />
+        </a>
+        <nav className="flex items-center gap-5 text-sm font-semibold">
+          <a href="/#pricing" className="text-muted hover:text-fg">
+            Pricing
+          </a>
+          <a href="/login" className="text-muted hover:text-fg">
+            Log in
+          </a>
+        </nav>
+      </header>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pt-6 pb-16">{children}</main>
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-5xl flex-col gap-4 px-4 py-8 text-sm text-muted sm:flex-row sm:items-center sm:justify-between">
+          <p>© 2026 FITRON · hello@fitron.in · WhatsApp +91 62077 74673</p>
+          <ul className="flex flex-wrap gap-x-5 gap-y-2">
+            {legal.map(([href, label]) => (
+              <li key={href}>
+                <a href={href} className="hover:text-fg">
+                  {label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </footer>
+    </div>
+  );
+}
