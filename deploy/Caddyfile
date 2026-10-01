@@ -1,0 +1,16 @@
+# HTTPS certificates are issued and renewed automatically for DOMAIN.
+{$DOMAIN} {
+	encode zstd gzip
+	reverse_proxy app:3000
+}
+
+# Door devices (ZKTeco / eSSL) often can't do HTTPS, so /iclock also answers on plain HTTP.
+# Everything else on HTTP is sent to HTTPS.
+http://{$DOMAIN} {
+	handle /iclock/* {
+		reverse_proxy app:3000
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}

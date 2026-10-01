@@ -45,3 +45,5 @@ session/
 /src/generated/
 
 !.env.example
+/storage/
+/deploy/backups/

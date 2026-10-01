@@ -8,6 +8,7 @@ import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { createMember, deleteMember, setSuspended, updateMember } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
 import { enrol, eraseBiometrics } from "@/lib/services/biometric";
+import { DOC_KINDS, deleteDocument, replaceDocument, uploadDocument } from "@/lib/services/documents";
 
 const read = (fd: FormData) => Object.fromEntries([...fd.keys()].map((k) => [k, fd.get(k)]));
 
@@ -67,4 +68,35 @@ export async function eraseBiometric(id: string) {
   await eraseBiometrics(u, id);
   revalidatePath(`/members/${id}`);
   redirect(`/members/${id}?${new URLSearchParams({ bio: "Biometric data deleted here and removed from every device." })}#biometric`);
+}
+
+const docBack = (id: string, p: Record<string, string>): never => redirect(`/members/${id}?${new URLSearchParams(p)}#documents`);
+
+async function docAction(memberId: string, fn: () => Promise<unknown>, ok: string) {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof UserError) docBack(memberId, { docError: e.message });
+    throw e;
+  }
+  revalidatePath(`/members/${memberId}`);
+  docBack(memberId, { doc: ok });
+}
+
+export async function uploadDocumentAction(memberId: string, fd: FormData) {
+  const u = await requirePermission("documents.manage");
+  const kind = String(fd.get("kind") ?? "");
+  const title = String(fd.get("title") ?? "").trim().slice(0, 80);
+  if (!(DOC_KINDS as readonly string[]).includes(kind)) docBack(memberId, { docError: "Pick what kind of document it is." });
+  await docAction(memberId, () => uploadDocument(u, memberId, { kind, title: title || kind }, fd.get("file") as File), "Document saved.");
+}
+
+export async function replaceDocumentAction(memberId: string, docId: string, fd: FormData) {
+  const u = await requirePermission("documents.manage");
+  await docAction(memberId, () => replaceDocument(u, docId, fd.get("file") as File), "Document replaced. The old file is kept in the history.");
+}
+
+export async function deleteDocumentAction(memberId: string, docId: string, fd: FormData) {
+  const u = await requirePermission("documents.manage");
+  await docAction(memberId, () => deleteDocument(u, docId, String(fd.get("reason") ?? "")), "Document removed. It stays in the history.");
 }
