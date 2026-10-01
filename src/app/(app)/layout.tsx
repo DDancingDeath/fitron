@@ -7,10 +7,27 @@ import { BranchSwitcher } from "@/components/branch-switcher";
 import { logout } from "@/app/login/actions";
 import { Logo } from "@/components/logo";
 import { unreadCount } from "@/lib/services/notifications";
+import { gymPlan } from "@/lib/services/saas";
+import { daysBetween } from "@/lib/domain/dates";
+import { todayIso } from "@/lib/services/time";
+import { fmtDate } from "@/lib/format";
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
   const unread = await unreadCount(u);
+  const plan = await gymPlan(u.orgId);
+  const s = plan.standing;
+  const left = s.kind === "TRIAL" ? daysBetween(s.until, todayIso()) + 1 : 0;
+  const banner =
+    plan.checking && (s.kind === "TRIAL" || s.kind === "LAPSED")
+      ? { alert: false, text: "Thanks for paying. We're checking your UPI payment and will confirm by email.", link: "" }
+      : s.kind === "TRIAL"
+        ? { alert: false, text: `Free trial of ${plan.name}: ${left} day${left === 1 ? "" : "s"} left. Everything stays as it is when you pay.`, link: "Choose a plan" }
+        : s.kind === "GRACE"
+          ? { alert: true, text: `Your ${plan.name} plan has ended. Renew before ${fmtDate(s.readOnlyFrom)} to keep adding members and invoices.`, link: "Renew" }
+          : s.kind === "LAPSED"
+            ? { alert: true, text: "Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.", link: "Choose a plan" }
+            : null;
   const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || u.can(i.perm)) })).filter((g) => g.items.length);
 
   return (
@@ -41,10 +58,20 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               <div className="text-muted">{u.role}</div>
             </div>
             <form action={logout}>
-              <button className="min-h-9 rounded-md border border-line px-3 text-sm">Sign out</button>
+              <button className="min-h-9 rounded-md border border-line px-3 text-sm">Log out</button>
             </form>
           </div>
         </header>
+        {banner && (
+          <div className={`border-b border-line px-4 py-2 text-center text-sm sm:px-6 ${banner.alert ? "bg-alert-soft text-alert" : "bg-accent-soft"}`}>
+            {banner.text}{" "}
+            {banner.link && u.can("settings.manage") && (
+              <Link href="/settings/billing" className="font-semibold underline">
+                {banner.link}
+              </Link>
+            )}
+          </div>
+        )}
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
       </div>
     </div>

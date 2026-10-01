@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession } from "@/lib/auth/session";
+import { safeNext } from "@/lib/auth/next";
 import { rateLimit } from "@/lib/rate-limit";
 import type { FormState } from "@/lib/validation/common";
 
@@ -18,7 +19,7 @@ const loginInput = z.object({
 let dummyHash: Promise<string> | undefined;
 const getDummyHash = () => (dummyHash ??= hashPassword("not-a-real-password"));
 
-type LoginState = (FormState & { email?: string }) | undefined;
+type LoginState = (FormState & { email?: string; unverified?: boolean }) | undefined;
 
 export async function login(_: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get("email") ?? "");
@@ -31,10 +32,11 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   const user = await db.user.findFirst({ where: { email: parsed.data.email, active: true, deletedAt: null } });
   const ok = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), parsed.data.password);
   if (!user || !ok) return { email, message: "That email and password don't match." };
+  if (!user.emailVerifiedAt) return { email, unverified: true, message: "Confirm your email first: open the link we sent you." };
 
   await createSession(user.id);
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
-  redirect("/dashboard");
+  redirect(safeNext(formData.get("next")));
 }
 
 export async function logout() {

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
-import { billingHistory, branchStandings } from "@/lib/services/saas";
+import { db } from "@/lib/db";
+import { activeMemberCount, billingHistory, branchStandings, gymPlan, paymentRef } from "@/lib/services/saas";
 import { fitronKeyId } from "@/lib/integrations/razorpay";
-import { branchPrice, GRACE_DAYS, INCLUDED_BRANCHES, type Standing } from "@/lib/domain/saas";
+import { fitronUpi, isFitronAdmin } from "@/lib/integrations/upi";
+import { PLANS, rupeesLabel } from "@/lib/domain/pricing";
+import { branchPrice, GRACE_DAYS, planPrice, type PlanStanding, type Standing } from "@/lib/domain/saas";
 import { Badge, Card, Empty, Notice, PageHeader } from "@/components/ui";
 import { fmtDate, formatInr } from "@/lib/format";
 import { PayButton } from "./pay-button";
@@ -16,28 +19,93 @@ function StandingBadge({ s }: { s: Standing }) {
   return <Badge tone="alert">Read-only</Badge>;
 }
 
+function PlanBadge({ s, checking }: { s: PlanStanding; checking: boolean }) {
+  if (checking && (s.kind === "TRIAL" || s.kind === "LAPSED")) return <Badge tone="accent">Payment being checked</Badge>;
+  if (s.kind === "CUSTOM") return <Badge tone="ok">Set up by FITRON</Badge>;
+  if (s.kind === "TRIAL") return <Badge tone="accent">Free trial till {fmtDate(s.until)}</Badge>;
+  if (s.kind === "PAID") return <Badge tone="ok">Paid till {fmtDate(s.until)}</Badge>;
+  if (s.kind === "GRACE") return <Badge tone="accent">Grace till {fmtDate(s.readOnlyFrom)}</Badge>;
+  return <Badge tone="alert">Ended · read-only</Badge>;
+}
+
+const STATUS: Record<string, string> = { PAID: "", SUBMITTED: " · being checked", REJECTED: " · not matched" };
+const GYM_PLANS = PLANS.filter((p) => p.product === "GYM_ACCOUNTING");
+const prices = (f: (c: "MONTHLY" | "YEARLY") => { total: number }) => ({ MONTHLY: f("MONTHLY").total, YEARLY: f("YEARLY").total });
+
 export default async function BillingPage() {
   const u = await requirePermission("settings.manage");
-  const [{ branches, freeSlots }, history] = await Promise.all([branchStandings(u.orgId), billingHistory(u)]);
-  const demo = !fitronKeyId();
+  const [{ branches, freeSlots, terms }, history, plan, members] = await Promise.all([branchStandings(u.orgId), billingHistory(u), gymPlan(u.orgId), activeMemberCount(db, u.orgId)]);
+  const upi = fitronUpi();
+  const demo = !upi && !fitronKeyId();
+  const admin = isFitronAdmin(u.email);
+  const toCheck = admin ? await db.branchSubscription.count({ where: { mode: "UPI", status: "SUBMITTED" } }) : 0;
   const y = branchPrice("YEARLY");
   const m = branchPrice("MONTHLY");
   const extra = branches.filter((b) => b.standing.kind !== "INCLUDED").length;
+  const s = plan.standing;
+  const renewing = s.kind === "PAID" || s.kind === "GRACE";
 
   return (
     <>
-      <PageHeader
-        title="Plan & billing"
-        subtitle={`Your Fitron plan includes ${INCLUDED_BRANCHES} branches. Each extra branch is ${formatInr(m.base)} a month or ${formatInr(y.base)} a year, plus 18% GST.`}
-      />
-      {demo && (
-        <div className="mb-4">
-          <Notice>Demo mode: Fitron&apos;s Razorpay keys aren&apos;t set on this server, so payments are simulated and no money is charged.</Notice>
-        </div>
-      )}
+      <PageHeader title="Plan & billing" subtitle="Your FITRON Gym Accounting plan, extra branches and payments to FITRON. Prices are plus 18% GST." />
+      <div className="mb-4 flex flex-col gap-2">
+        {demo && <Notice>Demo mode: FITRON&apos;s UPI ID isn&apos;t set on this server, so payments are simulated and no money is charged.</Notice>}
+        {upi && <Notice tone="neutral">You pay by UPI to {upi.name} ({upi.id}) and enter the UTR. We check it and email you, usually within a working day; your gym keeps working meanwhile.</Notice>}
+        {admin && (
+          <Notice tone="ok">
+            FITRON team: {toCheck} UPI payment{toCheck === 1 ? "" : "s"} to check.{" "}
+            <Link href="/fitron-admin" className="font-semibold underline">
+              Open payment checks
+            </Link>
+          </Notice>
+        )}
+      </div>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <Card title={`Branches · ${branches.length - extra} of ${INCLUDED_BRANCHES} included${extra ? ` + ${extra} extra` : ""}`}>
+          <Card title="Your plan" action={<PlanBadge s={s} checking={plan.checking} />}>
+            {terms.custom ? (
+              <p className="text-sm">
+                FITRON set up your gym by hand, so it has no member limit and {terms.includedBranches} branches are included. Extra branches are paid below. Write to hello@fitron.in to move to a
+                listed plan.
+              </p>
+            ) : (
+              <div className="flex flex-col gap-4 text-sm">
+                <p>
+                  <strong>{plan.name}</strong> · {plan.cycle === "YEARLY" ? "yearly" : "monthly"} · {members} active member{members === 1 ? "" : "s"}
+                  {terms.memberLimit !== null ? ` of ${terms.memberLimit}` : ", no limit"} · {branches.length} branch{branches.length === 1 ? "" : "es"}
+                </p>
+                {s.kind === "LAPSED" && !plan.checking && <p className="text-alert">Your plan has ended, so no new members or invoices can be added. Nothing is deleted; paying switches it back on at once.</p>}
+                {s.kind === "GRACE" && <p className="text-muted">Your paid period ended on {fmtDate(s.until)}. Renew before {fmtDate(s.readOnlyFrom)} to keep adding members and invoices.</p>}
+                <ul className="grid gap-3 sm:grid-cols-3">
+                  {GYM_PLANS.map((p) => {
+                    const current = p.key === plan.key;
+                    return (
+                      <li key={p.key} className={`flex flex-col gap-2 rounded-lg border p-3 ${current ? "border-accent" : "border-line"}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">{p.name}</span>
+                          {current && <Badge tone="accent">Current</Badge>}
+                        </div>
+                        <p className="text-muted">{p.tagline}</p>
+                        <p>
+                          {rupeesLabel(p.price.MONTHLY)}/month or {rupeesLabel(p.price.YEARLY)}/year
+                        </p>
+                        <PayButton
+                          what={{ kind: "PLAN", plan: p.key }}
+                          label={current ? (renewing ? "Renew" : "Pay") : "Switch"}
+                          prices={prices((c) => planPrice(p.key, c))}
+                          success={`Paid. You're on ${p.name}.`}
+                        />
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="text-muted">
+                  A new plan applies as soon as it&apos;s paid. The paid period starts after your current one (or after the free trial), so you never lose days.
+                </p>
+              </div>
+            )}
+          </Card>
+          <Card title={`Branches · ${branches.length - extra} included${extra ? ` + ${extra} extra` : ""}`}>
             <ul className="divide-y divide-line text-sm">
               {branches.map((b) => (
                 <li key={b.id} className="flex flex-col gap-2 py-3">
@@ -51,35 +119,54 @@ export default async function BillingPage() {
                     </p>
                   )}
                   {b.standing.kind === "READ_ONLY" && <p className="text-muted">Records are kept and can be viewed, but no new members or invoices until it is renewed.</p>}
-                  {b.standing.kind !== "INCLUDED" && <PayButton branchId={b.id} label="Renew" />}
+                  {b.standing.kind !== "INCLUDED" && terms.extraBranches && (
+                    <PayButton what={{ kind: "BRANCH", branchId: b.id }} label="Renew" prices={prices(branchPrice)} success="Paid. The branch is renewed." />
+                  )}
                 </li>
               ))}
             </ul>
           </Card>
-          <Card title="Payments to Fitron">
+          <Card title="Payments to FITRON">
             {history.length === 0 ? (
               <Empty>No payments yet.</Empty>
             ) : (
               <ul className="divide-y divide-line text-sm">
-                {history.map((h) => (
-                  <li key={h.id}>
-                    <Link href={`/settings/billing/${h.id}`} className="flex flex-wrap justify-between gap-2 py-2 hover:text-accent">
+                {history.map((h) => {
+                  const what = h.kind === "PLAN" ? `${PLANS.find((p) => p.key === h.plan)?.name ?? h.plan} plan` : `Extra branch${h.branchId ? ` · ${branches.find((b) => b.id === h.branchId)?.name ?? ""}` : " · not used yet"}`;
+                  const line = (
+                    <>
                       <span>
-                        {h.invoiceNo} · {h.cycle === "YEARLY" ? "Yearly" : "Monthly"} · {fmtDate(h.periodStart)} to {fmtDate(h.periodEnd)}
-                        {h.branchId ? ` · ${branches.find((b) => b.id === h.branchId)?.name ?? ""}` : " · not used yet"}
+                        {h.invoiceNo ?? paymentRef(h.id)} · {what} · {h.cycle === "YEARLY" ? "Yearly" : "Monthly"}
+                        {h.periodStart ? ` · ${fmtDate(h.periodStart)} to ${fmtDate(h.periodEnd)}` : ""}
+                        {h.utr ? ` · UTR ${h.utr}` : ""}
                         {h.mode === "DEMO" ? " · demo" : ""}
+                        <span className={h.status === "REJECTED" ? "text-alert" : "text-muted"}>{STATUS[h.status]}</span>
+                        {h.rejectReason && <span className="block text-alert">{h.rejectReason}</span>}
                       </span>
                       <span className="tabular-nums">{formatInr(h.total)}</span>
-                    </Link>
-                  </li>
-                ))}
+                    </>
+                  );
+                  return (
+                    <li key={h.id}>
+                      {h.status === "PAID" ? (
+                        <Link href={`/settings/billing/${h.id}`} className="flex flex-wrap justify-between gap-2 py-2 hover:text-accent">
+                          {line}
+                        </Link>
+                      ) : (
+                        <div className="flex flex-wrap justify-between gap-2 py-2">{line}</div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Card>
         </div>
         <div className="flex flex-col gap-4">
           <Card title="Add another branch">
-            {freeSlots.length > 0 ? (
+            {!terms.extraBranches ? (
+              <p className="text-sm">{plan.name} is for one branch. Enterprise includes 3 branches, and more cost {formatInr(m.base)} a month each.</p>
+            ) : freeSlots.length > 0 ? (
               <p className="text-sm">
                 You have {freeSlots.length} paid branch slot
                 {freeSlots.length === 1 ? "" : "s"} ready.{" "}
@@ -88,10 +175,10 @@ export default async function BillingPage() {
                 </Link>
                 .
               </p>
-            ) : branches.length < INCLUDED_BRANCHES ? (
+            ) : branches.length < terms.includedBranches ? (
               <p className="text-sm">
-                You can add {INCLUDED_BRANCHES - branches.length} more branch
-                {INCLUDED_BRANCHES - branches.length === 1 ? "" : "es"} at no cost.{" "}
+                You can add {terms.includedBranches - branches.length} more branch
+                {terms.includedBranches - branches.length === 1 ? "" : "es"} at no cost.{" "}
                 <Link href="/settings" className="text-accent">
                   Add it in Settings
                 </Link>
@@ -100,16 +187,17 @@ export default async function BillingPage() {
             ) : (
               <div className="flex flex-col gap-3 text-sm">
                 <p>
-                  Pay for one extra branch, then add its details. Yearly is {formatInr(y.total)} with GST (saves {formatInr(m.total * 12 - y.total)} on monthly).
+                  Each extra branch is {formatInr(m.base)} a month or {formatInr(y.base)} a year, plus GST. Yearly is {formatInr(y.total)} with GST (saves {formatInr(m.total * 12 - y.total)} on
+                  monthly).
                 </p>
-                <PayButton branchId={null} label="Pay for a branch" />
+                <PayButton what={{ kind: "BRANCH", branchId: null }} label="Pay for a branch" prices={prices(branchPrice)} success="Paid. Now add the new branch in Settings › Branches." />
               </div>
             )}
           </Card>
           <Card title="How renewals work">
             <p className="text-sm text-muted">
-              You get a reminder 7, 3 and 1 days before an extra branch&apos;s period ends. After it ends there are {GRACE_DAYS} days&apos; grace, then the branch turns read-only. Nothing is ever
-              deleted, and renewing switches it back on at once.
+              You get a reminder before your trial or a paid period ends. After a paid period there are {GRACE_DAYS} days&apos; grace, then the gym (or that extra branch) turns read-only. Nothing is
+              ever deleted, and paying switches it back on at once.
             </p>
           </Card>
         </div>

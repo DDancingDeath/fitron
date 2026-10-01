@@ -38,6 +38,12 @@ model Organization {
   autopayMandates   AutopayMandate[]
   assets            Asset[]
   purchases         Purchase[]
+  /// FITRON plan key from src/lib/domain/pricing.ts (starter, professional, enterprise)
+  plan              String             @default("professional")
+  /// MONTHLY | YEARLY
+  planCycle         String             @default("MONTHLY")
+  /// Free trial end for gyms that signed up on fitron.in; null for gyms set up by hand
+  trialEndsAt       DateTime?          @db.Timestamptz
 }
 
 model Branch {
@@ -84,9 +90,26 @@ model User {
   shift        String?
   active       Boolean      @default(true)
   lastLoginAt  DateTime?    @db.Timestamptz
+  /// Null until the user clicks the link in the verification email
+  emailVerifiedAt DateTime? @db.Timestamptz
+  authTokens   AuthToken[]
   createdAt    DateTime     @default(now()) @db.Timestamptz
   updatedAt    DateTime     @updatedAt @db.Timestamptz
   deletedAt    DateTime?    @db.Timestamptz
+}
+
+/// One-time links sent by email. `id` is the SHA-256 of the token in the link.
+model AuthToken {
+  id        String    @id
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// VERIFY_EMAIL | RESET_PASSWORD
+  purpose   String
+  expiresAt DateTime  @db.Timestamptz
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+
+  @@index([userId, purpose])
 }
 
 /// Server-side session. `id` is the SHA-256 of the cookie token, so a leaked
@@ -965,10 +988,15 @@ model AccessLog {
 }
 
 /// Fitron's own billing: an extra branch beyond the 3 the plan includes, paid to Fitron.
+/// A payment from a gym to FITRON: a period of its Gym Accounting plan, or of one extra branch.
 model BranchSubscription {
   id                String    @id @default(cuid())
   orgId             String
-  /// null = paid for but not yet given to a branch
+  /// PLAN | BRANCH
+  kind              String    @default("BRANCH")
+  /// PLAN only: the plan key paid for (starter, professional, enterprise)
+  plan              String?
+  /// BRANCH only; null = paid for but not yet given to a branch
   branchId          String?
   /// MONTHLY | YEARLY
   cycle             String
@@ -977,10 +1005,17 @@ model BranchSubscription {
   total             Int
   periodStart       DateTime? @db.Date
   periodEnd         DateTime? @db.Date
-  /// PENDING | PAID | FAILED
+  /// PENDING | SUBMITTED (UTR entered, FITRON checking) | PAID | REJECTED | FAILED
   status            String    @default("PENDING")
-  /// LIVE (Razorpay) | DEMO
+  /// UPI (FITRON's UPI QR + UTR) | LIVE (Razorpay) | DEMO
   mode              String
+  /// UPI only: the 12-digit UTR the gym typed after paying; one UTR pays for one thing
+  utr               String?   @unique
+  submittedAt       DateTime? @db.Timestamptz
+  /// The FITRON team member who confirmed or rejected the UTR
+  reviewedBy        String?
+  reviewedAt        DateTime? @db.Timestamptz
+  rejectReason      String?
   razorpayOrderId   String?   @unique
   razorpayPaymentId String?   @unique
   /// Fitron's tax invoice number, set when paid
@@ -990,6 +1025,7 @@ model BranchSubscription {
   paidAt            DateTime? @db.Timestamptz
 
   @@index([orgId, status])
+  @@index([status])
   @@index([branchId])
 }
 

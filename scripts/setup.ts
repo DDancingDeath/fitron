@@ -37,6 +37,7 @@ async function main() {
       phone: a.phone!,
       roleId: roles.get("Super Admin")!,
       passwordHash: await hashPassword(a.password!),
+      emailVerifiedAt: new Date(),
       branches: { create: [{ branchId: branch.id }] },
     },
   });

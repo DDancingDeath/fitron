@@ -5,7 +5,8 @@ import { requestTrial } from "../actions";
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
 import { PLANS, PRODUCT_LABEL, findPlan, rupeesLabel, type Cycle, type Product } from "@/lib/domain/pricing";
 
-const groups: Product[] = ["GYM_ACCOUNTING", "AI_TRAINER", "PARTNER"];
+// Gym plans have their own sign-up form, so this one offers the rest.
+const groups: Product[] = ["AI_TRAINER", "PARTNER"];
 
 export function TrialForm({ plan: initialPlan, cycle: initialCycle }: { plan: string; cycle: Cycle }) {
   const [state, action, pending] = useActionState(requestTrial, undefined);

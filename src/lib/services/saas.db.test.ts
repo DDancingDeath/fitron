@@ -18,6 +18,7 @@ describe.skipIf(!hasDb)("Fitron branch plan (database)", () => {
   beforeAll(async () => {
     vi.stubEnv("FITRON_RAZORPAY_KEY_ID", "");
     vi.stubEnv("FITRON_RAZORPAY_KEY_SECRET", "");
+    vi.stubEnv("FITRON_UPI_ID", "");
     gym = await makeGym();
     owner = await gym.user("Super Admin");
   });
@@ -29,7 +30,7 @@ describe.skipIf(!hasDb)("Fitron branch plan (database)", () => {
     expect(await db.branch.count({ where: { orgId: gym.org.id } })).toBe(3);
 
     const c = await startBranchPayment(owner, "YEARLY", null);
-    expect(c).toMatchObject({ mode: "DEMO", total: 944_000 });
+    expect(c).toMatchObject({ mode: "DEMO", total: 5_88_820 });
     const paid = await confirmDemoPayment(owner, c.id);
     expect(paid?.invoiceNo).toMatch(/^FIT\/\d{4}-\d{2}\/\d{5}$/);
     expect(paid?.periodStart?.toISOString().slice(0, 10)).toBe(today);
@@ -72,9 +73,10 @@ describe.skipIf(!hasDb)("Fitron branch plan (database)", () => {
     const pid = `pay_${randomUUID().slice(0, 12)}`;
     vi.stubEnv("FITRON_RAZORPAY_KEY_ID", "rzp_test_x");
     vi.stubEnv("FITRON_RAZORPAY_KEY_SECRET", "secret");
-    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ id: oid, amount: 295_000, status: "created" }), { status: 200 })));
+    vi.stubEnv("FITRON_UPI_ID", "");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ id: oid, amount: 58_882, status: "created" }), { status: 200 })));
     const c = await startBranchPayment(owner, "MONTHLY", fourth);
-    expect(c).toMatchObject({ mode: "LIVE", orderId: oid, keyId: "rzp_test_x", total: 295_000 });
+    expect(c).toMatchObject({ mode: "LIVE", orderId: oid, keyId: "rzp_test_x", total: 58_882 });
     await expect(confirmCheckout(owner, { orderId: oid, paymentId: pid, signature: "forged" })).rejects.toThrow(/couldn't confirm/);
     const sig = createHmac("sha256", "secret").update(`${oid}|${pid}`).digest("hex");
     const other = await makeGym();

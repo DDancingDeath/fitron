@@ -68,6 +68,8 @@ export async function createStaff(u: CurrentUser, input: StaffInput) {
           shift: input.shift ?? null,
           ptRate: input.ptRate,
           passwordHash,
+          // The admin who adds a colleague vouches for the address; they can sign in straight away.
+          emailVerifiedAt: new Date(),
           branches: { create: input.branchIds.map((branchId) => ({ branchId })) },
         },
       });

@@ -22,6 +22,7 @@ export async function makeGym() {
         email: `${randomUUID()}@test.local`,
         phone: "9000000000",
         passwordHash: "x",
+        emailVerifiedAt: new Date(),
         roleId: roles.get(role)!,
         branches: { create: branchIds.map((branchId) => ({ branchId })) },
       },
