@@ -1,0 +1,73 @@
+import { LegalPage } from "../legal";
+
+export const metadata = { title: "Privacy Policy · FITRON", description: "How FITRON collects, uses and protects personal data under India's DPDP Act, 2023." };
+
+export default function PrivacyPage() {
+  return (
+    <LegalPage
+      title="Privacy Policy"
+      updated="1 October 2026"
+      intro={<p>FITRON (&quot;we&quot;) runs fitron.in, the FITRON AI Trainer and FITRON Gym Accounting. This policy explains what personal data we collect, why, and the rights you have under India&apos;s Digital Personal Data Protection Act, 2023 (DPDP Act).</p>}
+    >
+      <section>
+        <h2 id="collect">What we collect</h2>
+        <ul>
+          <li><b>Account details:</b> name, email, mobile number, and for gyms the business name, address and GSTIN.</li>
+          <li><b>AI Trainer data you give us:</b> age, height, weight, goals, diet preference, equipment, workouts, meals and messages to the AI coach.</li>
+          <li><b>Gym Accounting data a gym enters:</b> its members, plans, invoices, payments, expenses, staff and attendance. For this data the gym decides what is collected and why; we process it on the gym&apos;s instructions.</li>
+          <li><b>Payments:</b> payment references and status from our payment partners. We never see or store your card details or UPI PIN.</li>
+          <li><b>Technical data:</b> IP address, device and browser type, and essential cookies needed to keep you signed in.</li>
+        </ul>
+      </section>
+      <section>
+        <h2 id="use">How we use it</h2>
+        <ul>
+          <li>To provide the service you signed up for, including AI-generated plans and coaching.</li>
+          <li>To bill you, send invoices and reminders, and provide support.</li>
+          <li>To keep the service secure and to meet legal, tax and accounting obligations.</li>
+          <li>With your consent only: anonymised analytics and product updates. You can withdraw consent at any time.</li>
+        </ul>
+        <p>We do not sell personal data and we do not use it for advertising. Members&apos; conversations with the AI coach are never shown to their gym.</p>
+      </section>
+      <section>
+        <h2 id="sharing">Who we share it with</h2>
+        <p>Only with service providers who help us run FITRON, under contract and only for that purpose: cloud hosting, payment processing (e.g. Razorpay), messaging (e.g. WhatsApp Business), email delivery, and the AI model provider that generates coaching replies. We may disclose data when the law requires it.</p>
+      </section>
+      <section>
+        <h2 id="storage">Where it is kept and for how long</h2>
+        <p>Data is hosted on servers in India. We keep it while your account is active and afterwards only as long as the law requires (for example, tax records for 8 years). When you delete your account, other data is erased within 30 days, except encrypted backups, which expire within 14 days after that.</p>
+      </section>
+      <section>
+        <h2 id="rights">Your DPDP rights</h2>
+        <ul>
+          <li>Access a summary of your personal data and how it is processed.</li>
+          <li>Correct, complete or update your data.</li>
+          <li>Erase your data and withdraw consent.</li>
+          <li>Nominate another person to exercise these rights if you die or become unable to.</li>
+          <li>Raise a grievance with us, and then with the Data Protection Board of India.</li>
+        </ul>
+        <p>Members of a gym that uses FITRON can also ask their gym directly. To use any right, write to <a href="mailto:hello@fitron.in?subject=DPDP%20request">hello@fitron.in</a>. We reply within 30 days.</p>
+      </section>
+      <section>
+        <h2 id="cookies">Cookies</h2>
+        <p>We use essential cookies to keep you signed in and to remember your cookie choice. With your consent we also remember preferences and collect anonymised analytics. We do not use advertising cookies. You can change your choice any time with &quot;Cookie settings&quot; at the bottom of fitron.in.</p>
+      </section>
+      <section>
+        <h2 id="security">Security</h2>
+        <p>Passwords are hashed with Argon2, connections use HTTPS, sensitive biometric templates are encrypted, staff access is limited by role, and every change in Gym Accounting is written to an audit log.</p>
+      </section>
+      <section>
+        <h2 id="children">Children</h2>
+        <p>The AI Trainer is for people aged 18 and over. We do not knowingly process children&apos;s data without verifiable parental consent.</p>
+      </section>
+      <section>
+        <h2 id="grievance">Grievance Officer</h2>
+        <p>For any complaint about your data or this policy, write to the Grievance Officer, FITRON, at <a href="mailto:hello@fitron.in?subject=Grievance">hello@fitron.in</a> with the subject &quot;Grievance&quot;, or WhatsApp <a href="https://wa.me/916207774673">+91 62077 74673</a>. We acknowledge within 24 hours and resolve within 15 days.</p>
+      </section>
+      <section>
+        <h2 id="changes">Changes</h2>
+        <p>If we change this policy in a way that matters, we will tell you by email or in the app before the change takes effect.</p>
+      </section>
+    </LegalPage>
+  );
+}

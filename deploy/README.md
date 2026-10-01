@@ -40,10 +40,21 @@ Go to **Networking › Virtual cloud networks**, then your network, then **Secur
 
 ## 4. Point a web address at the server
 
-Pick one:
+**For fitron.in:** at the registrar where you bought fitron.in, open its DNS settings and add two records:
 
-- **Your own domain** (about ₹800 a year from any registrar). Add an **A record**, for example `app` pointing to the server's public IP. That gives you `app.yourgym.in`.
+| Type | Name / Host | Value | TTL |
+|---|---|---|---|
+| `A` | `@` (some registrars want it blank or `fitron.in`) | the server's public IP | 600 or the lowest offered |
+| `A` | `www` | the server's public IP | 600 or the lowest offered |
+
+Delete any other `A`, `AAAA` or `CNAME` records for `@` and `www` first (registrars often add a "parking" record). Leave `MX` and `TXT` records alone: they're for email. When the install script asks for the domain, type `fitron.in`. The landing page is then at `https://fitron.in`, staff sign in at `https://fitron.in/login`, and `www.fitron.in` redirects to `fitron.in`.
+
+Other options:
+
+- **Another domain** (about ₹800 a year from any registrar). Add an **A record**, for example `app` pointing to the server's public IP. That gives you `app.yourgym.in`.
 - **Free:** sign in at <https://www.duckdns.org>, create a name such as `yourgym`, and set its IP to the server's public IP. That gives you `yourgym.duckdns.org`.
+
+New records take from a few minutes to a few hours to work. Check with `nslookup fitron.in`: it should print the server's IP before you run the install in step 7.
 
 ## 5. Log in to the server
 
@@ -102,6 +113,7 @@ nano deploy/.env
 | WhatsApp (official) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` | In Meta: webhook `https://your-address/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN` from the file |
 | UPI Autopay (your gym's Razorpay) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook `https://your-address/api/webhooks/razorpay` |
 | Fitron AI | `ANTHROPIC_API_KEY` | from console.anthropic.com |
+| Email (website enquiries) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `ENQUIRY_TO` | Verify fitron.in with your email provider (it gives you DNS records to add) |
 | Extra-branch billing (Fitron's Razorpay) | `FITRON_RAZORPAY_KEY_ID`, `FITRON_RAZORPAY_KEY_SECRET`, `FITRON_RAZORPAY_WEBHOOK_SECRET`, `FITRON_GSTIN`, `FITRON_ADDRESS` | Razorpay webhook `https://your-address/api/webhooks/fitron-billing` |
 | Documents in the cloud (optional) | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | e.g. a Cloudflare R2 bucket (free up to 10 GB); otherwise they're kept on the server |
 

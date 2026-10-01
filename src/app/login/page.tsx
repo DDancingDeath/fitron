@@ -9,7 +9,7 @@ export default async function LoginPage() {
   if (await getCurrentUser()) redirect("/dashboard");
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="hidden flex-col justify-between bg-[radial-gradient(ellipse_at_top_left,#2a2314,transparent_60%)] p-12 lg:flex">
+      <section className="hidden flex-col justify-between bg-[radial-gradient(ellipse_at_top_left,var(--accent-soft),transparent_60%)] p-12 lg:flex">
         <Logo size={56} />
         <div>
           <p className="mb-4 text-xs font-semibold tracking-[0.2em] text-accent uppercase">Fitron gym accounting solution</p>

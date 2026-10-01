@@ -7,6 +7,7 @@ Gym management and accounting software for Indian gyms: members, plans and renew
 - **The production app** (repo root): Next.js (App Router) + TypeScript + Tailwind, Postgres via Prisma. Being built from `prototype/HANDOFF.md`.
   - `prisma/schema.prisma`: core schema (tenancy, staff and roles, members, plans, memberships, invoices, payments, expenses, audit log, month locks, settings, sequences).
   - `src/lib/domain/`: business rules with unit tests (invoice totals and GST, computed invoice status, membership status, date maths).
+- **The website** (fitron.in): `/` is the static landing page in `public/site` (from the design export; update it with `python3 scripts/import-site.py "FITRON Website.html"`). `/signup`, `/contact`, `/privacy`, `/terms` and `/refund` are in `src/app/(site)`. Trial requests and messages are saved in the `Enquiry` table and emailed to `ENQUIRY_TO`. Prices live in `src/lib/domain/pricing.ts`; a test checks them against the page.
 - **`prototype/`**: the working browser prototype. Serve the folder (`npx serve prototype`) and open `Fitron Gym.dc.html`. Data lives in localStorage; WhatsApp and UPI Autopay are simulated.
   - `prototype/HANDOFF.md`: the production build spec.
   - `prototype/connector/`: WhatsApp linked-device and Razorpay UPI Autopay service.
@@ -18,7 +19,7 @@ npm install            # also generates the Prisma client
 cp .env.example .env   # point DATABASE_URL at a Postgres database (or run `npx prisma dev` for a local one)
 npm run db:migrate     # create tables
 npm run db:seed        # demo gym: sign in as sumit@demo.fitron.in / fitron-demo
-npm run dev            # http://localhost:3000
+npm run dev            # http://localhost:3000 (landing page; the console is at /login)
 ```
 
 Checks: `npm run lint`, `npm run typecheck`, `npm test` (database tests run when `DATABASE_URL` is set), `npm run build`.
