@@ -16,7 +16,7 @@ const STYLE_OF: Record<string, number> = {
   ACTIVE: 0, PAID: 0, Read: 0, Success: 0, Active: 0, Won: 0, Attended: 0, "In stock": 0, Booked: 0, Inside: 0,
   "EXPIRING SOON": 1, Delivered: 1, "Trial booked": 1, Waitlist: 1, Contacted: 1,
   "PARTIALLY PAID": 2, "Trial done": 2, Paused: 2,
-  EXPIRED: 3, Failed: 3, OVERDUE: 3, Full: 3, "No-show": 3, "Low stock": 3, "High risk": 3,
+  EXPIRED: 3, Failed: 3, Halted: 3, OVERDUE: 3, Full: 3, "No-show": 3, "Low stock": 3, "High risk": 3,
   "PAYMENT PENDING": 4, UNPAID: 4, "DUE TODAY": 4, "Medium risk": 4, New: 4,
 };
 
