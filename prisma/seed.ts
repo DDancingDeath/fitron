@@ -445,18 +445,21 @@ async function seedAutopay(orgId: string) {
 
 /** Monthly running costs per branch: [category, description, vendor, method, ₹ at City Centre, day of month]. */
 const RUNNING: [string, string, string, string, number, number][] = [
-  ["Rent", "Premises rent", "Landlord", "Bank Transfer", 45000, 5],
-  ["Electricity", "Electricity bill", "JBVNL", "UPI", 9500, 12],
+  ["Rent", "Premises rent", "Landlord", "Bank Transfer", 9000, 5],
+  ["Electricity", "Electricity bill", "JBVNL", "UPI", 2500, 12],
   ["Internet", "Broadband", "Airtel", "UPI", 1180, 8],
-  ["Trainer Salary", "Trainer salaries", "Payroll", "Bank Transfer", 14000, 1],
-  ["Staff Salary", "Front desk and housekeeping salaries", "Payroll", "Bank Transfer", 8000, 1],
-  ["Cleaning", "Cleaning supplies", "Local store", "Cash", 1800, 18],
+  ["Trainer Salary", "Trainer salaries", "Payroll", "Bank Transfer", 7000, 1],
+  ["Staff Salary", "Front desk and housekeeping salaries", "Payroll", "Bank Transfer", 4000, 1],
+  ["Cleaning", "Cleaning supplies", "Local store", "Cash", 600, 18],
   ["Software", "Fitron subscription", "Fitron", "UPI", 1499, 2],
 ];
 
 /** A year of rent, salaries and bills so Expenses, P&L and the dashboard have history. Runs once per demo gym. */
 async function seedRunningCosts(orgId: string) {
   if (await db.expense.count({ where: { orgId, category: { name: "Rent" } } })) return false;
+  // Cash and bank on the day the gym's books start, so the cash book and month-end show real balances.
+  const opening = { cash: 4000000, bank: 150000000, asOf: "2024-04-01" };
+  await db.setting.upsert({ where: { orgId_key: { orgId, key: "opening" } }, create: { orgId, key: "opening", value: opening }, update: {} });
   const branches = await db.branch.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
   const owner = await db.user.findFirstOrThrow({ where: { orgId, role: { name: "Super Admin" } } });
   const cats = new Map((await db.expenseCategory.findMany()).map((c) => [c.name, c.id]));
