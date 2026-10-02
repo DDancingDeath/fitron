@@ -118,7 +118,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         </Card>
         <div className="flex flex-col gap-4">
           {!cancelled && inv.balance > 0 && u.can("payments.collect") && (
-            <Card title="Collect payment">
+            <Card title="Collect payment" className="scroll-mt-24" id="collect">
               <CollectForm invoiceId={inv.id} balance={inv.balance} today={todayIso()} />
             </Card>
           )}

@@ -284,7 +284,11 @@ export async function listInvoices(u: CurrentUser, f: { q?: string; status?: str
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: f.openOnly || f.memberId ? undefined : 500,
-    include: { member: { select: { id: true, name: true, code: true, phone: true } }, payments: { select: { amount: true, status: true } } },
+    include: {
+      member: { select: { id: true, name: true, code: true, phone: true } },
+      payments: { select: { amount: true, status: true } },
+      items: { select: { description: true, productId: true } },
+    },
   });
   const today = todayIso();
   let rows = invoices.map((i) => ({
@@ -305,7 +309,16 @@ export async function listPayments(u: CurrentUser, f: { q?: string; method?: str
       ...(f.memberId ? { memberId: f.memberId } : {}),
       ...(f.method ? { method: f.method } : {}),
       ...(f.from || f.to ? { date: { ...(f.from ? { gte: fromIso(f.from) } : {}), ...(f.to ? { lte: fromIso(f.to) } : {}) } } : {}),
-      ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { txnRef: { contains: q, mode: "insensitive" } }, { member: { name: { contains: q, mode: "insensitive" } } }] } : {}),
+      ...(q
+        ? {
+            OR: [
+              { code: { contains: q, mode: "insensitive" } },
+              { txnRef: { contains: q, mode: "insensitive" } },
+              { invoice: { number: { contains: q, mode: "insensitive" } } },
+              { member: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 500,
