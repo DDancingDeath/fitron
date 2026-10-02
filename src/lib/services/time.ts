@@ -4,6 +4,8 @@ const IST_OFFSET_MS = 330 * 60_000;
 
 /** Today's date in India, as YYYY-MM-DD. */
 export const todayIso = (now = new Date()) => new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+/** The Indian clock time now, "18:30". */
+export const istClock = (now = new Date()) => new Date(now.getTime() + IST_OFFSET_MS).toISOString().slice(11, 16);
 
 export const toIso = (d: Date) => d.toISOString().slice(0, 10);
 
