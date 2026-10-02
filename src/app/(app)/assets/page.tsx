@@ -1,98 +1,124 @@
 import Link from "next/link";
+import { DownloadSimpleIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { listAssets } from "@/lib/services/assets";
-import { ASSET_CATEGORIES, fyLabel, fyOf } from "@/lib/domain/assets";
-import { Badge, Button, Empty, Input, LinkButton, PageHeader, Select } from "@/components/ui";
-import { fmtDate, formatInr } from "@/lib/format";
+import { fyLabel, fyOf } from "@/lib/domain/assets";
+import { monthLabel } from "@/lib/domain/periods";
+import { Tag } from "@/components/tag";
+import { LinkButton, ListHeader, TABLE, TD, TH, cx } from "@/components/ui";
+import { fmtDate, formatRupees } from "@/lib/format";
 import { todayIso } from "@/lib/services/time";
-import { ASSET_STATUS, ASSET_TONE } from "./tone";
+import { ASSET_STATUS } from "./tone";
 
 export const metadata = { title: "Fixed assets · Fitron" };
 
-const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
+const FILTERS = [
+  ["IN_USE", "In use"],
+  ["SOLD", "Sold"],
+  ["SCRAPPED", "Scrapped"],
+  ["all", "All"],
+] as const;
+/** Status chips as the prototype colours them: gold for in use, gold outline for sold, grey for scrapped. */
+const STATUS_TAG: Record<string, string> = { IN_USE: "Active", SOLD: "Delivered", SCRAPPED: "Scrapped" };
 
 export default async function AssetsPage({ searchParams }: PageProps<"/assets">) {
   const u = await requirePermission("assets.manage");
   const sp = await searchParams;
-  const f = { q: one(sp.q), status: one(sp.status) ?? "IN_USE", category: one(sp.category) };
-  const rows = await listAssets(u, { ...f, status: f.status === "all" ? undefined : f.status });
-  const cost = rows.reduce((s, a) => s + a.cost, 0);
-  const nbv = rows.reduce((s, a) => s + (a.status === "IN_USE" ? a.info.nbv : 0), 0);
-  const fyDep = rows.reduce((s, a) => s + a.info.fyDep, 0);
-  const fy = fyLabel(fyOf(todayIso().slice(0, 7)));
+  const status = FILTERS.some(([k]) => k === sp.status) ? (sp.status as string) : "IN_USE";
+  const [rows, all] = await Promise.all([listAssets(u, { status: status === "all" ? undefined : status }), listAssets(u, { status: "IN_USE" })]);
+  const today = todayIso();
+  const gross = all.reduce((s, a) => s + a.cost, 0);
+  const acc = all.reduce((s, a) => s + a.info.acc, 0);
+  const kpis: [string, string, string][] = [
+    ["Gross block", formatRupees(gross), `${all.length} asset${all.length === 1 ? "" : "s"} in use`],
+    ["Accumulated depreciation", formatRupees(acc), `to ${monthLabel(today)}`],
+    ["Net book value", formatRupees(gross - acc), "what the equipment is worth on the books"],
+    [`Depreciation ${fyLabel(fyOf(today.slice(0, 7)))}`, formatRupees(all.reduce((s, a) => s + a.info.fyDep, 0)), "charged to P&L"],
+  ];
+  const branchLabel = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
+
   return (
-    <>
-      <PageHeader
-        title="Fixed assets"
-        subtitle={`${rows.length} asset${rows.length === 1 ? "" : "s"} · cost ${formatInr(cost)} · book value ${formatInr(nbv)} · depreciation ${fy} ${formatInr(fyDep)}`}
-        actions={
-          <>
-            <LinkButton href="/purchases/new">Record a bill</LinkButton>
-            <LinkButton href="/assets/new" variant="primary">
-              Add asset
-            </LinkButton>
-          </>
-        }
-      />
+    <div className="flex flex-col gap-7">
+      <ListHeader kicker={branchLabel} title="Accounting" />
       <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/assets" />
-      <form className="mb-4 flex flex-wrap gap-2">
-        <Input name="q" defaultValue={f.q ?? ""} placeholder="Name, ID, supplier or serial" aria-label="Search assets" className="min-w-48 flex-1" />
-        <Select name="category" defaultValue={f.category ?? ""} aria-label="Category" className="w-auto!">
-          <option value="">All categories</option>
-          {ASSET_CATEGORIES.map((c) => (
-            <option key={c}>{c}</option>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex flex-wrap overflow-hidden rounded-md border border-line">
+          {FILTERS.map(([k, label]) => (
+            <Link key={k} href={k === "IN_USE" ? "/assets" : `/assets?status=${k}`} className={cx("px-3 py-[7px] text-[13px]", k === status ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}>
+              {label}
+            </Link>
           ))}
-        </Select>
-        <Select name="status" defaultValue={f.status} aria-label="Status" className="w-auto!">
-          <option value="IN_USE">In use</option>
-          <option value="SOLD">Sold</option>
-          <option value="SCRAPPED">Scrapped</option>
-          <option value="all">All</option>
-        </Select>
-        <Button>Filter</Button>
-      </form>
-      {rows.length === 0 ? (
-        <Empty>No assets here yet. Add gym equipment, ACs, computers and furniture so depreciation is charged each month.</Empty>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-line bg-surface">
-          <table className="w-full min-w-[760px] text-sm">
-            <thead className="text-left text-muted">
-              <tr className="border-b border-line">
-                <th className="px-4 py-2 font-medium">Asset</th>
-                <th className="px-4 py-2 font-medium">Purchased</th>
-                <th className="px-4 py-2 font-medium">Method</th>
-                <th className="px-4 py-2 text-right font-medium">Cost</th>
-                <th className="px-4 py-2 text-right font-medium">Depreciation</th>
-                <th className="px-4 py-2 text-right font-medium">Book value</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((a) => (
-                <tr key={a.id}>
-                  <td className="px-4 py-2.5">
-                    <Link href={`/assets/${a.id}`} className="font-semibold hover:text-accent">
-                      {a.name}
-                      {a.qty > 1 ? ` ×${a.qty}` : ""}
-                    </Link>
-                    <span className="block text-xs text-muted">
-                      {a.code} · {a.category}
-                      {u.branchIds.length > 1 ? ` · ${a.branch.name}` : ""}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5">{fmtDate(a.purchaseDate)}</td>
-                  <td className="px-4 py-2.5">{a.method === "SLM" ? `SLM ${a.life} yrs` : `WDV ${Number(a.rate)}%`}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{formatInr(a.cost)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">{formatInr(a.info.acc)}</td>
-                  <td className="px-4 py-2.5 text-right tabular-nums">
-                    {a.status === "IN_USE" ? formatInr(a.info.nbv) : <Badge tone={ASSET_TONE[a.status]}>{ASSET_STATUS[a.status]}</Badge>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      )}
-    </>
+        <div className="flex flex-wrap gap-2">
+          <LinkButton href="/reports/assets/csv" prefetch={false}>
+            <DownloadSimpleIcon size={16} weight="duotone" />
+            Register CSV
+          </LinkButton>
+          <LinkButton href="/assets/new" variant="primary">
+            <PlusIcon size={16} weight="duotone" />
+            Add asset
+          </LinkButton>
+        </div>
+      </div>
+
+      <div className="grid gap-x-10 gap-y-7 [grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))]">
+        {kpis.map(([k, v, sub]) => (
+          <div key={k}>
+            <div className="text-xs tracking-[0.06em] text-muted uppercase">{k}</div>
+            <div className="mt-1 text-[30px] leading-[1.15] font-semibold">{v}</div>
+            <div className="mt-0.5 text-[13px] text-muted">{sub}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className={TABLE}>
+          <thead>
+            <tr>
+              {["Asset", "Category", "Purchased", "Cost", "Depreciation", "This FY", "Accumulated", "Book value", "Status", ""].map((h, i) => (
+                <th key={i} className={cx(TH, [3, 5, 6, 7].includes(i) && "text-right")}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((a) => (
+              <tr key={a.id} className="hover:bg-fg/4">
+                <td className={cx(TD, "whitespace-nowrap")}>
+                  <Link href={`/assets/${a.id}`} className="font-semibold hover:text-accent">
+                    {a.name}
+                    {a.qty > 1 ? ` ×${a.qty}` : ""}
+                  </Link>
+                  <div className="text-xs text-muted">
+                    {a.code} · {a.vendor ?? "—"}
+                    {u.branchIds.length > 1 ? ` · ${a.branch.name}` : ""}
+                  </div>
+                </td>
+                <td className={cx(TD, "whitespace-nowrap")}>{a.category}</td>
+                <td className={cx(TD, "whitespace-nowrap")}>{fmtDate(a.purchaseDate)}</td>
+                <td className={cx(TD, "text-right whitespace-nowrap")}>{formatRupees(a.cost)}</td>
+                <td className={cx(TD, "whitespace-nowrap")}>{a.method === "SLM" ? `SLM · ${a.life} yrs` : `WDV · ${Number(a.rate)}%`}</td>
+                <td className={cx(TD, "text-right whitespace-nowrap")}>{formatRupees(a.info.fyDep)}</td>
+                <td className={cx(TD, "text-right whitespace-nowrap")}>{formatRupees(a.info.acc)}</td>
+                <td className={cx(TD, "text-right font-semibold whitespace-nowrap")}>{formatRupees(a.info.nbv)}</td>
+                <td className={TD}>
+                  <Tag label={STATUS_TAG[a.status] ?? a.status}>{ASSET_STATUS[a.status] ?? a.status}</Tag>
+                </td>
+                <td className={cx(TD, "text-right")}>
+                  {a.status === "IN_USE" && (
+                    <Link href={`/assets/${a.id}#dispose`} className="inline-flex items-center rounded-md px-2 py-1 text-[13px] font-semibold text-accent hover:bg-accent/10">
+                      Dispose
+                    </Link>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {!rows.length && <div className="text-sm text-muted">No assets with this status.</div>}
+    </div>
   );
 }

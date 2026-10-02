@@ -30,7 +30,7 @@ export async function listPurchases(u: CurrentUser, f: { q?: string; show?: "pay
       ...(q ? { OR: [{ vendor: { contains: q, mode: "insensitive" } }, { code: { contains: q, mode: "insensitive" } }, { billNo: { contains: q, mode: "insensitive" } }] } : {}),
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
-    include: { payments: { select: { amount: true } }, lines: { select: { type: true } }, branch: { select: { name: true } } },
+    include: { payments: { select: { amount: true } }, lines: { select: { type: true, description: true, qty: true, rate: true, gstPct: true, amount: true } }, branch: { select: { name: true } } },
   });
   const out = rows.map((p) => ({ ...p, paid: paidOf(p), balance: p.total - paidOf(p) }));
   return f.show === "payable" ? out.filter((p) => p.balance > 0) : out;

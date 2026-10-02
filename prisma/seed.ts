@@ -376,7 +376,7 @@ async function seedAssets(orgId: string) {
     const date = addDays(today, -ago);
     const lines = products.map((p) => ({ p, qty: p.sku === "SHAKER" ? 20 : 6, rate: Math.round(p.cost / 1.18 / 100) * 100 }));
     const total = lines.reduce((s, l) => s + Math.round(l.qty * Math.round(l.rate) * 1.18), 0);
-    const paid = Math.round((total * paidShare) / 100) * 100;
+    const paid = paidShare >= 1 ? total : Math.round((total * paidShare) / 100) * 100;
     const method = paid >= total ? "Bank Transfer" : "Credit";
     const pur = await db.purchase.create({ data: { orgId, branchId: main.id, code: `PUR-${await seqNext(orgId, "purchase", 1001)}`, date: d(date), vendor, billNo, total, createdById: owner.id } });
     for (const l of lines) {

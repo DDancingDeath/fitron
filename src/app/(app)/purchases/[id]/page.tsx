@@ -110,7 +110,7 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
             </p>
           </Card>
           {active && p.balance > 0 && (
-            <Card title="Pay the supplier">
+            <Card title="Pay the supplier" id="pay">
               <PayVendorForm id={p.id} balance={p.balance} today={todayIso()} billDate={toIso(p.date)} />
             </Card>
           )}
