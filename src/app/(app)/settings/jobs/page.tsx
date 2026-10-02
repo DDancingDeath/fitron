@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { JOBS, recentRuns, runDailyJobs } from "@/lib/services/jobs";
 import { todayIso } from "@/lib/services/time";
 import { Badge, Button, Card, Empty, Notice, PageHeader } from "@/components/ui";
+import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, fmtTime } from "@/lib/format";
 
 export const metadata = { title: "Daily jobs · Fitron" };
@@ -32,6 +33,7 @@ export default async function JobsPage() {
           </form>
         }
       />
+      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/jobs" />
       <div className="mb-4">
         <Notice>
           On the server, a scheduler calls <code>/api/jobs/daily</code> each morning at about 6:30 with the <code>CRON_SECRET</code>. Each job runs once a day however many times it is called, and a failed job is retried on the next call.

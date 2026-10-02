@@ -32,3 +32,15 @@ export const ACCOUNTING_TABS: Tab[] = [
   { href: "/accounting?tab=ledger", label: "Ledgers", perm: "accounting.view" },
   { href: "/accounting?tab=close", label: "Month-end closing", perm: "accounting.view" },
 ];
+
+export const SETTINGS_TABS: Tab[] = [
+  { href: "/settings", label: "Gym profile" },
+  { href: "/settings?tab=billing", label: "Billing & GST" },
+  { href: "/settings?tab=wa", label: "WhatsApp" },
+  { href: "/settings?tab=int", label: "Integrations & AI" },
+  { href: "/settings/import", label: "Migrate & import", perm: "import.run" },
+  { href: "/settings/jobs", label: "Daily jobs" },
+  { href: "/settings/billing", label: "Subscription" },
+  { href: "/settings?tab=branches", label: "Branches" },
+  { href: "/staff?tab=perm", label: "Roles & access", perm: "staff.manage" },
+];
