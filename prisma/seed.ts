@@ -34,7 +34,8 @@ async function main() {
     const added = await seedFrontDesk(existing.id);
     const assets = await seedAssets(existing.id);
     const mandates = await seedAutopay(existing.id);
-    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}${mandates ? ", autopay mandates added" : ""}.`);
+    const running = await seedRunningCosts(existing.id);
+    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}${mandates ? ", autopay mandates added" : ""}${running ? ", a year of running costs added" : ""}.`);
     return;
   }
   const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
@@ -204,6 +205,7 @@ async function main() {
   await seedFrontDesk(org.id);
   await seedAssets(org.id);
   await seedAutopay(org.id);
+  await seedRunningCosts(org.id);
   // The prototype's offer codes, so Plans & offers isn't empty in the demo.
   const offers: [string, string, string, number, number, number | null, number][] = [
     ["DIWALI26", "Festive offer on Quarterly and above", "PERCENT", 15, 39, 100, 0],
@@ -439,4 +441,41 @@ async function seedAutopay(orgId: string) {
     });
   }
   return picks.length > 0;
+}
+
+/** Monthly running costs per branch: [category, description, vendor, method, ₹ at City Centre, day of month]. */
+const RUNNING: [string, string, string, string, number, number][] = [
+  ["Rent", "Premises rent", "Landlord", "Bank Transfer", 45000, 5],
+  ["Electricity", "Electricity bill", "JBVNL", "UPI", 9500, 12],
+  ["Internet", "Broadband", "Airtel", "UPI", 1180, 8],
+  ["Trainer Salary", "Trainer salaries", "Payroll", "Bank Transfer", 14000, 1],
+  ["Staff Salary", "Front desk and housekeeping salaries", "Payroll", "Bank Transfer", 8000, 1],
+  ["Cleaning", "Cleaning supplies", "Local store", "Cash", 1800, 18],
+  ["Software", "Fitron subscription", "Fitron", "UPI", 1499, 2],
+];
+
+/** A year of rent, salaries and bills so Expenses, P&L and the dashboard have history. Runs once per demo gym. */
+async function seedRunningCosts(orgId: string) {
+  if (await db.expense.count({ where: { orgId, category: { name: "Rent" } } })) return false;
+  const branches = await db.branch.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  const owner = await db.user.findFirstOrThrow({ where: { orgId, role: { name: "Super Admin" } } });
+  const cats = new Map((await db.expenseCategory.findMany()).map((c) => [c.name, c.id]));
+  const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1];
+  let rnd = 7;
+  const jitter = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280) * 0.3 + 0.85;
+  for (let back = 11; back >= 0; back--) {
+    for (const [bi, b] of branches.entries()) {
+      for (const [cat, desc, vendor, method, rupees, day] of RUNNING) {
+        if (cat === "Software" && bi > 0) continue;
+        const date = new Date(Date.UTC(y, m - back, day));
+        if (date.toISOString().slice(0, 10) > today) continue;
+        const base = bi === 0 ? rupees : Math.round(rupees * 0.6);
+        const amount = (["Electricity", "Cleaning"].includes(cat) ? Math.round(base * jitter()) : base) * 100;
+        const n = await seqNext(orgId, "expense", 1);
+        await db.expense.create({ data: { orgId, branchId: b.id, code: `EXP-${n}`, date, categoryId: cats.get(cat)!, description: desc, vendor, amount, method, createdById: owner.id } });
+      }
+    }
+  }
+  return true;
 }

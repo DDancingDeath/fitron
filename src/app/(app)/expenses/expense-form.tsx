@@ -14,7 +14,7 @@ export function ExpenseForm({ categories, today }: { categories: { id: string; n
   return (
     <form action={action} key={state?.nonce} className="flex flex-col gap-3">
       {state?.message && <Notice tone={state.ok ? "ok" : "alert"}>{state.message}</Notice>}
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2">
         <Field label="Date" error={e.date}>
           <Input name="date" type="date" defaultValue={sent?.date ?? today} max={today} required />
         </Field>
@@ -66,5 +66,5 @@ export function ExpenseForm({ categories, today }: { categories: { id: string; n
 }
 
 export function VoidExpense({ id }: { id: string }) {
-  return <ReasonForm action={voidIt.bind(null, id)} label="Void" confirm="Void this expense? It stays on record but no longer counts." />;
+  return <ReasonForm action={voidIt.bind(null, id)} label="Void" confirm="Void this expense? It stays on record but no longer counts." compact />;
 }
