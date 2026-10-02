@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
+import { LightningIcon } from "@phosphor-icons/react";
 import { campaignAction, saveTemplateAction, sendOneAction } from "./actions";
 import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui";
 
@@ -108,5 +109,105 @@ export function CampaignForm({ audiences }: { audiences: { key: string; label: s
         {n > 250 && <p className="mt-2 text-sm text-alert">WhatsApp limits bulk sending. Pick a smaller group (250 or fewer).</p>}
       </div>
     </form>
+  );
+}
+
+type Card = { key: string; name: string; trigger: string; body: string; autoSend: boolean; metaTemplateName: string | null; language: string; rule: string; due?: string; sent: number };
+
+/** A template card as in the prototype: trigger, Auto-send, the message, its rule and today's matches; Edit opens the text in place. */
+export function TemplateCard({ t, vars, canEdit, cloud, toggle }: { t: Card; vars: string[]; canEdit: boolean; cloud: boolean; toggle: (on: boolean) => Promise<void> }) {
+  const [editing, setEditing] = useState(false);
+  const [body, setBody] = useState(t.body);
+  const [saved, setSaved] = useState(t.body);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm">
+      <div className="flex items-center justify-between gap-2">
+        <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{t.trigger}</div>
+        <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+          <input
+            type="checkbox"
+            defaultChecked={t.autoSend}
+            disabled={!canEdit || busy}
+            onChange={async (e) => {
+              setBusy(true);
+              await toggle(e.currentTarget.checked);
+              setBusy(false);
+            }}
+            className="accent-[var(--accent)]"
+          />
+          Auto-send
+        </label>
+      </div>
+      <div className="text-[17px] font-semibold">{t.name}</div>
+      {editing ? (
+        <form
+          action={async (fd) => {
+            setPending(true);
+            const r = await saveTemplateAction(t.key, undefined, fd);
+            setPending(false);
+            if (r?.ok) {
+              setSaved(body);
+              setEditing(false);
+              setError("");
+            } else setError(r?.errors?.body?.[0] ?? r?.message ?? "Couldn't save.");
+          }}
+          className="flex flex-col gap-2"
+        >
+          {error && <Notice tone="alert">{error}</Notice>}
+          <Textarea name="body" value={body} onChange={(e) => setBody(e.target.value)} className="min-h-[170px] text-[13px]" required />
+          <div className="flex flex-wrap gap-1">
+            {vars.map((v) => (
+              <button key={v} type="button" onClick={() => setBody((b) => `${b}{{${v}}}`)} className="rounded-sm bg-neutral-200 px-2 py-[3px] text-[11px] text-neutral-800">
+                {`{{${v}}}`}
+              </button>
+            ))}
+          </div>
+          {cloud ? (
+            <div className="grid grid-cols-[1fr_6rem] gap-2">
+              <Input name="metaTemplateName" defaultValue={t.metaTemplateName ?? ""} placeholder="Approved Meta template name" aria-label="Meta template name" />
+              <Input name="language" defaultValue={t.language} aria-label="Language" />
+            </div>
+          ) : (
+            <>
+              <input type="hidden" name="metaTemplateName" value={t.metaTemplateName ?? ""} />
+              <input type="hidden" name="language" value={t.language} />
+            </>
+          )}
+          {t.autoSend && <input type="hidden" name="autoSend" value="on" />}
+          <div className="flex gap-2">
+            <Button variant="primary" disabled={pending}>
+              {pending ? "Saving…" : "Save template"}
+            </Button>
+            <Button type="button" variant="ghost" onClick={() => (setEditing(false), setBody(saved), setError(""))}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="max-h-[170px] overflow-auto rounded-md bg-bg px-3 py-2.5 text-[13px] whitespace-pre-wrap">{saved}</div>
+          <div className="flex items-start gap-2 text-[13px]">
+            <LightningIcon size={16} weight="duotone" className="mt-0.5 flex-none text-accent" />
+            <span>
+              {t.rule}
+              {t.due && <span className="mt-0.5 block text-xs text-accent">{t.due}</span>}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between border-t border-line-soft pt-2.5 text-[13px] text-muted">
+            <span>
+              {t.autoSend ? "Auto-send on" : "Auto-send off"} · {t.sent} sent
+            </span>
+            {canEdit && (
+              <Button type="button" variant="ghost" onClick={() => setEditing(true)}>
+                Edit
+              </Button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
