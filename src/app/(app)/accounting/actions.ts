@@ -11,7 +11,7 @@ export async function lock(month: string): Promise<void> {
   try {
     await lockMonth(u, month);
   } catch (e) {
-    if (e instanceof UserError) redirect(`/accounting?tab=months&error=${encodeURIComponent(e.message)}`);
+    if (e instanceof UserError) redirect(`/accounting?tab=close&month=${month}&error=${encodeURIComponent(e.message)}`);
     throw e;
   }
   revalidatePath("/accounting");
