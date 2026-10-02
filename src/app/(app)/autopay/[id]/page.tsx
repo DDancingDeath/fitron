@@ -50,7 +50,7 @@ export default async function MandatePage({ params }: PageProps<"/autopay/[id]">
       <div className="grid gap-4 md:grid-cols-2">
         <Card title="Mandate">
           <dl className="divide-y divide-line text-sm">
-            <Row label="Member" value={<Link href={`/members/${m.member.id}`} className="text-accent">{m.member.name} ({m.member.code})</Link>} />
+            <Row label="Member" value={u.can("members.view") ? <Link href={`/members/${m.member.id}`} className="text-accent">{m.member.name} ({m.member.code})</Link> : `${m.member.name} (${m.member.code})`} />
             <Row label="Next debit" value={m.nextDebitOn && ["Active", "Pending"].includes(m.status) ? fmtDate(m.nextDebitOn) : null} />
             <Row label="Last result" value={m.lastResult} />
             <Row label="Failed attempts" value={String(m.retries)} />

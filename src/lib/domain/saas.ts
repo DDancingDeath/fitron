@@ -1,7 +1,7 @@
 // FITRON's own billing of gyms: the Gym Accounting plan (see pricing.ts), and extra branches
 // paid monthly or yearly, plus GST.
 import { addDays, membershipEndDate, type IsoDate } from "./dates";
-import { findPlan } from "./pricing";
+import { findPlan, PLANS } from "./pricing";
 
 /** Branches included before extra-branch payments start. */
 export const INCLUDED_BRANCHES = 3;
@@ -94,3 +94,13 @@ export function planStanding(trialEnd: IsoDate | null, paidUntil: IsoDate | null
 }
 
 export const planWritable = (s: PlanStanding) => s.kind !== "LAPSED";
+
+/** The Gym Accounting plans as the landing page shows them, with what each costs to pay (GST included). */
+export const gymPlanCards = () =>
+  PLANS.filter((p) => p.product === "GYM_ACCOUNTING").map((p) => ({
+    key: p.key,
+    name: p.name,
+    price: { MONTHLY: p.price.MONTHLY, YEARLY: p.price.YEARLY },
+    total: { MONTHLY: planPrice(p.key, "MONTHLY").total, YEARLY: planPrice(p.key, "YEARLY").total },
+    card: p.card!,
+  }));

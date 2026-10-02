@@ -90,3 +90,14 @@ export const NAV: NavGroup[] = [
     ],
   },
 ];
+
+/** Whether this person may open a page, by the sidebar item it belongs to (so links never lead to "not allowed"). */
+export function canOpen(u: { can: (p: Permission) => boolean }, href: string) {
+  const path = href.split(/[?#]/)[0]!;
+  for (const g of NAV)
+    for (const i of g.items) {
+      const roots = [i.href, ...(i.also ?? [])];
+      if (roots.some((r) => path === r || path.startsWith(`${r}/`))) return !i.perm || u.can(i.perm);
+    }
+  return true;
+}

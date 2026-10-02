@@ -25,9 +25,13 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
         title={inv.number}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
-            <Link href={`/members/${inv.memberId}`} className="hover:text-accent">
-              {inv.member.name} ({inv.member.code})
-            </Link>
+            {u.can("members.view") ? (
+              <Link href={`/members/${inv.memberId}`} className="hover:text-accent">
+                {inv.member.name} ({inv.member.code})
+              </Link>
+            ) : (
+              `${inv.member.name} (${inv.member.code})`
+            )}
             · {fmtDate(inv.date)} <InvoiceStatusBadge status={inv.status} overdueDays={inv.overdueDays} />
           </span>
         }
@@ -36,7 +40,7 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
             <LinkButton href={`/invoices/${inv.id}/pdf`} prefetch={false} target="_blank">
               Download PDF
             </LinkButton>
-            <LinkButton href={`/members/${inv.memberId}`}>Member</LinkButton>
+            {u.can("members.view") && <LinkButton href={`/members/${inv.memberId}`}>Member</LinkButton>}
           </>
         }
       />
