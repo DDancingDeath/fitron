@@ -38,6 +38,7 @@ if [ ! -f .env ]; then
   set_env DOMAIN "$DOMAIN"
   set_env POSTGRES_PASSWORD "$(rand 24)"
   set_env CRON_SECRET "$(rand 32)"
+  set_env AUTH_SECRET "$(rand 32)"
   set_env BIOMETRIC_KEY "$(rand 32)"
   set_env WHATSAPP_VERIFY_TOKEN "$(rand 16)"
   set_env AI_MODEL "claude-sonnet-5"

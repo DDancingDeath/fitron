@@ -11,7 +11,15 @@ const nextConfig: NextConfig = {
   },
   // fitron.in itself is the static marketing site in public/site; the console lives under its own paths.
   async rewrites() {
-    return { beforeFiles: [{ source: "/", destination: "/site/index.html" }], afterFiles: [], fallback: [] };
+    return {
+      beforeFiles: [
+        { source: "/", destination: "/site/index.html" },
+        // The AI Trainer member app is a static page in public/trainer.
+        { source: "/trainer", destination: "/trainer/index.html" },
+      ],
+      afterFiles: [],
+      fallback: [],
+    };
   },
   async headers() {
     return [

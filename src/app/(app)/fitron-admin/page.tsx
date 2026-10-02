@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth/current";
 import { isFitronAdmin } from "@/lib/integrations/upi";
 import { paymentsToCheck } from "@/lib/services/saas";
+import { trainerPaymentsToCheck } from "@/lib/services/trainer-admin";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtStamp, formatInr } from "@/lib/format";
 import { ReviewForm } from "./review-form";
@@ -12,13 +13,13 @@ export const metadata = { title: "Payment checks · FITRON" };
 export default async function FitronAdminPage() {
   const u = await requireUser();
   if (!isFitronAdmin(u.email)) notFound();
-  const { waiting, recent } = await paymentsToCheck();
+  const [{ waiting, recent }, members] = await Promise.all([paymentsToCheck(), trainerPaymentsToCheck()]);
 
   return (
     <>
       <PageHeader title="UPI payments to check" subtitle="Find each UTR in your bank or UPI app for the same amount. Confirm only when the money is in." />
       <div className="flex flex-col gap-4">
-        <Card title={`Waiting · ${waiting.length}`}>
+        <Card title={`Gyms waiting · ${waiting.length}`}>
           {waiting.length === 0 ? (
             <Empty>Nothing to check.</Empty>
           ) : (
@@ -34,6 +35,29 @@ export default async function FitronAdminPage() {
                     {p.status === "REJECTED" && <Badge tone="alert">rejected before</Badge>}
                   </p>
                   <ReviewForm id={p.id} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card title={`AI Trainer members waiting · ${members.waiting.length}`}>
+          {members.waiting.length === 0 ? (
+            <Empty>Nothing to check.</Empty>
+          ) : (
+            <ul className="divide-y divide-line text-sm">
+              {members.waiting.map((p) => (
+                <li key={p.id} className="flex flex-col gap-2 py-3">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <span className="font-medium">
+                      {p.member} <span className="font-normal text-muted">{p.email}</span>
+                    </span>
+                    <span className="text-base font-semibold tabular-nums">{formatInr(p.total)}</span>
+                  </div>
+                  <p className="flex flex-wrap items-center gap-1.5">
+                    UTR <strong className="font-mono">{p.utr}</strong> · {p.ref} · {p.what} · entered {p.submittedAt ? fmtStamp(p.submittedAt) : "-"}
+                    {p.mode === "DEMO" && <Badge tone="neutral">demo, no real money</Badge>}
+                  </p>
+                  <ReviewForm id={p.id} trainer />
                 </li>
               ))}
             </ul>
@@ -62,6 +86,28 @@ export default async function FitronAdminPage() {
             </ul>
           )}
         </Card>
+        {members.recent.length > 0 && (
+          <Card title="AI Trainer, recently checked">
+            <ul className="divide-y divide-line text-sm">
+              {members.recent.map((p) => (
+                <li key={p.id} className="flex flex-col gap-2 py-3">
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <span>
+                      {p.member} · UTR <span className="font-mono">{p.utr}</span> · {p.what} · {formatInr(p.total)}
+                    </span>
+                    {p.status === "PAID" ? <Badge tone="ok">Confirmed</Badge> : <Badge tone="alert">Rejected</Badge>}
+                  </div>
+                  <p className="text-muted">
+                    {p.reviewedBy} · {p.reviewedAt ? fmtStamp(p.reviewedAt) : ""}
+                    {p.periodEnd ? ` · paid until ${p.periodEnd}` : ""}
+                    {p.rejectReason ? ` · ${p.rejectReason}` : ""}
+                  </p>
+                  {p.status === "REJECTED" && <ReviewForm id={p.id} trainer />}
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
       </div>
     </>
   );

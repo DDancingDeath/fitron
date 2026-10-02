@@ -1,4 +1,9 @@
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { TrialForm } from "./trial-form";
+import { GoogleButton, googleMessage } from "@/components/google-button";
+import { Notice } from "@/components/ui";
+import { GOOGLE_SIGNUP_COOKIE, unsign } from "@/lib/integrations/google";
 import { GymSignupForm } from "./gym-signup-form";
 import { DEFAULT_PLAN, PRODUCT_LABEL, findPlan, rupeesLabel } from "@/lib/domain/pricing";
 
@@ -8,8 +13,13 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
   const q = await searchParams;
   const plan = findPlan(typeof q.plan === "string" ? q.plan : null) ?? findPlan(DEFAULT_PLAN)!;
   const cycle = q.cycle === "YEARLY" || q.cycle === "year" ? "YEARLY" : "MONTHLY";
+  // AI Trainer plans sign up inside the member app itself (email link or Google), with the plan picked.
+  if (plan.product === "AI_TRAINER") redirect(`/trainer?plan=${plan.key}`);
   // Gym plans get a real account straight away; AI Trainer and partner plans are set up with the team.
   const gym = plan.product === "GYM_ACCOUNTING";
+  // Back from Google: the verified email and name fill the form.
+  const google = gym ? unsign<{ email: string; name: string }>((await cookies()).get(GOOGLE_SIGNUP_COOKIE)?.value) : null;
+  const problem = googleMessage(q.google);
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,26rem)]">
       <section>
@@ -41,7 +51,15 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
         </p>
       </section>
       <section className="rounded-xl border border-line bg-surface p-5 sm:p-6">
-        {gym ? <GymSignupForm plan={plan.key} cycle={cycle} /> : <TrialForm plan={plan.key} cycle={cycle} />}
+        {gym ? (
+          <div className="flex flex-col gap-4">
+            {problem && <Notice tone="alert">{problem}</Notice>}
+            {!google && <GoogleButton href={`/auth/google?${new URLSearchParams({ for: "signup", plan: plan.key, cycle })}`} label="Sign up with Google" />}
+            <GymSignupForm plan={plan.key} cycle={cycle} google={google ? { email: google.email, name: google.name } : undefined} />
+          </div>
+        ) : (
+          <TrialForm plan={plan.key} cycle={cycle} />
+        )}
       </section>
     </div>
   );

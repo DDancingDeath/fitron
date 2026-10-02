@@ -1106,3 +1106,163 @@ model Offer {
 
   @@unique([orgId, code])
 }
+
+// ── AI Trainer (member app at /trainer) ────────────────────────────────────
+// Consumers who pay FITRON directly. Not tied to a gym, and separate from staff users and sessions.
+
+/// One AI Trainer member. Signs in with an email link or Google; no password.
+model TrainerMember {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  name            String    @default("")
+  /// Tier the member is on or picked: ai-pro | ai-premium
+  plan            String    @default("ai-pro")
+  /// MONTHLY | YEARLY
+  cycle           String    @default("MONTHLY")
+  /// Set once, when the member starts the free trial
+  trialEndsAt     DateTime? @db.Timestamptz
+  /// Last day of the latest confirmed payment's period
+  paidUntil       DateTime? @db.Date
+  /// The member asked not to renew
+  planCancelled   Boolean   @default(false)
+  /// What the app keeps for the member: onboarding answers, weekly split, day schedule, settings, look
+  profile         Json      @default("{}")
+  onboardedAt     DateTime? @db.Timestamptz
+  consentedAt     DateTime? @db.Timestamptz
+  emailVerifiedAt DateTime? @db.Timestamptz
+  /// EMAIL | GOOGLE: how the account was first created
+  signupVia       String    @default("EMAIL")
+  createdAt       DateTime  @default(now()) @db.Timestamptz
+  updatedAt       DateTime  @updatedAt @db.Timestamptz
+  lastSeenAt      DateTime? @db.Timestamptz
+
+  sessions TrainerSession[]
+  days     TrainerDay[]
+  chats    TrainerChat[]
+  payments TrainerPayment[]
+  reviews  TrainerReview[]
+}
+
+/// Sign-in links sent by email. `id` is the SHA-256 of the token in the link.
+model TrainerLoginToken {
+  id        String    @id
+  email     String
+  expiresAt DateTime  @db.Timestamptz
+  usedAt    DateTime? @db.Timestamptz
+  createdAt DateTime  @default(now()) @db.Timestamptz
+
+  @@index([email, createdAt])
+}
+
+/// A signed-in trainer member (cookie fitron_trainer). `id` is the SHA-256 of the cookie token.
+model TrainerSession {
+  id         String        @id
+  memberId   String
+  member     TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  expiresAt  DateTime      @db.Timestamptz
+  lastSeenAt DateTime      @default(now()) @db.Timestamptz
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime      @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+}
+
+/// One day of a member's log: water, habits ticked, whether the workout was done, body weight.
+model TrainerDay {
+  id          String        @id @default(cuid())
+  memberId    String
+  member      TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  date        DateTime      @db.Date
+  /// Litres
+  water       Float         @default(0)
+  /// { workout, water, steps, protein, meals, sleep }: true when ticked
+  habits      Json          @default("{}")
+  workoutDone Boolean       @default(false)
+  /// The day's training focus from the plan (Chest, Legs, Rest…)
+  focus       String?
+  weightKg    Float?
+  updatedAt   DateTime      @updatedAt @db.Timestamptz
+
+  @@unique([memberId, date])
+}
+
+/// One AI Coach conversation, as the app shows it.
+model TrainerChat {
+  id        String        @id @default(cuid())
+  memberId  String
+  member    TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// The id the app gave the chat
+  clientId  String
+  title     String
+  /// [{ role: user|coach, text, exs?, media? }]
+  messages  Json          @default("[]")
+  createdAt DateTime      @default(now()) @db.Timestamptz
+  updatedAt DateTime      @updatedAt @db.Timestamptz
+
+  @@unique([memberId, clientId])
+  @@index([memberId, updatedAt])
+}
+
+/// A member's weekly review, kept as it stood for that week.
+model TrainerReview {
+  id          String        @id @default(cuid())
+  memberId    String
+  member      TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Monday of the week (India time)
+  weekStart   DateTime      @db.Date
+  workouts    Int
+  planned     Int
+  /// Percent of planned sessions done
+  consistency Int
+  /// Percent of meal/protein habits ticked
+  nutrition   Int
+  /// Average litres a day over logged days
+  avgWater    Float
+  insight     String
+  focus       Json          @default("[]")
+  updatedAt   DateTime      @updatedAt @db.Timestamptz
+
+  @@unique([memberId, weekStart])
+}
+
+/// A member paid FITRON by UPI and typed the UTR; the FITRON team checks it (see fitron-admin).
+model TrainerPayment {
+  id           String        @id @default(cuid())
+  memberId     String
+  member       TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// ai-pro | ai-premium
+  plan         String
+  /// MONTHLY | YEARLY
+  cycle        String
+  /// purchase | upgrade | renew | month: which button the member pressed
+  kind         String
+  base         Int
+  gst          Int
+  total        Int
+  /// UPI (FITRON_UPI_ID set) | DEMO (no UPI ID configured; nothing to match)
+  mode         String
+  /// PENDING | SUBMITTED | PAID | REJECTED
+  status       String        @default("PENDING")
+  utr          String?       @unique
+  submittedAt  DateTime?     @db.Timestamptz
+  reviewedBy   String?
+  reviewedAt   DateTime?     @db.Timestamptz
+  rejectReason String?
+  periodStart  DateTime?     @db.Date
+  periodEnd    DateTime?     @db.Date
+  createdAt    DateTime      @default(now()) @db.Timestamptz
+  paidAt       DateTime?     @db.Timestamptz
+
+  @@index([status, submittedAt])
+  @@index([memberId, createdAt])
+}
+
+/// AI Coach messages a member sent on a day (India time), for the plan's daily limit.
+model TrainerCoachUsage {
+  memberId String
+  date     DateTime @db.Date
+  count    Int      @default(0)
+
+  @@id([memberId, date])
+}

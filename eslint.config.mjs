@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "prototype/**",
     // The marketing site is exported from the design tool as-is (it bundles three.js).
     "public/site/**",
+    // The AI Trainer member app is the design tool's export too, with React bundled in vendor/.
+    "public/trainer/**",
     "src/generated/**",
   ]),
 ]);

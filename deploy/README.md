@@ -124,6 +124,7 @@ nano deploy/.env
 | UPI Autopay (your gym's Razorpay) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook `https://your-address/api/webhooks/razorpay` |
 | **Payments to FITRON** (your UPI QR) | `FITRON_UPI_ID` (the UPI ID printed under your QR, e.g. `fitron@okaxis`), `FITRON_UPI_NAME` (name shown in the payer's app), `FITRON_ADMIN_EMAILS` (your login email; several are comma separated) | Nothing else. See step 9 |
 | Your details on FITRON's invoices to gyms | `FITRON_LEGAL_NAME`, `FITRON_GSTIN`, `FITRON_ADDRESS` | Leave `FITRON_GSTIN` empty if you're not GST-registered yet |
+| **Sign in with Google** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | See "Google sign-in" below. Until both are set, the Google button stays hidden and email + password still work |
 | Fitron AI and the AI Trainer's coach | `ANTHROPIC_API_KEY` | from console.anthropic.com |
 | Email (sign-up confirmation, password reset, payment emails, website enquiries) | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `MAIL_FROM`, `ENQUIRY_TO` | Verify fitron.in with your email provider (it gives you DNS records to add). Without email, new sign-ups are trusted without a confirmation link and password reset can't send its link |
 | Documents in the cloud (optional) | `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` | e.g. a Cloudflare R2 bucket (free up to 10 GB); otherwise they're kept on the server |
@@ -138,7 +139,17 @@ Never paste these keys into chat or email. They belong only in this file on the 
 
 You don't need to set `APP_URL`: it's set from your domain automatically. FITRON's own Razorpay settings (`FITRON_RAZORPAY_*`) are optional and only used if `FITRON_UPI_ID` is empty.
 
-## 9. Confirm UPI payments from gyms
+### Google sign-in
+
+1. Open <https://console.cloud.google.com/>, create a project (for example "FITRON") and select it.
+2. Go to **APIs & Services › OAuth consent screen**. Pick **External**, app name **FITRON**, your support email, and add `fitron.in` under authorised domains. Add the links to `https://fitron.in/privacy` and `https://fitron.in/terms`. Then **Publish app** so anyone with a Google account can sign in.
+3. Go to **APIs & Services › Credentials › Create credentials › OAuth client ID**. Pick **Web application**.
+4. Under **Authorised redirect URIs** add exactly `https://fitron.in/auth/google/callback` (use your own domain if it's different).
+5. Copy the **Client ID** and **Client secret** into `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `deploy/.env`, then run `bash deploy/update.sh`.
+
+How it behaves: staff whose email is already a FITRON login sign straight in. A new gym owner can press **Sign up with Google** on the sign-up page; Google confirms the email, so no confirmation link is sent and no password is needed (they can set one later with "Forgot your password?"). A Google account with no FITRON login is told to ask their gym's owner to add them.
+
+## 9. Confirm UPI payments from gyms and AI Trainer members
 
 When a gym pays you, this is what happens:
 
@@ -149,6 +160,8 @@ When a gym pays you, this is what happens:
 5. Sign in, open `https://your-address/fitron-admin` (also linked from Settings › Plan & billing), find that UTR and amount in your bank or UPI app, and press **Money received**. If it isn't there, type why and press **Reject**.
 
 Confirming switches the gym to the plan at once, issues FITRON's invoice, and emails the gym. Rejecting emails the gym the reason so they can check and pay again.
+
+**AI Trainer members** (the app at `https://your-address/trainer`) pay the same way: they pick AI Pro or AI Premium, monthly or yearly, scan the QR (reference like `FTR-AB12CD34`), and type the UTR. Their payments are listed on the same `/fitron-admin` page under **AI Trainer members waiting**. Confirming starts their plan the day after their free trial or current paid period ends, and emails them. A UTR used by a gym can't be used by a member, and the other way round.
 
 Plans and limits (from the pricing page): Starter is up to 100 active members and one branch, Professional up to 300 and one branch, Enterprise has no member limit and 3 branches, and more branches cost ₹499 a month. After a trial or paid period ends there are 7 days' grace, then the gym can still see everything but can't add members or invoices until it pays. Gyms you set up by hand with `npm run setup` aren't on a trial and have no limits.
 
