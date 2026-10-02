@@ -6,6 +6,8 @@ import * as z from "zod";
 import { requirePermission } from "@/lib/auth/current";
 import { openDoor, removeDevice, saveDevice, syncDevices } from "@/lib/services/biometric";
 import { UserError } from "@/lib/services/errors";
+import { accessInput } from "@/lib/validation/frontdesk";
+import { putSetting } from "@/lib/services/settings";
 
 const back = (params: Record<string, string>): never => redirect(`/settings/devices?${new URLSearchParams(params)}`);
 
@@ -49,4 +51,12 @@ export async function syncAction() {
 export async function openDoorAction(id: string) {
   const u = await requirePermission("attendance.manage");
   await run(() => openDoor(u, id), "Door will open on the device's next call in (within a few seconds).");
+}
+
+/** The door rules, edited on this page (the same setting as Settings → Entry rules). */
+export async function saveRulesAction(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  const p = accessInput.safeParse(Object.fromEntries(fd));
+  if (!p.success) back({ error: p.error.issues[0]?.message ?? "Check the rules." });
+  else await run(() => putSetting(u, "access", p.data), "Door rules saved. Devices pick them up on their next sync.");
 }
