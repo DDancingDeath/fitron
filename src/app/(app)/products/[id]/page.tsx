@@ -37,7 +37,7 @@ export default async function ProductPage({ params }: PageProps<"/products/[id]"
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
           {p.stock !== null && (
-            <Card title="Receive or write off stock">
+            <Card title="Receive or write off stock" id="stock">
               <StockForm id={p.id} />
             </Card>
           )}
