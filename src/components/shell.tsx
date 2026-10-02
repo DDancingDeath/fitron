@@ -1,4 +1,3 @@
-import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BellIcon, CrownSimpleIcon, HourglassMediumIcon } from "@phosphor-icons/react/dist/ssr";
@@ -29,15 +28,3 @@ export function BellLink({ unread }: { unread: number }) {
   );
 }
 
-/** The floating "Ask Fitron AI" button, bottom right on every page (prototype). */
-export function AskAiButton() {
-  return (
-    <Link
-      href="/ai"
-      className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-[22px] bg-accent py-[11px] pr-[18px] pl-2.5 text-sm font-semibold whitespace-nowrap text-accent-ink shadow-lg hover:bg-accent-hover"
-    >
-      <Image src="/fitron-mark.png" alt="" width={26} height={26} className="-my-1 rounded-full" />
-      Ask Fitron AI
-    </Link>
-  );
-}

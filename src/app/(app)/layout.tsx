@@ -9,7 +9,8 @@ import { photoUrl } from "@/components/avatar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { GlobalSearch } from "@/components/global-search";
 import { SideLogo } from "@/components/side-logo";
-import { AskAiButton, BellLink, TrialBanner } from "@/components/shell";
+import { BellLink, TrialBanner } from "@/components/shell";
+import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
 import { gymPlan } from "@/lib/services/saas";
 import { PLANS } from "@/lib/domain/pricing";
@@ -89,7 +90,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         {banner && <TrialBanner alert={banner.alert} cta={canPay ? banner.cta : undefined}>{banner.body}</TrialBanner>}
         <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 lg:px-10">{children}</main>
       </div>
-      {u.can("ai.use") && <AskAiButton />}
+      {u.can("ai.use") && <AskAi />}
     </div>
   );
 }

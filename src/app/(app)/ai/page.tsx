@@ -1,71 +1,34 @@
-import Link from "next/link";
+import Image from "next/image";
 import { requirePermission } from "@/lib/auth/current";
-import { aiReady } from "@/lib/integrations/anthropic";
-import { atRisk, dailyBrief } from "@/lib/services/insights";
-import { Badge, Button, Card, PageHeader } from "@/components/ui";
-import { riskBand } from "@/lib/domain/risk";
-import { AiChat } from "./chat";
-import { refreshRiskAction } from "./actions";
+import { aiBrief } from "@/lib/services/ai-local";
+import { todayIso } from "@/lib/services/time";
+import { AiWorkspace } from "./chat";
 
 export const metadata = { title: "Fitron AI · Fitron" };
 
+const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
+
 export default async function AiPage() {
   const u = await requirePermission("ai.use");
-  const [brief, risky] = await Promise.all([dailyBrief(u), u.can("members.view") ? atRisk(u, 12) : Promise.resolve([])]);
+  const brief = await aiBrief(u);
   return (
-    <>
-      <PageHeader title="Fitron AI" subtitle="Today's brief, members at risk, and an assistant that knows your gym." />
-      <div className="grid gap-6 lg:grid-cols-5">
-        <Card title="Ask" className="lg:col-span-3">
-          <AiChat ready={aiReady()} />
-        </Card>
-        <div className="flex flex-col gap-6 lg:col-span-2">
-          <Card title="Today's brief">
-            {brief.length === 0 ? (
-              <p className="text-sm text-muted">Nothing needs attention right now.</p>
-            ) : (
-              <ul className="divide-y divide-line text-sm">
-                {brief.map((a, i) => (
-                  <li key={i} className="py-2">
-                    <p className="font-semibold">
-                      <Badge tone={a.tone}>{a.tone === "alert" ? "Act" : a.tone === "accent" ? "Watch" : "Note"}</Badge> {a.href ? <Link href={a.href} className="hover:text-accent">{a.title}</Link> : a.title}
-                    </p>
-                    <p className="text-muted">{a.detail}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-          {u.can("members.view") && (
-            <Card
-              title="Members at risk"
-              action={
-                <form action={refreshRiskAction}>
-                  <Button className="min-h-8 px-3 text-xs">Refresh</Button>
-                </form>
-              }
-            >
-              {risky.length === 0 ? (
-                <p className="text-sm text-muted">No one at risk. Scores update every night.</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {risky.map((m) => (
-                    <li key={m.id} className="py-2">
-                      <Link href={`/members/${m.id}`} className="flex items-center justify-between gap-2 font-semibold hover:text-accent">
-                        <span>{m.name}</span>
-                        <Badge tone={riskBand(m.riskScore ?? 0) === "High" ? "alert" : "accent"}>
-                          {riskBand(m.riskScore ?? 0)} · {m.riskScore}
-                        </Badge>
-                      </Link>
-                      <p className="text-muted">{m.riskReasons.join(" · ")}</p>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          )}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <span className="relative inline-block h-[60px] w-[60px] flex-none rounded-full shadow-[0_0_0_1px_var(--accent-500),0_8px_28px_rgba(207,169,79,0.22)]">
+            <Image src="/fitron-mark.png" alt="" width={60} height={60} className="rounded-full" />
+          </span>
+          <div>
+            <div className="text-xs tracking-[0.04em] text-muted uppercase">Your operations assistant</div>
+            <h1 className="mt-1 text-[28px] lg:text-[40px]">Fitron AI</h1>
+          </div>
         </div>
+        <span className="flex items-center gap-2 rounded-full bg-surface px-3 py-2 text-[13px] text-muted">
+          <span className="h-2 w-2 rounded-full bg-[#4ade80] shadow-[0_0_6px_#4ade80]" />
+          Reads live gym data · actions need your OK
+        </span>
       </div>
-    </>
+      <AiWorkspace brief={brief} today={longDate(todayIso())} />
+    </div>
   );
 }
