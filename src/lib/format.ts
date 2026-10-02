@@ -30,3 +30,16 @@ export function fmtClock(hhmm: string) {
 
 /** The Indian calendar date of a timestamp, "28 Sep 2026" (fmtDate reads @db.Date columns as-is). */
 export const fmtStamp = (d: Date | null | undefined) => (d ? fmtDate(new Date(d.getTime() + 330 * 60_000)) : "—");
+
+/** Paise as whole rupees for summary figures, as the prototype shows them: "₹33,300", "−₹7,215". */
+export const formatRupees = (paise: number) => `${paise < 0 ? "−" : ""}₹${Math.round(Math.abs(paise) / 100).toLocaleString("en-IN")}`;
+
+/** "2026-10-02" → "2 Oct" */
+export function fmtShort(d: string | Date | null | undefined) {
+  if (!d) return "—";
+  const s = typeof d === "string" ? d : d.toISOString().slice(0, 10);
+  return `${Number(s.slice(8, 10))} ${MONTHS[Number(s.slice(5, 7)) - 1]}`;
+}
+
+/** "2026-10" → "Oct" */
+export const fmtMonthShort = (ym: string) => MONTHS[Number(ym.slice(5, 7)) - 1]!;

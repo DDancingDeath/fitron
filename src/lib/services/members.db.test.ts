@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { hasDb, makeGym, pick } from "@/test/db";
-import { createMember, deleteMember, getMember, listMembers, updateMember } from "./members";
+import { createMember, deleteMember, getMember, listDeleted, listMembers, restoreMember, updateMember } from "./members";
 import { createPlan, deletePlan } from "./plans";
 import { UserError } from "./errors";
 import type { MemberInput } from "@/lib/validation/member";
@@ -76,5 +76,29 @@ describe.skipIf(!hasDb)("members (database)", () => {
     const p = await createPlan(admin, { name: "Trial", kind: "Membership", months: 1, price: 100, regFee: 0, discount: 0, gstApplicable: true, features: [] });
     await deletePlan(admin, p.id);
     expect(await db.membershipPlan.findUnique({ where: { id: p.id } })).toBeNull();
+  });
+
+  it("restores a deleted member unless their phone was taken meanwhile", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ phone: "9876500091", name: "Comes Back" }));
+    await deleteMember(admin, m.id);
+    expect((await listDeleted(admin)).find((d) => d.id === m.id)?.deletedBy).toBe(admin.name);
+    await restoreMember(admin, m.id);
+    expect(await getMember(admin, m.id)).not.toBeNull();
+
+    await deleteMember(admin, m.id);
+    await createMember(admin, input({ phone: "9876500091", name: "New Number Owner" }));
+    await expect(restoreMember(admin, m.id)).rejects.toThrow(/now belongs to New Number Owner/);
+  });
+
+  it("filters by area, balance due and risk, sorted by name", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    await createMember(admin, input({ phone: "9876500101", name: "Zoya Area", area: "Sector 4" }));
+    const risky = await createMember(admin, input({ phone: "9876500102", name: "Aarav Risky", area: "Sector 4" }));
+    await db.member.update({ where: { id: risky.id }, data: { riskScore: 70 } });
+    expect((await listMembers(admin, { area: "Sector 4" })).rows.map((r) => r.name)).toEqual(["Aarav Risky", "Zoya Area"]);
+    expect((await listMembers(admin, { status: "RISK" })).rows.map((r) => r.name)).toContain("Aarav Risky");
+    expect((await listMembers(admin, { status: "DUE" })).rows.every((r) => r.outstanding > 0)).toBe(true);
+    expect((await listMembers(admin, { pageSize: 2 })).rows).toHaveLength(2);
   });
 });

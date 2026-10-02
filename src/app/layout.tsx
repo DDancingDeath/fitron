@@ -12,9 +12,15 @@ export const metadata: Metadata = {
   description: "Gym management and accounting",
 };
 
+// Applies the saved light/dark choice before the first paint, so pages never flash the wrong theme.
+const THEME_SCRIPT = `try{if(localStorage.getItem("fitron_theme")==="light")document.documentElement.dataset.theme="light"}catch(e){}`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${sourceSerif.variable} h-full antialiased`}>
+    <html lang="en" className={`${sourceSerif.variable} h-full antialiased`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

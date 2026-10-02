@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
+import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { listPurchases } from "@/lib/services/purchases";
 import { Badge, Button, Empty, Input, LinkButton, PageHeader } from "@/components/ui";
 import { cx } from "@/components/ui";
@@ -31,6 +32,7 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
           </LinkButton>
         }
       />
+      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/purchases" />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {TABS.map(([k, label]) => (
           <Link key={k} href={k ? `/purchases?show=${k}` : "/purchases"} className={cx("rounded-full border px-3 py-1 text-sm", show === k ? "border-accent text-accent" : "border-line text-muted hover:text-fg")}>

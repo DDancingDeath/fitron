@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
+import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { ledger, monthOverview, monthPeriod, profitAndLoss } from "@/lib/services/accounting";
 import { todayIso } from "@/lib/services/time";
 import { Badge, Button, Card, Input, Notice, PageHeader, cx } from "@/components/ui";
@@ -49,6 +50,7 @@ export default async function AccountingPage({ searchParams }: PageProps<"/accou
   return (
     <>
       <PageHeader title="Accounting" subtitle={u.branch === "ALL" ? "All branches" : u.branches.find((b) => b.id === u.branch)?.name} />
+      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/accounting" />
       <div className="mb-4 flex flex-wrap gap-2">
         {tabs.map(([k, l]) => (
           <Link key={k} href={`/accounting?tab=${k}`} className={cx("rounded-full border px-3 py-1.5 text-sm", tab === k ? "border-accent bg-accent-soft text-accent" : "border-line")}>

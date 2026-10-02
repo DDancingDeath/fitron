@@ -81,13 +81,15 @@ export async function summarize(memberIds: string[], today = todayIso()) {
 
 export async function listMembers(
   u: CurrentUser,
-  f: { q?: string; status?: string; gender?: string; plan?: string; page?: number; all?: boolean },
+  f: { q?: string; status?: string; gender?: string; plan?: string; area?: string; page?: number; pageSize?: number; all?: boolean },
 ) {
   const q = f.q?.trim();
   const where: Prisma.MemberWhereInput = {
     ...memberScope(u),
     walkIn: false,
     ...(f.gender ? { gender: f.gender } : {}),
+    ...(f.area ? { area: f.area } : {}),
+    ...(f.status === "RISK" ? { riskScore: { gte: 40 } } : {}),
     ...(q
       ? {
           OR: [
@@ -101,7 +103,7 @@ export async function listMembers(
   };
   const members = await db.member.findMany({
     where,
-    orderBy: { createdAt: "desc" },
+    orderBy: { name: "asc" },
     select: { id: true, code: true, name: true, phone: true, gender: true, area: true, branchId: true, suspended: true },
   });
   const today = todayIso();
@@ -114,10 +116,12 @@ export async function listMembers(
       status: membershipStatus({ suspended: m.suspended, latestEnd: s.latestEnd, outstanding: s.outstanding, today }),
     };
   });
-  if (f.status) rows = rows.filter((r) => r.status === f.status);
+  // DUE: any balance owed; RISK (Fitron AI score) is filtered in the query.
+  if (f.status === "DUE") rows = rows.filter((r) => r.outstanding > 0);
+  else if (f.status && f.status !== "RISK") rows = rows.filter((r) => r.status === f.status);
   if (f.plan) rows = rows.filter((r) => r.planName === f.plan);
   const counts = rows.reduce<Record<string, number>>((c, r) => ((c[r.status] = (c[r.status] ?? 0) + 1), c), {});
-  const pageSize = f.all ? Math.max(1, rows.length) : 50;
+  const pageSize = f.all ? Math.max(1, rows.length) : (f.pageSize ?? 50);
   const page = Math.max(1, f.page ?? 1);
   return { rows: rows.slice((page - 1) * pageSize, page * pageSize), total: rows.length, page, pageSize, counts };
 }
@@ -209,6 +213,38 @@ export async function deleteMember(u: CurrentUser, id: string) {
     await eraseBiometrics(u, id, tx);
     const after = await tx.member.update({ where: { id }, data: { deletedAt: new Date() } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.delete", entity: "Member", entityId: id, before, after });
+  });
+}
+
+/** Members deleted in the picked branch(es), newest first, with who deleted them (for "Recently deleted"). */
+export async function listDeleted(u: CurrentUser) {
+  const gone = await db.member.findMany({
+    where: { orgId: u.orgId, branchId: { in: u.branchIds }, walkIn: false, deletedAt: { not: null } },
+    orderBy: { deletedAt: "desc" },
+    take: 50,
+    select: { id: true, code: true, name: true, deletedAt: true },
+  });
+  const logs = await db.auditLog.findMany({
+    where: { orgId: u.orgId, entity: "Member", action: "member.delete", entityId: { in: gone.map((m) => m.id) } },
+    orderBy: { id: "desc" },
+    select: { entityId: true, userId: true },
+  });
+  const users = await db.user.findMany({ where: { id: { in: [...new Set(logs.map((l) => l.userId).filter((x): x is string => !!x))] } }, select: { id: true, name: true } });
+  return gone.map((m) => {
+    const by = logs.find((l) => l.entityId === m.id)?.userId;
+    return { ...m, deletedBy: users.find((x) => x.id === by)?.name ?? "—" };
+  });
+}
+
+/** Brings a deleted member back, unless their phone now belongs to someone else. */
+export async function restoreMember(u: CurrentUser, id: string) {
+  const before = await db.member.findFirst({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, id, deletedAt: { not: null } } });
+  if (!before) throw new UserError("Member not found.");
+  const clash = await db.member.findFirst({ where: { orgId: u.orgId, phone: before.phone, deletedAt: null, walkIn: false }, select: { code: true, name: true } });
+  if (clash) throw new UserError(`${before.phone} now belongs to ${clash.name} (${clash.code}). Change one of the numbers first.`);
+  await db.$transaction(async (tx) => {
+    const after = await tx.member.update({ where: { id }, data: { deletedAt: null } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.restore", entity: "Member", entityId: id, before, after });
   });
 }
 

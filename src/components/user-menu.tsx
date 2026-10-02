@@ -3,11 +3,21 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/login/actions";
+import { ClockCounterClockwiseIcon, CrownSimpleIcon, GearSixIcon, LockKeyIcon, SignOutIcon, UserCircleIcon, type Icon } from "@phosphor-icons/react";
 import { Avatar } from "./avatar";
 
 type MenuUser = { name: string; email: string; role: string; branch: string; photo: string | null; canSettings: boolean };
 
-const item = "flex w-full items-center rounded-md px-3 py-2 text-left text-sm hover:bg-accent-soft";
+const item = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-[9px] text-left text-sm hover:bg-accent-soft";
+
+function Item({ href, icon: I, label, onClick }: { href: string; icon: Icon; label: string; onClick: () => void }) {
+  return (
+    <Link role="menuitem" href={href} onClick={onClick} className={item}>
+      <I size={18} weight="duotone" className="text-accent" />
+      {label}
+    </Link>
+  );
+}
 
 export function UserMenu({ user }: { user: MenuUser }) {
   const [open, setOpen] = useState(false);
@@ -28,50 +38,45 @@ export function UserMenu({ user }: { user: MenuUser }) {
   const close = () => setOpen(false);
   return (
     <div ref={ref} className="relative">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-full" aria-haspopup="menu" aria-expanded={open} aria-label="Your account">
-        <span className="hidden text-right text-sm leading-tight sm:block">
-          <span className="block font-semibold">{user.name}</span>
-          <span className="block text-muted">{user.role}</span>
-        </span>
-        <Avatar name={user.name} src={user.photo} className="size-9 text-sm" />
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="block rounded-full"
+        title={user.name}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="Account menu"
+      >
+        <Avatar name={user.name} src={user.photo} className="size-[34px] text-[13px]" />
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-[calc(100%+8px)] z-50 w-72 rounded-xl border border-line bg-surface p-2 shadow-lg">
+        <div role="menu" className="absolute top-[calc(100%+8px)] right-0 z-50 w-[280px] rounded-lg border border-line bg-surface p-2 shadow-lg">
           <div className="flex items-center gap-3 p-2.5">
             <Avatar name={user.name} src={user.photo} className="size-11" />
             <div className="min-w-0">
               <div className="truncate font-semibold">{user.name}</div>
               <div className="truncate text-xs text-muted">{user.email}</div>
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                <span className="rounded-full border border-accent/40 px-2 text-[11px] text-accent">{user.role}</span>
+                <span className="rounded-full border border-accent/50 px-[7px] py-px text-[11px] text-accent">{user.role}</span>
                 <span className="text-[11px] text-muted">{user.branch}</span>
               </div>
             </div>
           </div>
           <div className="my-1 h-px bg-line" />
-          <Link role="menuitem" href="/profile" onClick={close} className={item}>
-            My profile
-          </Link>
-          <Link role="menuitem" href="/profile?tab=password" onClick={close} className={item}>
-            Change password
-          </Link>
-          <Link role="menuitem" href="/profile#activity" onClick={close} className={item}>
-            My activity
-          </Link>
+          <Item href="/profile" icon={UserCircleIcon} label="My profile" onClick={close} />
+          <Item href="/profile?tab=password" icon={LockKeyIcon} label="Change password" onClick={close} />
           {user.canSettings && (
             <>
-              <Link role="menuitem" href="/settings/billing" onClick={close} className={item}>
-                Plan &amp; billing
-              </Link>
-              <Link role="menuitem" href="/settings" onClick={close} className={item}>
-                Settings
-              </Link>
+              <Item href="/settings/billing" icon={CrownSimpleIcon} label="Plan & billing" onClick={close} />
+              <Item href="/settings" icon={GearSixIcon} label="Settings" onClick={close} />
             </>
           )}
+          <Item href="/profile#activity" icon={ClockCounterClockwiseIcon} label="My activity" onClick={close} />
           <div className="my-1 h-px bg-line" />
           <form action={logout}>
-            <button role="menuitem" className={item}>
-              Log out
+            <button role="menuitem" className={`${item} text-alert hover:bg-alert-soft`}>
+              <SignOutIcon size={18} weight="duotone" />
+              Sign out
             </button>
           </form>
         </div>

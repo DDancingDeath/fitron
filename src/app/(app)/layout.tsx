@@ -6,54 +6,74 @@ import { MobileNav } from "@/components/mobile-nav";
 import { BranchSwitcher } from "@/components/branch-switcher";
 import { UserMenu } from "@/components/user-menu";
 import { photoUrl } from "@/components/avatar";
-import { Logo } from "@/components/logo";
-import { unreadCount } from "@/lib/services/notifications";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { GlobalSearch } from "@/components/global-search";
+import { SideLogo } from "@/components/side-logo";
+import { AskAiButton, BellLink, TrialBanner } from "@/components/shell";
+import { navCounts } from "@/lib/services/shell";
 import { gymPlan } from "@/lib/services/saas";
+import { PLANS } from "@/lib/domain/pricing";
 import { daysBetween } from "@/lib/domain/dates";
 import { todayIso } from "@/lib/services/time";
-import { fmtDate } from "@/lib/format";
+import { fmtDate, formatInr } from "@/lib/format";
+
+const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_ACCOUNTING").map((p) => p.price.MONTHLY))).replace(/\.00$/, "");
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
-  const unread = await unreadCount(u);
-  const plan = await gymPlan(u.orgId);
+  const [counts, plan] = await Promise.all([navCounts(u), gymPlan(u.orgId)]);
   const s = plan.standing;
   const left = s.kind === "TRIAL" ? daysBetween(s.until, todayIso()) + 1 : 0;
+  const canPay = u.can("settings.manage");
   const banner =
     plan.checking && (s.kind === "TRIAL" || s.kind === "LAPSED")
-      ? { alert: false, text: "Thanks for paying. We're checking your UPI payment and will confirm by email.", link: "" }
+      ? { alert: false, body: <>Thanks for paying. We&apos;re checking your UPI payment and will confirm by email.</> }
       : s.kind === "TRIAL"
-        ? { alert: false, text: `Free trial of ${plan.name}: ${left} day${left === 1 ? "" : "s"} left. Everything stays as it is when you pay.`, link: "Choose a plan" }
+        ? {
+            alert: left <= 2,
+            body: (
+              <>
+                Free trial:{" "}
+                <strong>
+                  {left} {left === 1 ? "day" : "days"} left
+                </strong>{" "}
+                · ends {fmtDate(s.until)}. Your account locks after the trial.
+              </>
+            ),
+            cta: `Upgrade from ${fromPrice}/month`,
+          }
         : s.kind === "GRACE"
-          ? { alert: true, text: `Your ${plan.name} plan has ended. Renew before ${fmtDate(s.readOnlyFrom)} to keep adding members and invoices.`, link: "Renew" }
+          ? { alert: true, body: <>Your {plan.name} plan has ended. Renew before {fmtDate(s.readOnlyFrom)} to keep adding members and invoices.</>, cta: "Renew" }
           : s.kind === "LAPSED"
-            ? { alert: true, text: "Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.", link: "Choose a plan" }
+            ? { alert: true, body: <>Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.</>, cta: "Choose a plan" }
             : null;
-  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.perm || u.can(i.perm)) })).filter((g) => g.items.length);
+  const groups = NAV.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => !i.perm || u.can(i.perm)).map((i) => ({ ...i, badge: i.count ? counts[i.count] : undefined })),
+  })).filter((g) => g.items.length);
+  const branchName = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
 
   return (
     <div className="flex min-h-screen">
-      <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-line bg-surface p-4 lg:flex">
-        <Link href="/dashboard" className="px-3 pt-2">
-          <Logo />
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-5 overflow-x-hidden overflow-y-auto border-r border-line-soft bg-surface px-3.5 pb-6 lg:flex">
+        <Link href="/dashboard" className="mt-4 -mb-1 block w-[200px]" aria-label="Dashboard">
+          <SideLogo />
         </Link>
+        <div className="flex flex-col gap-0.5 px-2">
+          <div className="text-[11px] tracking-[0.1em] text-muted uppercase">Tenant</div>
+          <div className="text-[15px] font-semibold">{u.orgName}</div>
+          <div className="text-xs text-muted">{branchName}</div>
+        </div>
         <NavLinks groups={groups} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-line bg-bg/90 px-4 py-3 backdrop-blur sm:px-6">
-          <div className="flex items-center gap-3">
-            <MobileNav groups={groups} />
-            <span className="hidden font-semibold sm:inline">{u.orgName}</span>
+        <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-line-soft bg-bg px-4 py-3 lg:px-10">
+          <MobileNav groups={groups} orgName={u.orgName} branchName={branchName} />
+          <GlobalSearch />
+          <div className="flex flex-none items-center gap-1.5 sm:gap-2.5 lg:ml-auto">
             <BranchSwitcher branches={u.branches} value={u.branch} />
-          </div>
-          <div className="flex items-center gap-3">
-            <Link href="/notifications" className="relative flex min-h-9 items-center rounded-md border border-line px-3 text-sm" aria-label={unread ? `${unread} unread alerts` : "Alerts"}>
-              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-                <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-              </svg>
-              {unread > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-alert px-1 text-center text-[11px] font-semibold leading-5 text-bg">{unread > 99 ? "99+" : unread}</span>}
-            </Link>
+            <ThemeToggle />
+            <BellLink unread={counts.notifications ?? 0} />
             <UserMenu
               user={{
                 name: u.name,
@@ -61,23 +81,15 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 role: u.role,
                 branch: u.branch === "ALL" ? "All branches" : (u.branches.find((b) => b.id === u.branch)?.name ?? ""),
                 photo: photoUrl(u.id, u.photoKey),
-                canSettings: u.can("settings.manage"),
+                canSettings: canPay,
               }}
             />
           </div>
         </header>
-        {banner && (
-          <div className={`border-b border-line px-4 py-2 text-center text-sm sm:px-6 ${banner.alert ? "bg-alert-soft text-alert" : "bg-accent-soft"}`}>
-            {banner.text}{" "}
-            {banner.link && u.can("settings.manage") && (
-              <Link href="/settings/billing" className="font-semibold underline">
-                {banner.link}
-              </Link>
-            )}
-          </div>
-        )}
-        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8">{children}</main>
+        {banner && <TrialBanner alert={banner.alert} cta={canPay ? banner.cta : undefined}>{banner.body}</TrialBanner>}
+        <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 lg:px-10">{children}</main>
       </div>
+      {u.can("ai.use") && <AskAiButton />}
     </div>
   );
 }
