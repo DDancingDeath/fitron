@@ -1,61 +1,158 @@
 import Link from "next/link";
+import { PlusIcon, TicketIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
+import { db } from "@/lib/db";
 import { listPlans } from "@/lib/services/plans";
-import { Badge, Button, Empty, LinkButton, Notice, PageHeader } from "@/components/ui";
+import { listOffers } from "@/lib/services/offers";
+import { getTax } from "@/lib/services/tax";
+import { fromIso, todayIso, toIso } from "@/lib/services/time";
+import { offerState } from "@/lib/domain/offers";
 import { ConfirmButton } from "@/components/confirm-button";
-import { formatInr } from "@/lib/format";
-import { changePlanStatus, removePlan } from "./actions";
+import { Tag } from "@/components/tag";
+import { LinkButton, ListHeader, Notice, TABLE, TD, TH, TR, cx } from "@/components/ui";
+import { fmtDate, formatRupees } from "@/lib/format";
+import { changePlanStatus, removePlan, toggleOffer } from "./actions";
 
-export const metadata = { title: "Plans · Fitron" };
+export const metadata = { title: "Plans & offers · Fitron" };
+
+const ghost = "inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
 
 export default async function PlansPage({ searchParams }: PageProps<"/plans">) {
   const u = await requirePermission("plans.manage");
   const { error } = await searchParams;
-  const plans = await listPlans(u);
+  const today = todayIso();
+  const [plans, offers, tax, current] = await Promise.all([
+    listPlans(u),
+    listOffers(u),
+    getTax(u.orgId),
+    // Active members per plan: memberships covering today.
+    db.membership.findMany({
+      where: { status: "VALID", startDate: { lte: fromIso(today) }, endDate: { gte: fromIso(today) }, member: { orgId: u.orgId, deletedAt: null } },
+      select: { planId: true, memberId: true },
+      distinct: ["memberId", "planId"],
+    }),
+  ]);
+  const activeOn = (id: string) => new Set(current.filter((m) => m.planId === id).map((m) => m.memberId)).size;
+
   return (
-    <>
-      <PageHeader title="Plans & offers" actions={<LinkButton href="/plans/new" variant="primary">New plan</LinkButton>} />
-      {typeof error === "string" && <div className="mb-4"><Notice tone="alert">{error}</Notice></div>}
-      {plans.length === 0 ? (
-        <Empty>No plans yet. Create the plans you sell, like Monthly, Quarterly and Annual.</Empty>
-      ) : (
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-          {plans.map((p) => (
-            <div key={p.id} className="flex flex-col rounded-xl border border-line bg-surface p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <Link href={`/plans/${p.id}/edit`} className="text-lg font-semibold hover:text-accent">
-                    {p.name}
-                  </Link>
-                  <div className="text-sm text-muted">
-                    {p.kind} · {p.months} {p.months === 1 ? "month" : "months"}
-                  </div>
-                </div>
-                {p.status === "ACTIVE" ? <Badge tone="ok">Active</Badge> : <Badge>Inactive</Badge>}
+    <div className="flex flex-col gap-6 pt-4">
+      <ListHeader
+        kicker={`${plans.filter((p) => p.status === "ACTIVE").length} active plans`}
+        title="Plans & offers"
+        actions={
+          <>
+            <LinkButton href="/plans/offers/new">
+              <TicketIcon size={17} weight="duotone" />
+              New offer code
+            </LinkButton>
+            <LinkButton href="/plans/new" variant="primary">
+              <PlusIcon size={17} weight="duotone" />
+              New plan
+            </LinkButton>
+          </>
+        }
+      />
+      {typeof error === "string" && <Notice tone="alert">{error}</Notice>}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-5">
+        {plans.map((p) => (
+          <div key={p.id} className={cx("flex flex-col gap-2.5 rounded-md bg-surface p-[15px]", p.status !== "ACTIVE" && "opacity-60")}>
+            <div className="flex items-center justify-between">
+              <div className="text-[10px] tracking-[0.1em] text-accent uppercase">{p.months === 1 ? "1 month" : `${p.months} months`}</div>
+              <Tag label={p.status === "ACTIVE" ? "Active" : "Inactive"} />
+            </div>
+            <div className="text-[22px] leading-tight font-semibold">{p.name}</div>
+            <div className="text-[28px] font-semibold">{formatRupees(p.price)}</div>
+            <div className="text-[13px] text-muted">
+              {p.regFee ? `+ ${formatRupees(p.regFee)} registration` : "No registration fee"}
+              {tax.enabled && p.gstApplicable ? ` · + GST ${tax.rate}%` : ""} · {formatRupees(Math.round(p.price / p.months))}/month
+            </div>
+            {p.description && <p className="m-0 flex-1 text-[13px] opacity-80">{p.description}</p>}
+            {p.features.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {p.features.map((f) => (
+                  <Tag key={f} label={f} />
+                ))}
               </div>
-              <div className="mt-3 text-2xl font-semibold">{formatInr(p.price)}</div>
-              <div className="text-sm text-muted">
-                {p.regFee > 0 ? `+ ${formatInr(p.regFee)} registration` : "No registration fee"}
-                {p.gstApplicable ? " · GST extra" : ""}
-              </div>
-              <div className="mt-1 text-sm text-muted">Sold {p._count.memberships} times</div>
-              <div className="mt-4 flex gap-2">
-                <LinkButton href={`/plans/${p.id}/edit`}>Edit</LinkButton>
+            )}
+            <div className="text-[13px] text-muted">{p.prices.length ? `Pricing: ${p.prices.map((x) => `${x.category} ${formatRupees(x.price)}`).join(" · ")}` : "Single price"}</div>
+            <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px] text-fg/50">
+              <span>{activeOn(p.id)} active members</span>
+              <span className="flex gap-0.5">
+                <Link href={`/plans/${p.id}/edit`} className={ghost}>
+                  Edit
+                </Link>
                 <form action={changePlanStatus.bind(null, p.id, p.status === "ACTIVE" ? "INACTIVE" : "ACTIVE")}>
-                  <Button>{p.status === "ACTIVE" ? "Deactivate" : "Activate"}</Button>
+                  <button className={ghost}>{p.status === "ACTIVE" ? "Deactivate" : "Activate"}</button>
                 </form>
                 {p._count.memberships === 0 && (
                   <form action={removePlan.bind(null, p.id)}>
-                    <ConfirmButton variant="danger" confirm={`Delete the ${p.name} plan?`}>
+                    <ConfirmButton variant="ghost" className="text-alert-700" confirm={`Delete plan ${p.name}? This plan has never been sold, so it can be removed.`}>
                       Delete
                     </ConfirmButton>
                   </form>
                 )}
-              </div>
+              </span>
             </div>
-          ))}
+          </div>
+        ))}
+      </div>
+      {plans.length === 0 && <p className="text-muted">No plans yet. Create the plans you sell, like Monthly, Quarterly and Annual.</p>}
+      <p className="text-[13px] text-muted">Plans used in any membership or invoice can’t be deleted. Deactivate them instead; history stays intact.</p>
+
+      <section id="offers" className="mt-4 flex scroll-mt-24 flex-col gap-3">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h2 className="m-0 text-[28px]">Offers &amp; promo codes</h2>
+            <div className="text-[13px] text-muted">Apply at registration or renewal. Each use is tracked.</div>
+          </div>
+          <LinkButton href="/plans/offers/new">
+            <PlusIcon weight="duotone" />
+            New offer
+          </LinkButton>
         </div>
-      )}
-    </>
+        {offers.length ? (
+          <div className="overflow-x-auto">
+            <table className={TABLE}>
+              <thead>
+                <tr>
+                  {["Code", "Description", "Discount", "Valid till", "Uses", "Status", ""].map((h, i) => (
+                    <th key={i} className={TH}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {offers.map((o) => {
+                  const st = offerState({ ...o, validTill: toIso(o.validTill) }, today);
+                  return (
+                    <tr key={o.id} className={TR}>
+                      <td className={cx(TD, "font-semibold tracking-[0.04em]")}>{o.code}</td>
+                      <td className={TD}>{o.description}</td>
+                      <td className={TD}>{o.type === "PERCENT" ? `${o.value}%` : formatRupees(o.value)}</td>
+                      <td className={cx(TD, "whitespace-nowrap")}>{fmtDate(o.validTill)}</td>
+                      <td className={TD}>
+                        {o.uses}
+                        {o.usageLimit ? ` / ${o.usageLimit}` : ""}
+                      </td>
+                      <td className={TD}>
+                        <Tag label={st}>{st}</Tag>
+                      </td>
+                      <td className={TD}>
+                        <form action={toggleOffer.bind(null, o.id, o.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}>
+                          <button className={ghost}>{o.status === "ACTIVE" ? "Pause" : "Activate"}</button>
+                        </form>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="m-0 text-sm text-muted">No offer codes yet. Create one for festivals, referrals or students.</p>
+        )}
+      </section>
+    </div>
   );
 }

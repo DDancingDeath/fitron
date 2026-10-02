@@ -171,6 +171,25 @@ export const REPORTS: Record<string, Def> = {
       return { columns: [{ key: "source", label: "Source" }, { key: "members", label: "New members" }], rows, totals: { members: sumCol(rows, "members") } };
     },
   },
+  leads: {
+    title: "All leads",
+    group: "Members",
+    perm: "leads.manage",
+    usesPeriod: false,
+    async run(u) {
+      const leads = await db.lead.findMany({ where: branchScope(u), orderBy: { createdAt: "desc" } });
+      const d = (x: Date | null) => (x ? toIso(x) : null);
+      const rows = leads.map((l) => ({ name: l.name, phone: l.phone, source: l.source, interest: l.interest, stage: l.stage, followUp: d(l.followUpOn), trial: d(l.trialOn), lost: l.lostReason, notes: l.notes, added: todayIso(l.createdAt) }));
+      return {
+        columns: [
+          { key: "name", label: "Name" }, { key: "phone", label: "Phone" }, { key: "source", label: "Source" }, { key: "interest", label: "Interested in" },
+          { key: "stage", label: "Stage" }, { key: "followUp", label: "Follow up" }, { key: "trial", label: "Trial" }, { key: "lost", label: "Lost reason" },
+          { key: "notes", label: "Notes" }, { key: "added", label: "Added" },
+        ],
+        rows,
+      };
+    },
+  },
   assets: {
     title: "Fixed asset register",
     group: "Fixed assets",

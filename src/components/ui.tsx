@@ -46,9 +46,9 @@ export function Field({ label, error, hint, children, className }: { label: stri
   );
 }
 
-export function Card({ className, children, title, action }: { className?: string; children: ReactNode; title?: string; action?: ReactNode }) {
+export function Card({ className, children, title, action, id }: { className?: string; children: ReactNode; title?: string; action?: ReactNode; id?: string }) {
   return (
-    <section className={cx("rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm", className)}>
+    <section id={id} className={cx("rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm", className)}>
       {(title || action) && (
         <div className="mb-3.5 flex items-center justify-between gap-3">
           {title && <h2 className="text-[17px] font-semibold">{title}</h2>}
@@ -132,3 +132,41 @@ export function Pager({ page, pageSize, total, href }: { page: number; pageSize:
     </div>
   );
 }
+
+/** The prototype's joined filter buttons; the picked one is gold. */
+export function Segmented({ options, current }: { options: { key: string; label: ReactNode; href: string }[]; current: string }) {
+  return (
+    <div className="inline-flex flex-wrap self-start overflow-hidden rounded-md border border-line">
+      {options.map((o) => (
+        <Link key={o.key} href={o.href} className={cx("px-3 py-[7px] text-[13px]", o.key === current ? "bg-accent text-accent-ink" : "text-fg hover:bg-fg/7")}>
+          {o.label}
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+/** A small uppercase label over a large figure, as in the prototype's stat rows. */
+export function Stat({ label, value, tone }: { label: string; value: ReactNode; tone?: "alert" }) {
+  return (
+    <div>
+      <div className="text-[11px] tracking-[0.08em] text-muted uppercase">{label}</div>
+      <div className={cx("text-[26px] font-semibold", tone === "alert" && "text-alert")}>{value}</div>
+    </div>
+  );
+}
+
+/** Kicker + 40px title + actions, the header every prototype list page uses. */
+export function ListHeader({ kicker, title, actions }: { kicker?: ReactNode; title: string; actions?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        {kicker && <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{kicker}</div>}
+        <h1 className="mt-1 text-[28px] lg:text-[40px]">{title}</h1>
+      </div>
+      {actions && <div className="flex flex-wrap gap-2.5">{actions}</div>}
+    </div>
+  );
+}
+
+export const SEARCH = "min-h-9 max-w-[360px] flex-[1_1_240px] rounded-md border border-line bg-surface px-2.5 py-1.5 text-fg placeholder:text-fg/65 hover:border-fg/45 focus:border-accent focus:outline-none";

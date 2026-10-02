@@ -202,6 +202,18 @@ async function main() {
   });
   await seedFrontDesk(org.id);
   await seedAssets(org.id);
+  // The prototype's offer codes, so Plans & offers isn't empty in the demo.
+  const offers: [string, string, string, number, number, number | null, number][] = [
+    ["DIWALI26", "Festive offer on Quarterly and above", "PERCENT", 15, 39, 100, 0],
+    ["FRIEND500", "Referral: ₹500 off for the new member", "FLAT", 50000, 90, null, 17],
+    ["STUDENT10", "Students with valid college ID", "PERCENT", 10, 180, null, 9],
+    ["MONSOON25", "Monsoon 2025 promotion", "PERCENT", 25, -32, 60, 41],
+  ];
+  await db.offer.createMany({
+    data: offers.map(([code, description, type, value, days, usageLimit, uses]) => ({
+      orgId: org.id, code, description, type, value, validTill: new Date(`${addDays(today, days)}T00:00:00Z`), usageLimit, uses, createdById: users["sumit@demo.fitron.in"]!,
+    })),
+  });
   console.log(`Seeded the demo gym. Sign in as sumit@demo.fitron.in with password "${DEMO_PASSWORD}".`);
 }
 

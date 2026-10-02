@@ -6,7 +6,8 @@ import { requirePermission } from "@/lib/auth/current";
 import { formAction, simpleAction } from "@/lib/form-action";
 import { leadInput, type LeadStage } from "@/lib/validation/frontdesk";
 import type { FormState } from "@/lib/validation/common";
-import { createLead, setLeadStage, updateLead } from "@/lib/services/leads";
+import { createLead, setLeadStage, touchLead, updateLead } from "@/lib/services/leads";
+import { UserError } from "@/lib/services/errors";
 
 export async function saveLead(id: string | null, _: FormState, fd: FormData): Promise<FormState> {
   const u = await requirePermission("leads.manage");
@@ -27,4 +28,25 @@ export async function stageAction(id: string, stage: LeadStage, _: FormState, fd
   revalidatePath("/leads");
   revalidatePath(`/leads/${id}`);
   return r;
+}
+
+const NEXT: Partial<Record<LeadStage, LeadStage>> = { New: "Contacted", Contacted: "Trial booked", "Trial booked": "Trial done" };
+
+/** The board's buttons: call or WhatsApp (marks a new lead contacted), the next stage, or lost with a reason. */
+export async function touchLeadAction(id: string, how: "call" | "whatsapp") {
+  const u = await requirePermission("leads.manage");
+  await touchLead(u, id, how);
+  revalidatePath("/leads");
+}
+
+export async function advanceLeadAction(id: string, from: LeadStage) {
+  const u = await requirePermission("leads.manage");
+  const next = NEXT[from];
+  if (next) await setLeadStage(u, id, next).catch((e) => (e instanceof UserError ? null : Promise.reject(e)));
+  revalidatePath("/leads");
+}
+
+export async function loseLeadAction(id: string, reason: string) {
+  const u = await requirePermission("leads.manage");
+  return simpleAction(() => setLeadStage(u, id, "Lost", { lostReason: reason }), "Marked lost.").finally(() => revalidatePath("/leads"));
 }
