@@ -7,6 +7,7 @@ import { entryBlock } from "@/lib/domain/access";
 import { cmd, parseAcks, parseAttlog, parseTemplates, verifyMethod, type Punch } from "@/lib/domain/adms";
 import { getAccessRules } from "./attendance";
 import { audit } from "./audit";
+import { frozenBlocks } from "./freeze";
 import { UserError } from "./errors";
 import { summarize } from "./members";
 import { notify } from "./notifications";
@@ -97,7 +98,7 @@ export async function recordPunches(d: Device, punches: Punch[]) {
       continue;
     }
     const s = (await summarize([member.id], date)).get(member.id)!;
-    const block = entryBlock({ suspended: member.suspended, ...s }, rules, date);
+    const block = entryBlock({ suspended: member.suspended, ...s }, rules, date) ?? (await frozenBlocks([member.id], date)).get(member.id) ?? null;
     await db.$transaction(async (tx) => {
       await tx.accessLog.create({ data: { deviceId: d.id, branchId: d.branchId, memberId: member.id, pin: p.pin, method, result: block ? "DENIED" : "ALLOWED", reason: block, at } });
       if (block) {
@@ -166,10 +167,11 @@ export async function syncDevices(orgId: string, today = todayIso()) {
   const members = await db.member.findMany({ where: { orgId, deletedAt: null, devicePin: { not: null } }, select: { id: true, name: true, devicePin: true, suspended: true, branchId: true } });
   const sums = await summarize(members.map((m) => m.id), today);
   const rules = await getAccessRules(orgId);
+  const frozen = await frozenBlocks(members.map((m) => m.id), today);
   let changes = 0;
   for (const d of devices) {
     for (const m of members) {
-      const allowed = !entryBlock({ suspended: m.suspended, ...sums.get(m.id)! }, rules, today);
+      const allowed = !entryBlock({ suspended: m.suspended, ...sums.get(m.id)! }, rules, today) && !frozen.has(m.id);
       if (await setOnDevice(d, m, allowed)) changes++;
     }
   }

@@ -1,445 +1,755 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
+import {
+  ArrowLeftIcon,
+  ArrowsClockwiseIcon,
+  ArrowsLeftRightIcon,
+  BellRingingIcon,
+  ClockCounterClockwiseIcon,
+  FileImageIcon,
+  FilePdfIcon,
+  FilePlusIcon,
+  HandCoinsIcon,
+  PauseIcon,
+  PencilSimpleIcon,
+  PlayIcon,
+  SnowflakeIcon,
+  SunIcon,
+  TrashIcon,
+  UploadSimpleIcon,
+  WhatsappLogoIcon,
+} from "@phosphor-icons/react/dist/ssr";
+import type { Icon } from "@phosphor-icons/react";
 import { requirePermission } from "@/lib/auth/current";
+import { db } from "@/lib/db";
 import { getMember } from "@/lib/services/members";
 import { memberHistory } from "@/lib/services/billing";
-import { InvoiceStatusBadge } from "@/components/invoice-status";
-import Link from "next/link";
-import { Badge, Button, Card, Input, LinkButton, Notice, PageHeader, Select } from "@/components/ui";
-import { MemberStatus } from "@/components/status";
-import { ConfirmButton } from "@/components/confirm-button";
-import { fmtDate, formatInr, fmtStamp } from "@/lib/format";
-import { deleteDocumentAction, enrolBiometric, eraseBiometric, removeMember, replaceDocumentAction, toggleSuspend, uploadDocumentAction } from "../actions";
 import { DOC_KINDS, listDocuments } from "@/lib/services/documents";
 import { memberBiometrics } from "@/lib/services/biometric";
-import { db } from "@/lib/db";
 import { memberVisits } from "@/lib/services/attendance";
 import { memberBookings } from "@/lib/services/classes";
 import { listDiets, listWorkouts, progressFor } from "@/lib/services/programs";
-import { todayIso } from "@/lib/services/time";
-import { fmtTime } from "@/lib/format";
+import { listMessages, listTemplates } from "@/lib/services/whatsapp";
+import { openFreeze } from "@/lib/services/freeze";
+import { todayIso, toIso } from "@/lib/services/time";
+import { addDays, daysBetween } from "@/lib/domain/dates";
+import { FREEZE_REASONS } from "@/lib/domain/freeze";
+import { InvoiceStatusBadge } from "@/components/invoice-status";
+import { MemberStatus } from "@/components/status";
+import { Tag } from "@/components/tag";
+import { ConfirmButton } from "@/components/confirm-button";
+import { Button, Input, Notice, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
+import { fmtDate, fmtShort, fmtStamp, fmtTime, formatRupees, initials } from "@/lib/format";
+import { remindDueAction } from "../../reminder-actions";
+import {
+  deleteDocumentAction,
+  enrolBiometric,
+  eraseBiometric,
+  freezeAction,
+  removeMember,
+  replaceDocumentAction,
+  sendInvoiceWaAction,
+  toggleSuspend,
+  transferAction,
+  unfreezeAction,
+  uploadDocumentAction,
+} from "../actions";
 import { AssignForm, ProgressForm } from "./fitness";
 import { SendOneForm } from "../../whatsapp/wa-forms";
-import { listMessages, listTemplates } from "@/lib/services/whatsapp";
 
 export const metadata = { title: "Member · Fitron" };
 
-const Row = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex justify-between gap-4 py-2">
-    <dt className="text-muted">{label}</dt>
-    <dd className="text-right">{value || "—"}</dd>
-  </div>
-);
+const TABS = [
+  ["overview", "Overview"],
+  ["payments", "Payments"],
+  ["invoices", "Invoices"],
+  ["memberships", "Renewal history"],
+  ["attendance", "Attendance"],
+  ["fitness", "Fitness"],
+  ["documents", "Documents"],
+  ["whatsapp", "WhatsApp"],
+] as const;
+type TabKey = (typeof TABS)[number][0];
+
+const TYPE_LABEL: Record<string, string> = { NEW: "New", RENEWAL: "Renewal", AUTOPAY: "Autopay", IMPORT: "Imported" };
+const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+const BTN = {
+  primary: `${btn} border-transparent bg-accent text-accent-ink hover:bg-accent-hover`,
+  secondary: `${btn} border-line hover:bg-fg/7`,
+  ghost: `${btn} border-transparent px-1.5 text-accent hover:bg-accent/10`,
+};
 
 export default async function MemberPage({ params, searchParams }: PageProps<"/members/[id]">) {
   const u = await requirePermission("members.view");
   const { id } = await params;
   const m = await getMember(u, id);
   if (!m) notFound();
-  const history = u.can("invoices.view") ? await memberHistory(u, m.id) : null;
+  const sp = await searchParams;
+  const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
+  const tab: TabKey = (TABS.find(([k]) => k === str("tab"))?.[0] ?? (str("doc") || str("docError") ? "documents" : "overview")) as TabKey;
+  const today = todayIso();
+  const here = `/members/${m.id}`;
+
+  const canMoney = u.can("invoices.view");
+  const canWa = u.can("whatsapp.send");
   const canPrograms = u.can("programs.manage");
-  const [visits, bookings, workouts, diets, progress] = await Promise.all([
-    u.can("attendance.manage") ? memberVisits(m.id, 10) : null,
+  const canBio = u.can("members.edit") && !m.walkIn;
+  const [history, visits, bookings, workouts, diets, progress, freeze, templates, messages, docs] = await Promise.all([
+    canMoney ? memberHistory(u, m.id) : null,
+    memberVisits(m.id, 200),
     u.can("classes.manage") ? memberBookings(m.id) : null,
     listWorkouts(u),
     listDiets(u),
     progressFor(m.id),
+    openFreeze(m.id, today),
+    canWa ? listTemplates(u.orgId) : [],
+    canWa ? listMessages(u, { memberId: m.id }) : null,
+    u.can("documents.manage") && !m.walkIn ? listDocuments(u, m.id) : null,
   ]);
-  const canWa = u.can("whatsapp.send");
-  const [templates, messages] = canWa ? await Promise.all([listTemplates(u.orgId), listMessages(u, { memberId: m.id })]) : [[], null];
-  const workout = workouts.find((w) => w.id === m.workoutPlanId);
-  const diet = diets.find((d) => d.id === m.dietPlanId);
-  const sp = await searchParams;
-  const canBio = u.can("members.edit") && !m.walkIn;
-  const [bio, devices] = canBio ? await Promise.all([memberBiometrics(m.id), db.device.findMany({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } })]) : [null, []];
-  const docs = u.can("documents.manage") && !m.walkIn ? await listDocuments(u, m.id) : null;
-  const address = [m.house, m.area, m.city, m.state, m.pin].filter(Boolean).join(", ");
+  const [bio, devices] = canBio && tab === "overview" ? await Promise.all([memberBiometrics(m.id), db.device.findMany({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } })]) : [null, []];
+  const staff = await db.user.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true } });
+  const nameOf = (uid: string | null | undefined) => staff.find((x) => x.id === uid)?.name ?? "—";
+
+  const daysLeft = m.latestEnd ? daysBetween(m.latestEnd, today) : null;
+  const expired = daysLeft !== null && daysLeft < 0;
+  const openInvoices = (history?.invoices ?? []).filter((i) => i.balance > 0 && i.status !== "CANCELLED");
+  const lastInvoice = (history?.invoices ?? []).find((i) => i.status !== "CANCELLED");
+  const lifetimePaid = (history?.payments ?? []).filter((p) => p.status === "SUCCESS").reduce((a, p) => a + p.amount, 0);
+  const visits30 = visits.filter((v) => toIso(v.date) >= addDays(today, -30)).length;
+  const current = history?.memberships.find((x) => x.status === "VALID" && toIso(x.startDate) <= today && toIso(x.endDate) >= today) ?? history?.memberships.find((x) => x.status === "VALID");
+  const currentInvoice = current ? history?.invoices.find((i) => i.id === current.invoice.id) : undefined;
+  const risk = m.riskScore !== null ? (m.riskScore >= 60 ? "High risk" : m.riskScore >= 40 ? "Medium risk" : null) : null;
+  const canFreeze = u.can("memberships.renew") && !!m.latestEnd && !expired && !freeze;
+  const canTransfer = u.can("members.edit") && u.branches.length > 1;
+
+  const actions: { label: string; icon: Icon; cls: keyof typeof BTN; href?: string; form?: (fd: FormData) => Promise<void>; confirm?: string }[] = [];
+  if (u.can("payments.collect") && canMoney)
+    actions.push({ label: "Collect payment", icon: HandCoinsIcon, cls: expired ? "secondary" : "primary", href: openInvoices[0] ? `/invoices/${openInvoices.at(-1)!.id}#collect` : "/receivables" });
+  if (u.can("memberships.renew")) actions.push({ label: m.latestEnd ? "Renew membership" : "Sell membership", icon: ArrowsClockwiseIcon, cls: expired || !m.latestEnd ? "primary" : "secondary", href: `${here}/sell` });
+  if (u.can("invoices.create")) actions.push({ label: "Create invoice", icon: FilePlusIcon, cls: "secondary", href: `/invoices/new?member=${m.id}` });
+  if (u.can("members.delete")) actions.push({ label: "Delete member", icon: TrashIcon, cls: "ghost", form: removeMember.bind(null, m.id), confirm: `Delete ${m.name}? Their invoices and payments are kept, and the member can be restored from "Recently deleted".` });
+  if (canFreeze) actions.push({ label: "Freeze", icon: SnowflakeIcon, cls: "ghost", href: `${here}?do=freeze` });
+  if (freeze && u.can("memberships.renew")) actions.push({ label: "Unfreeze", icon: SunIcon, cls: "ghost", form: unfreezeAction.bind(null, m.id) });
+  if (canTransfer) actions.push({ label: "Transfer branch", icon: ArrowsLeftRightIcon, cls: "ghost", href: `${here}?do=transfer` });
+  if (canWa && lastInvoice) actions.push({ label: "Send invoice on WhatsApp", icon: WhatsappLogoIcon, cls: "secondary", form: sendInvoiceWaAction.bind(null, m.id, lastInvoice.id, lastInvoice.number, lastInvoice.total) });
+  if (canWa && m.outstanding > 0) actions.push({ label: "Send payment reminder", icon: BellRingingIcon, cls: "secondary", form: remindDueAction.bind(null, m.id, openInvoices[0]?.number ?? "", here) });
+  if (docs) actions.push({ label: "Upload document", icon: UploadSimpleIcon, cls: "secondary", href: `${here}?tab=documents#upload` });
+  if (u.can("members.edit")) actions.push({ label: "Edit member", icon: PencilSimpleIcon, cls: "secondary", href: `${here}/edit` });
+  if (u.can("members.edit")) actions.push({ label: m.suspended ? "Resume" : "Suspend", icon: m.suspended ? PlayIcon : PauseIcon, cls: "ghost", form: toggleSuspend.bind(null, m.id, !m.suspended) });
+  if (canMoney) actions.push({ label: "Payment history", icon: ClockCounterClockwiseIcon, cls: "ghost", href: `${here}?tab=payments` });
+
+  const stats: [string, string, string?][] = [
+    ["Plan", m.planName ?? "—"],
+    ["Valid till", m.latestEnd ? fmtShort(m.latestEnd) : "—"],
+    ["Days left", daysLeft === null ? "—" : daysLeft < 0 ? "Expired" : String(daysLeft), daysLeft !== null && daysLeft < 0 ? "text-alert-700" : daysLeft !== null && daysLeft <= 7 ? "text-accent-700" : undefined],
+    ["Outstanding", formatRupees(m.outstanding), m.outstanding ? "text-alert-700" : undefined],
+    ...(canMoney ? ([["Lifetime paid", formatRupees(lifetimePaid)]] as [string, string][]) : []),
+    ["Visits · 30 days", String(visits30)],
+    ...(risk ? ([["Fitron AI", risk, "text-alert-700"]] as [string, string, string][]) : []),
+  ];
+
+  const age = m.dob ? Math.floor(daysBetween(today, toIso(m.dob)) / 365.25) : null;
+  const sections: { title: string; rows: [string, ReactNode][] }[] = [
+    {
+      title: "Personal",
+      rows: [
+        ["Member ID", m.code],
+        ["Full name", m.name],
+        ["Date of birth", m.dob ? `${fmtDate(m.dob)} (${age} yrs)` : "—"],
+        ["Gender", m.gender],
+        ["Occupation", m.occupation || "—"],
+        ["Heard about us", m.source],
+        ["Tags", m.tags.join(", ") || "—"],
+        ["Trainer", m.trainerName ?? "—"],
+        ["Branch", m.branch.name],
+      ],
+    },
+    { title: "Contact", rows: [["Mobile", m.phone], ["WhatsApp", m.whatsapp ?? m.phone], ["Email", m.email || "—"]] },
+    { title: "Address", rows: [["House / flat", m.house || "—"], ["Area / street", m.area || "—"], ["City", m.city || "—"], ["State", m.state || "—"], ["PIN code", m.pin || "—"]] },
+    { title: "Emergency contact", rows: [["Name", m.emergencyName || "—"], ["Relationship", m.emergencyRelation || "—"], ["Phone", m.emergencyPhone || "—"]] },
+    ...(current
+      ? [
+          {
+            title: "Membership",
+            rows: [
+              ["Plan", `${current.plan.name}${current.pricingCategory && current.pricingCategory !== "Standard" ? ` · ${current.pricingCategory}` : ""}`],
+              ["Type", TYPE_LABEL[current.type] ?? current.type],
+              ["Start date", fmtDate(current.startDate)],
+              ["End date", fmtDate(current.endDate)],
+              ["Status", <MemberStatus key="s" status={m.status} />],
+              ["Price", formatRupees(current.price)],
+              ["Discount", formatRupees(current.discount)],
+              ...(current.offerCode ? ([["Offer code", current.offerCode]] as [string, string][]) : []),
+              ["Final amount", currentInvoice ? formatRupees(currentInvoice.total) : "—"],
+              ["Amount paid", currentInvoice ? formatRupees(currentInvoice.paid) : "—"],
+              ["Pending", currentInvoice ? formatRupees(currentInvoice.balance) : "—"],
+              ["Payment status", currentInvoice ? <InvoiceStatusBadge key="p" status={currentInvoice.status} overdueDays={currentInvoice.overdueDays} /> : "—"],
+              ["Renewal date", fmtDate(addDays(toIso(current.endDate), 1))],
+              ...(freeze ? ([["Frozen", `${fmtDate(freeze.fromDate)} – ${fmtDate(freeze.lastDay)} · ${freeze.reason}`]] as [string, string][]) : []),
+            ] as [string, ReactNode][],
+          },
+        ]
+      : []),
+    { title: "Notes", rows: [["Notes", m.notes || "—"], ["Staff notes", m.staffNotes || "—"], ["Created by", nameOf(m.createdById)], ["Joined", fmtStamp(m.createdAt)]] },
+  ];
 
   return (
-    <>
-      <PageHeader
-        title={m.name}
-        subtitle={
-          <span className="flex flex-wrap items-center gap-2">
-            {m.code} · {m.branch.name} <MemberStatus status={m.status} />
-          </span>
-        }
-        actions={
-          <>
-            {u.can("memberships.renew") && (
-              <LinkButton href={`/members/${m.id}/sell`} variant="primary">
-                {m.latestEnd ? "Renew" : "Sell membership"}
-              </LinkButton>
-            )}
-            {u.can("invoices.create") && <LinkButton href={`/invoices/new?member=${m.id}`}>New invoice</LinkButton>}
-            {u.can("members.edit") && <LinkButton href={`/members/${m.id}/edit`}>Edit</LinkButton>}
-            {u.can("members.edit") && (
-              <form action={toggleSuspend.bind(null, m.id, !m.suspended)}>
-                <Button>{m.suspended ? "Resume" : "Suspend"}</Button>
-              </form>
-            )}
-            {u.can("members.delete") && (
-              <form action={removeMember.bind(null, m.id)}>
-                <ConfirmButton variant="danger" confirm={`Delete ${m.name}? Their invoices and payments are kept.`}>Delete</ConfirmButton>
-              </form>
-            )}
-          </>
-        }
-      />
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="md:col-span-1">
-          <div className="text-sm text-muted">Current plan</div>
-          <div className="mt-1 text-xl font-semibold">{m.planName ?? "No membership yet"}</div>
-          <div className="mt-3 text-sm text-muted">Ends</div>
-          <div className="text-lg">{fmtDate(m.latestEnd)}</div>
-          <div className="mt-3 text-sm text-muted">Outstanding</div>
-          <div className={m.outstanding > 0 ? "text-lg font-semibold text-alert" : "text-lg"}>{formatInr(m.outstanding)}</div>
-        </Card>
-        <Card title="Contact" className="md:col-span-2">
-          <dl className="divide-y divide-line text-sm">
-            <Row label="Mobile" value={m.phone} />
-            <Row label="WhatsApp" value={m.whatsapp ?? m.phone} />
-            <Row label="Email" value={m.email} />
-            <Row label="Address" value={address} />
-            <Row label="Emergency contact" value={m.emergencyName && `${m.emergencyName}${m.emergencyRelation ? ` (${m.emergencyRelation})` : ""} ${m.emergencyPhone ?? ""}`} />
-          </dl>
-        </Card>
-        <Card title="Profile" className="md:col-span-3">
-          <dl className="grid divide-line text-sm sm:grid-cols-2 sm:gap-x-8 [&>div]:border-b [&>div]:border-line">
-            <Row label="Gender" value={m.gender} />
-            <Row label="Date of birth" value={m.dob ? fmtDate(m.dob) : null} />
-            <Row label="Occupation" value={m.occupation} />
-            <Row label="Source" value={m.source} />
-            <Row label="Trainer" value={m.trainerName} />
-            <Row label="Joined" value={fmtStamp(m.createdAt)} />
-            <Row label="Tags" value={m.tags.length ? <span className="flex flex-wrap justify-end gap-1">{m.tags.map((t) => <Badge key={t}>{t}</Badge>)}</span> : null} />
-          </dl>
-          {m.notes && <p className="mt-4 text-sm"><span className="text-muted">Notes: </span>{m.notes}</p>}
-          {m.staffNotes && <p className="mt-2 text-sm"><span className="text-muted">Staff notes: </span>{m.staffNotes}</p>}
-        </Card>
-        {history && (
-          <>
-            <Card title="Memberships" className="md:col-span-3">
-              {history.memberships.length === 0 ? (
-                <p className="text-sm text-muted">No memberships yet.</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {history.memberships.map((ms) => (
-                    <li key={ms.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                      <span>
-                        <span className="font-semibold">{ms.plan.name}</span> · {fmtDate(ms.startDate)} to {fmtDate(ms.endDate)}
-                        <span className="text-muted"> · {ms.type === "NEW" ? "New" : ms.type === "RENEWAL" ? "Renewal" : ms.type}</span>
-                      </span>
-                      <span className="flex items-center gap-2">
-                        {ms.status === "CANCELLED" && <Badge tone="alert">Cancelled</Badge>}
-                        <Link href={`/invoices/${ms.invoice.id}`} className="text-accent">
-                          {ms.invoice.number}
-                        </Link>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-            <Card title="Invoices" className="md:col-span-2">
-              {history.invoices.length === 0 ? (
-                <p className="text-sm text-muted">No invoices yet.</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {history.invoices.map((inv) => (
-                    <li key={inv.id}>
-                      <Link href={`/invoices/${inv.id}`} className="flex flex-wrap items-center justify-between gap-2 py-2 hover:text-accent">
-                        <span>
-                          <span className="font-semibold">{inv.number}</span> · {fmtDate(inv.date)} · {formatInr(inv.total)}
-                        </span>
-                        <InvoiceStatusBadge status={inv.status} overdueDays={inv.overdueDays} />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-            <Card title="Payments">
-              {history.payments.length === 0 ? (
-                <p className="text-sm text-muted">No payments yet.</p>
-              ) : (
-                <ul className="divide-y divide-line text-sm">
-                  {history.payments.map((p) => (
-                    <li key={p.id} className="flex justify-between gap-2 py-2">
-                      <span className={p.status === "REVERSED" ? "text-muted line-through" : ""}>
-                        {formatInr(p.amount)} · {p.method}
-                      </span>
-                      <span className="text-muted">{fmtDate(p.date)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
-          </>
-        )}
-        <Card title="Workout & diet" className="md:col-span-1">
-          {canPrograms ? (
-            <AssignForm memberId={m.id} workouts={workouts.filter((w) => w.active || w.id === m.workoutPlanId)} diets={diets.filter((d) => d.active || d.id === m.dietPlanId)} workoutId={m.workoutPlanId} dietId={m.dietPlanId} />
+    <div className="flex flex-col gap-8 pt-3">
+      <Link href="/members" className={cx(BTN.ghost, "self-start")}>
+        <ArrowLeftIcon weight="duotone" />
+        All members
+      </Link>
+      {str("msg") && <Notice tone="ok">{str("msg")}</Notice>}
+
+      <div className="flex flex-wrap items-center gap-6">
+        <div className="grid size-24 place-items-center rounded-full bg-neutral-200 text-[32px] font-semibold">{initials(m.name)}</div>
+        <div className="min-w-[240px] flex-1">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="m-0 text-[28px] lg:text-[38px]">{m.name}</h1>
+            {freeze ? <Tag label="Paused">FROZEN</Tag> : <MemberStatus status={m.status} />}
+          </div>
+          <div className="mt-1.5 flex flex-wrap gap-[18px] text-sm text-muted">
+            <span>{m.code}</span>
+            <span>{m.phone}</span>
+            <span>{m.planName ?? "No membership yet"}</span>
+            {m.latestEnd && <span>Expires {fmtDate(m.latestEnd)}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        {actions.map((a) =>
+          a.href ? (
+            <Link key={a.label} href={a.href} className={BTN[a.cls]}>
+              <a.icon size={16} weight="duotone" />
+              {a.label}
+            </Link>
+          ) : a.confirm ? (
+            <form key={a.label} action={a.form!}>
+              <ConfirmButton variant="ghost" confirm={a.confirm} className="gap-1.5">
+                <a.icon size={16} weight="duotone" />
+                {a.label}
+              </ConfirmButton>
+            </form>
           ) : (
-            <dl className="divide-y divide-line text-sm">
-              <Row label="Workout" value={workout?.name} />
-              <Row label="Diet" value={diet?.name} />
-            </dl>
-          )}
-          {workout && (
-            <details className="mt-3 text-sm">
-              <summary className="cursor-pointer text-muted">See {workout.name}</summary>
-              {workout.days.map((d) => (
-                <div key={d.name} className="mt-2">
-                  <p className="font-semibold">{d.name}</p>
-                  <p className="text-muted">{d.exercises.map((x) => `${x.name} ${x.sets}`).join(" · ")}</p>
-                </div>
-              ))}
-            </details>
-          )}
-          {diet && (
-            <details className="mt-2 text-sm">
-              <summary className="cursor-pointer text-muted">See {diet.name}</summary>
-              {diet.meals.map((x) => (
-                <p key={x.name} className="mt-1">
-                  <span className="font-semibold">{x.name}:</span> <span className="text-muted">{x.food}</span>
-                </p>
-              ))}
-            </details>
-          )}
-        </Card>
-        <Card title="Progress" className="md:col-span-2">
-          {progress.length > 0 && (
-            <div className="mb-4 overflow-x-auto">
-              <table className="w-full min-w-[420px] text-sm">
-                <thead className="text-left text-muted">
-                  <tr>
-                    <th className="py-1 font-medium">Date</th>
-                    <th className="py-1 text-right font-medium">Weight</th>
-                    <th className="py-1 text-right font-medium">Body fat</th>
-                    <th className="py-1 text-right font-medium">Waist</th>
-                    <th className="py-1 pl-4 font-medium">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {progress.map((p, i) => {
-                    const prev = progress[i + 1];
-                    const delta = p.weightKg != null && prev?.weightKg != null ? p.weightKg - prev.weightKg : null;
-                    return (
-                      <tr key={p.id}>
-                        <td className="py-1.5">{fmtDate(p.date)}</td>
-                        <td className="py-1.5 text-right tabular-nums">
-                          {p.weightKg != null ? `${p.weightKg} kg` : "—"}
-                          {delta ? <span className={delta < 0 ? "ml-1 text-ok" : "ml-1 text-muted"}>{delta > 0 ? "+" : ""}{delta.toFixed(1)}</span> : null}
-                        </td>
-                        <td className="py-1.5 text-right tabular-nums">{p.bodyFat != null ? `${p.bodyFat}%` : "—"}</td>
-                        <td className="py-1.5 text-right tabular-nums">{p.waistCm != null ? `${p.waistCm} cm` : "—"}</td>
-                        <td className="py-1.5 pl-4 text-muted">{p.notes}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          {canPrograms ? <ProgressForm memberId={m.id} today={todayIso()} /> : progress.length === 0 && <p className="text-sm text-muted">No measurements yet.</p>}
-        </Card>
-        {canWa && (
-          <Card title="WhatsApp" className="md:col-span-3">
-            <div className="grid gap-6 md:grid-cols-2">
-              <SendOneForm
-                memberId={m.id}
-                templates={templates.map((t) => ({ key: t.key, name: t.name, body: t.body }))}
-                invoices={(history?.invoices ?? []).filter((i) => i.status !== "CANCELLED").map((i) => ({ id: i.id, number: i.number }))}
-              />
-              <div>
-                <p className="mb-2 text-sm text-muted">Recent messages</p>
-                {!messages?.rows.length ? (
-                  <p className="text-sm text-muted">None yet.</p>
-                ) : (
-                  <ul className="divide-y divide-line text-sm">
-                    {messages.rows.slice(0, 8).map((x) => (
-                      <li key={x.id} className="flex justify-between gap-2 py-1.5">
-                        <span className="truncate">{templates.find((t) => t.key === x.templateKey)?.name ?? x.templateKey}</span>
-                        <span className={x.status === "Failed" ? "text-alert" : "text-muted"}>
-                          {x.status} · {fmtDate(x.sentAt.toISOString().slice(0, 10))}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          </Card>
-        )}
-        {visits && (
-          <Card title="Recent visits" className="md:col-span-2">
-            {visits.length === 0 ? (
-              <p className="text-sm text-muted">No visits yet.</p>
-            ) : (
-              <ul className="divide-y divide-line text-sm">
-                {visits.map((v) => (
-                  <li key={v.id} className="flex justify-between gap-2 py-2">
-                    <span>
-                      {fmtDate(v.date)} · {fmtTime(v.checkIn)}
-                      {v.checkOut ? ` to ${fmtTime(v.checkOut)}` : ""}
-                    </span>
-                    <span className="text-muted">
-                      {v.method}
-                      {v.override ? " · override" : ""}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
-        {docs && (
-          <Card title="Documents" className="md:col-span-2">
-            <div id="documents" className="flex flex-col gap-3 text-sm">
-              {typeof sp.doc === "string" && <Notice tone="ok">{sp.doc}</Notice>}
-              {typeof sp.docError === "string" && <Notice tone="alert">{sp.docError}</Notice>}
-              {docs.filter((d) => d.status === "ACTIVE").length === 0 ? (
-                <p className="text-muted">No documents yet.</p>
-              ) : (
-                <ul className="divide-y divide-line">
-                  {docs
-                    .filter((d) => d.status === "ACTIVE")
-                    .map((d) => (
-                      <li key={d.id} className="flex flex-col gap-2 py-2">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <a href={`/documents/${d.id}`} target="_blank" rel="noopener" className="font-medium hover:text-accent">
-                            {d.title}
-                          </a>
-                          <span className="text-muted">
-                            {d.kind} · {fmtStamp(d.createdAt)} · {d.uploadedBy} · {Math.max(1, Math.round(d.size / 1024))} KB
-                          </span>
-                        </div>
-                        <details>
-                          <summary className="cursor-pointer text-muted">Replace or remove</summary>
-                          <div className="mt-2 flex flex-col gap-2">
-                            <form action={replaceDocumentAction.bind(null, m.id, d.id)} className="flex flex-wrap items-center gap-2">
-                              <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="New file" className="max-w-full text-sm" />
-                              <Button>Replace</Button>
-                            </form>
-                            <form action={deleteDocumentAction.bind(null, m.id, d.id)} className="flex flex-wrap items-center gap-2">
-                              <Input name="reason" required placeholder="Reason for removing" aria-label="Reason for removing" className="w-auto flex-1" />
-                              <Button variant="danger">Remove</Button>
-                            </form>
-                          </div>
-                        </details>
-                      </li>
-                    ))}
-                </ul>
-              )}
-              <form action={uploadDocumentAction.bind(null, m.id)} className="flex flex-col gap-2 border-t border-line pt-3">
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <Select name="kind" aria-label="Kind of document" defaultValue="ID proof">
-                    {DOC_KINDS.map((k) => (
-                      <option key={k}>{k}</option>
-                    ))}
-                  </Select>
-                  <Input name="title" placeholder="Title, e.g. Aadhaar card" aria-label="Title" maxLength={80} />
-                </div>
-                <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="File" className="max-w-full text-sm" />
-                <div>
-                  <Button variant="primary">Upload</Button>
-                </div>
-                <p className="text-xs text-muted">PDF or photo, up to 10 MB. Files are private; every view is recorded in the audit log.</p>
-              </form>
-              {docs.some((d) => d.status !== "ACTIVE") && (
-                <details>
-                  <summary className="cursor-pointer text-muted">History ({docs.filter((d) => d.status !== "ACTIVE").length})</summary>
-                  <ul className="mt-2 divide-y divide-line">
-                    {docs
-                      .filter((d) => d.status !== "ACTIVE")
-                      .map((d) => (
-                        <li key={d.id} className="flex flex-wrap justify-between gap-2 py-2">
-                          <a href={`/documents/${d.id}`} target="_blank" rel="noopener" className="hover:text-accent">
-                            {d.title} · {d.fileName}
-                          </a>
-                          <span className="text-muted">
-                            {d.status === "REPLACED" ? "Replaced" : `Removed by ${d.deletedBy}: ${d.deleteReason}`} · uploaded {fmtStamp(d.createdAt)}
-                          </span>
-                        </li>
-                      ))}
-                  </ul>
-                </details>
-              )}
-            </div>
-          </Card>
-        )}
-        {bio && (
-          <Card title="Biometric entry" className="md:col-span-2">
-            <div id="biometric" className="flex flex-col gap-3 text-sm">
-              {typeof sp.bio === "string" && <Notice tone="ok">{sp.bio}</Notice>}
-              {typeof sp.bioError === "string" && <Notice tone="alert">{sp.bioError}</Notice>}
-              <p>
-                {m.devicePin ? `Device PIN ${m.devicePin}` : "Not on any device yet"}
-                {bio.fingerprints || bio.faces ? ` · ${bio.fingerprints} fingerprint${bio.fingerprints === 1 ? "" : "s"}, ${bio.faces} face${bio.faces === 1 ? "" : "s"} stored (encrypted)` : ""}
-                {bio.devices.length ? ` · on ${bio.devices.map((d) => `${d.device.name ?? d.device.serial}${d.allowed ? "" : " (removed, plan not active)"}`).join(", ")}` : ""}
-              </p>
-              {m.biometricConsentAt && <p className="text-muted">Consent recorded {fmtStamp(m.biometricConsentAt)}.</p>}
-              {devices.length === 0 ? (
-                <p className="text-muted">
-                  No door device yet. {u.can("settings.manage") ? <Link href="/settings/devices" className="text-accent">Add one in Settings.</Link> : "Ask a Super Admin to add one."}
-                </p>
-              ) : (
-                <form action={enrolBiometric.bind(null, m.id)} className="flex flex-col gap-2">
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <Select name="deviceId" aria-label="Device">
-                      {devices.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name ?? d.serial}
-                        </option>
-                      ))}
-                    </Select>
-                    <Select name="kind" aria-label="What to enrol">
-                      <option value="FP">Fingerprint</option>
-                      <option value="FACE">Face</option>
-                    </Select>
-                  </div>
-                  {!m.biometricConsentAt && (
-                    <label className="flex items-start gap-2">
-                      <input type="checkbox" name="consent" className="mt-0.5 size-4" />
-                      <span>The member has given written consent to store their fingerprint or face for gym entry, and knows they can ask for it to be deleted.</span>
-                    </label>
-                  )}
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="primary">Enrol on device</Button>
-                  </div>
-                </form>
-              )}
-              {(m.devicePin || m.biometricConsentAt) && (
-                <form action={eraseBiometric.bind(null, m.id)}>
-                  <ConfirmButton variant="danger" confirm="Delete this member's fingerprints and face data here and on every device?">
-                    Delete biometric data
-                  </ConfirmButton>
-                </form>
-              )}
-            </div>
-          </Card>
-        )}
-        {bookings && (
-          <Card title="Classes">
-            {bookings.length === 0 ? (
-              <p className="text-sm text-muted">No class bookings.</p>
-            ) : (
-              <ul className="divide-y divide-line text-sm">
-                {bookings.map((b) => (
-                  <li key={b.id}>
-                    <Link href={`/classes/${b.classSlot.id}?date=${b.date.toISOString().slice(0, 10)}`} className="flex justify-between gap-2 py-2 hover:text-accent">
-                      <span>
-                        {b.classSlot.name} · {fmtDate(b.date)}
-                      </span>
-                      <span className="text-muted">{b.status}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
+            <form key={a.label} action={a.form!}>
+              <button className={BTN[a.cls]}>
+                <a.icon size={16} weight="duotone" />
+                {a.label}
+              </button>
+            </form>
+          ),
         )}
       </div>
+
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-6">
+        {stats.map(([k, v, tone]) => (
+          <div key={k}>
+            <div className="text-[11px] tracking-[0.08em] text-muted uppercase">{k}</div>
+            <div className={cx("text-2xl font-semibold", tone)}>{v}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-1 overflow-x-auto">
+        {TABS.filter(([k]) => (k !== "payments" && k !== "invoices" && k !== "memberships") || canMoney)
+          .filter(([k]) => k !== "documents" || docs)
+          .filter(([k]) => k !== "whatsapp" || canWa)
+          .map(([k, label]) => (
+            <Link key={k} href={k === "overview" ? here : `${here}?tab=${k}`} className={cx("border-b-2 px-3 py-2 text-sm", tab === k ? "border-accent text-accent" : "border-transparent text-fg")}>
+              {label}
+            </Link>
+          ))}
+      </div>
+
+      {tab === "overview" && (
+        <>
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,300px),1fr))] gap-x-14 gap-y-10">
+            {sections.map((sec) => (
+              <section key={sec.title}>
+                <h4 className="mb-2.5 text-lg">{sec.title}</h4>
+                {sec.rows.map(([k, v]) => (
+                  <div key={k} className="grid grid-cols-[140px_minmax(0,1fr)] gap-3 py-1.5 text-sm">
+                    <span className="text-muted">{k}</span>
+                    <span className="break-words whitespace-pre-wrap">{v}</span>
+                  </div>
+                ))}
+              </section>
+            ))}
+          </div>
+          {bio && <Biometric m={m} bio={bio} devices={devices} canSettings={u.can("settings.manage")} ok={str("bio")} err={str("bioError")} />}
+        </>
+      )}
+
+      {tab === "payments" && history && (
+        <Table
+          head={["Payment ID", "Date", "Invoice", "Method", "Transaction ID", "Received by", "Status", "Amount"]}
+          right={[7]}
+          empty={history.payments.length === 0 ? "No payments recorded." : undefined}
+          rows={history.payments.map((p) => [
+            p.code,
+            fmtDate(p.date),
+            <Link key="i" href={`/invoices/${p.invoice.id}`} className="hover:text-accent">
+              {p.invoice.number}
+            </Link>,
+            p.method,
+            p.txnRef || "—",
+            nameOf(p.receivedById),
+            <Tag key="t" label={p.status === "SUCCESS" ? "Success" : "Failed"}>
+              {p.status === "SUCCESS" ? "Success" : "Reversed"}
+            </Tag>,
+            formatRupees(p.amount),
+          ])}
+        />
+      )}
+
+      {tab === "invoices" && history && (
+        <Table
+          head={["Invoice", "Date", "Items", "Total", "Paid", "Balance", "Status"]}
+          right={[3, 4, 5]}
+          empty={history.invoices.length === 0 ? "No invoices yet." : undefined}
+          rows={history.invoices.map((i) => [
+            <Link key="n" href={`/invoices/${i.id}`} className="hover:text-accent">
+              {i.number}
+            </Link>,
+            fmtDate(i.date),
+            i.items.map((x) => x.description.split(" (")[0]).join(", "),
+            formatRupees(i.total),
+            formatRupees(i.paid),
+            formatRupees(i.balance),
+            <InvoiceStatusBadge key="s" status={i.status} overdueDays={i.overdueDays} />,
+          ])}
+        />
+      )}
+
+      {tab === "memberships" && history && (
+        <Table
+          head={["Membership ID", "Plan", "Type", "Start", "End", "Invoice", "Amount"]}
+          right={[6]}
+          empty={history.memberships.length === 0 ? "No memberships yet." : undefined}
+          rows={history.memberships.map((x) => [
+            x.code,
+            x.plan.name,
+            <>
+              {TYPE_LABEL[x.type] ?? x.type}
+              {x.status === "CANCELLED" && <span className="ml-1.5 text-alert-700">· Cancelled</span>}
+            </>,
+            fmtDate(x.startDate),
+            fmtDate(x.endDate),
+            <Link key="i" href={`/invoices/${x.invoice.id}`} className="hover:text-accent">
+              {x.invoice.number}
+            </Link>,
+            formatRupees(x.price - x.discount),
+          ])}
+        />
+      )}
+
+      {tab === "attendance" && (
+        <>
+          <p className="text-sm text-muted">
+            {visits30} visits in the last 30 days{visits[0] ? ` · last visit ${fmtDate(visits[0].date)}` : ""}
+          </p>
+          <Table
+            head={["Date", "Check-in", "Check-out", "Duration", "Method"]}
+            rows={visits.slice(0, 40).map((v) => [
+              fmtDate(v.date),
+              fmtTime(v.checkIn),
+              v.checkOut ? fmtTime(v.checkOut) : "In the gym",
+              v.checkOut ? `${Math.round((v.checkOut.getTime() - v.checkIn.getTime()) / 60000)} min` : "—",
+              `${v.method}${v.override ? " · override" : ""}`,
+            ])}
+          />
+          {bookings && bookings.length > 0 && (
+            <section>
+              <h4 className="mb-2.5 text-lg">Class bookings</h4>
+              <Table
+                head={["Class", "Date", "Status"]}
+                rows={bookings.map((b) => [
+                  <Link key="c" href={`/classes/${b.classSlot.id}?date=${toIso(b.date)}`} className="hover:text-accent">
+                    {b.classSlot.name}
+                  </Link>,
+                  fmtDate(b.date),
+                  <Tag key="t" label={b.status} />,
+                ])}
+              />
+            </section>
+          )}
+        </>
+      )}
+
+      {tab === "fitness" && (
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,320px),1fr))] gap-x-14 gap-y-10">
+          <section className="flex flex-col gap-3">
+            <h4 className="m-0 text-lg">Program</h4>
+            {canPrograms || u.can("members.edit") ? (
+              <AssignForm memberId={m.id} workouts={workouts.filter((w) => w.active || w.id === m.workoutPlanId)} diets={diets.filter((d) => d.active || d.id === m.dietPlanId)} workoutId={m.workoutPlanId} dietId={m.dietPlanId} />
+            ) : (
+              <p className="text-sm">
+                Workout: {workouts.find((w) => w.id === m.workoutPlanId)?.name ?? "None"} · Diet: {diets.find((d) => d.id === m.dietPlanId)?.name ?? "None"}
+              </p>
+            )}
+            {workouts
+              .find((w) => w.id === m.workoutPlanId)
+              ?.days.map((d) => (
+                <div key={d.name}>
+                  <div className="mt-1.5 text-sm font-semibold">{d.name}</div>
+                  {d.exercises.map((x) => (
+                    <div key={x.name} className="flex justify-between py-[3px] text-[13px]">
+                      <span>{x.name}</span>
+                      <span className="text-muted">{x.sets}</span>
+                    </div>
+                  ))}
+                </div>
+              ))}
+          </section>
+          <section className="flex flex-col gap-3">
+            <h4 className="m-0 text-lg">Progress</h4>
+            {progress.length > 0 ? (
+              <>
+                <ProgressStats progress={progress} />
+                <Table
+                  head={["Date", "Weight", "Body fat", "Waist"]}
+                  right={[1, 2, 3]}
+                  rows={progress.map((p) => [fmtDate(p.date), p.weightKg != null ? `${p.weightKg} kg` : "—", p.bodyFat != null ? `${p.bodyFat}%` : "—", p.waistCm != null ? `${p.waistCm} cm` : "—"])}
+                />
+              </>
+            ) : (
+              <p className="m-0 text-sm text-muted">No measurements logged yet.</p>
+            )}
+            {canPrograms && <ProgressForm memberId={m.id} today={today} />}
+          </section>
+        </div>
+      )}
+
+      {tab === "documents" && docs && <Documents memberId={m.id} docs={docs} ok={str("doc")} err={str("docError")} />}
+
+      {tab === "whatsapp" && canWa && (
+        <div className="grid gap-10 lg:grid-cols-2">
+          <div className="flex max-w-[640px] flex-col gap-3.5">
+            {messages?.rows.slice(0, 40).map((w) => (
+              <div key={w.id} className="flex flex-col gap-1">
+                <div className="flex items-center gap-2.5 text-xs text-muted">
+                  <WhatsappLogoIcon size={15} weight="duotone" className="text-accent" />
+                  <span>
+                    {templates.find((t) => t.key === w.templateKey)?.name ?? w.templateKey}
+                    {w.attachment ? " · PDF" : ""} · {fmtDate(todayIso(w.sentAt))}, {fmtTime(w.sentAt)}
+                  </span>
+                  <Tag label={w.status} />
+                </div>
+                <div className="rounded-lg bg-surface px-3.5 py-2.5 text-sm whitespace-pre-wrap">{w.body}</div>
+              </div>
+            ))}
+            {!messages?.rows.length && <p className="text-muted">No messages sent yet.</p>}
+          </div>
+          <SendOneForm
+            memberId={m.id}
+            templates={templates.map((t) => ({ key: t.key, name: t.name, body: t.body }))}
+            invoices={(history?.invoices ?? []).filter((i) => i.status !== "CANCELLED").map((i) => ({ id: i.id, number: i.number }))}
+          />
+        </div>
+      )}
+
+      {str("do") === "freeze" && canFreeze && (
+        <Dialog kicker={m.name} title="Freeze membership" close={here} error={str("err")} note="The end date moves forward by the frozen days. Check-in is blocked while frozen. Unfreezing early gives back the unused days.">
+          <form action={freezeAction.bind(null, m.id)} className="flex flex-col gap-3.5">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-[5px] text-sm">
+                <span className="text-xs text-fg/70">Days to freeze</span>
+                <Input name="days" type="number" min={1} max={90} defaultValue={15} required />
+              </label>
+              <label className="flex flex-col gap-[5px] text-sm">
+                <span className="text-xs text-fg/70">From</span>
+                <Input name="from" type="date" min={today} defaultValue={today} required />
+              </label>
+              <label className="flex flex-col gap-[5px] text-sm sm:col-span-2">
+                <span className="text-xs text-fg/70">Reason</span>
+                <Select name="reason" defaultValue="Travel">
+                  {FREEZE_REASONS.map((r) => (
+                    <option key={r}>{r}</option>
+                  ))}
+                </Select>
+              </label>
+            </div>
+            <DialogButtons close={here} label="Freeze" />
+          </form>
+        </Dialog>
+      )}
+
+      {str("do") === "transfer" && canTransfer && (
+        <Dialog kicker={m.name} title="Transfer to another branch" close={here} error={str("err")} note={`Currently at ${m.branch.name}. Membership dates and balance move with the member. Past invoices stay with ${m.branch.name}.`}>
+          <form action={transferAction.bind(null, m.id)} className="flex flex-col gap-3.5">
+            <label className="flex flex-col gap-[5px] text-sm">
+              <span className="text-xs text-fg/70">Move to</span>
+              <Select name="to" required defaultValue="">
+                <option value="" disabled>
+                  Choose
+                </option>
+                {u.branches
+                  .filter((b) => b.id !== m.branchId)
+                  .map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+              </Select>
+            </label>
+            <label className="flex flex-col gap-[5px] text-sm">
+              <span className="text-xs text-fg/70">Reason (optional)</span>
+              <Input name="reason" placeholder="Moved house" />
+            </label>
+            <DialogButtons close={here} label="Transfer" />
+          </form>
+        </Dialog>
+      )}
+    </div>
+  );
+}
+
+function Table({ head, rows, right = [], empty }: { head: string[]; rows: ReactNode[][]; right?: number[]; empty?: string }) {
+  if (empty) return <p className="text-muted">{empty}</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className={TABLE}>
+        <thead>
+          <tr>
+            {head.map((h, i) => (
+              <th key={h} className={cx(TH, right.includes(i) && "text-right")}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, k) => (
+            <tr key={k} className={TR}>
+              {r.map((c, i) => (
+                <td key={i} className={cx(TD, right.includes(i) && "text-right", "whitespace-nowrap")}>
+                  {c}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function ProgressStats({ progress }: { progress: Awaited<ReturnType<typeof progressFor>> }) {
+  const withW = progress.filter((p) => p.weightKg != null);
+  if (!withW.length) return null;
+  const last = withW[0]!;
+  const first = withW.at(-1)!;
+  const dw = (last.weightKg ?? 0) - (first.weightKg ?? 0);
+  const ws = [...withW].reverse().map((p) => p.weightKg!);
+  const mn = Math.min(...ws);
+  const mx = Math.max(...ws);
+  const pts = ws.map((w, i) => `${(ws.length > 1 ? (i / (ws.length - 1)) * 300 : 150).toFixed(1)},${(mx === mn ? 40 : 70 - ((w - mn) / (mx - mn)) * 60).toFixed(1)}`).join(" ");
+  return (
+    <>
+      <div className="flex flex-wrap gap-8">
+        <div>
+          <div className="text-[11px] tracking-[0.08em] text-muted uppercase">Weight</div>
+          <div className="text-[22px] font-semibold">{last.weightKg} kg</div>
+          <div className="text-xs text-muted">
+            {dw >= 0 ? "+" : ""}
+            {dw.toFixed(1)} kg since {fmtShort(first.date)}
+          </div>
+        </div>
+        {last.bodyFat != null && (
+          <div>
+            <div className="text-[11px] tracking-[0.08em] text-muted uppercase">Body fat</div>
+            <div className="text-[22px] font-semibold">{last.bodyFat}%</div>
+          </div>
+        )}
+      </div>
+      <svg viewBox="0 0 300 80" preserveAspectRatio="none" className="block h-20 w-full" aria-hidden="true">
+        <polyline points={pts} fill="none" stroke="var(--accent)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+      </svg>
     </>
   );
 }
+
+function Documents({ memberId, docs, ok, err }: { memberId: string; docs: Awaited<ReturnType<typeof listDocuments>>; ok?: string; err?: string }) {
+  const live = docs.filter((d) => d.status === "ACTIVE");
+  const past = docs.filter((d) => d.status !== "ACTIVE");
+  return (
+    <div className="flex flex-col gap-4">
+      {ok && <Notice tone="ok">{ok}</Notice>}
+      {err && <Notice tone="alert">{err}</Notice>}
+      <p className="m-0 text-sm text-muted">Stored privately against this member. Access is logged.</p>
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+        {live.map((d) => {
+          const I = d.mime === "application/pdf" ? FilePdfIcon : FileImageIcon;
+          return (
+            <div key={d.id} className="flex flex-col gap-2.5 rounded-md bg-surface p-[15px]">
+              <div className="text-[10px] tracking-[0.1em] text-accent uppercase">{d.kind}</div>
+              <div className="flex items-center gap-2.5">
+                <I size={28} weight="duotone" className="text-accent" />
+                <div className="min-w-0">
+                  <div className="text-[15px] font-semibold break-words">{d.title}</div>
+                  <div className="text-[11px] text-fg/50">
+                    {Math.max(1, Math.round(d.size / 1024))} KB · {fmtStamp(d.createdAt)} · {d.uploadedBy}
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-1">
+                <a href={`/documents/${d.id}`} target="_blank" rel="noopener" className={BTN.ghost}>
+                  Preview
+                </a>
+                <a href={`/documents/${d.id}?download`} className={BTN.ghost}>
+                  Download
+                </a>
+              </div>
+              <details className="text-sm">
+                <summary className="cursor-pointer text-accent">Replace or delete</summary>
+                <div className="mt-2 flex flex-col gap-2">
+                  <form action={replaceDocumentAction.bind(null, memberId, d.id)} className="flex flex-wrap items-center gap-2">
+                    <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="New file" className="max-w-full text-sm" />
+                    <Button>Replace</Button>
+                  </form>
+                  <form action={deleteDocumentAction.bind(null, memberId, d.id)} className="flex flex-wrap items-center gap-2">
+                    <Input name="reason" required placeholder="Reason for deleting" aria-label="Reason for deleting" className="w-auto flex-1" />
+                    <Button variant="danger">Delete</Button>
+                  </form>
+                </div>
+              </details>
+            </div>
+          );
+        })}
+      </div>
+      {live.length === 0 && <p className="text-muted">No documents yet. Upload the signed registration form and ID proof.</p>}
+      <form id="upload" action={uploadDocumentAction.bind(null, memberId)} className="flex max-w-xl scroll-mt-24 flex-col gap-2 rounded-lg border border-line bg-surface p-4">
+        <h4 className="m-0 text-base">Upload document</h4>
+        <div className="grid gap-2 sm:grid-cols-2">
+          <Select name="kind" aria-label="Kind of document" defaultValue="ID proof">
+            {DOC_KINDS.map((k) => (
+              <option key={k}>{k}</option>
+            ))}
+          </Select>
+          <Input name="title" placeholder="Title, e.g. Aadhaar card" aria-label="Title" maxLength={80} />
+        </div>
+        <input type="file" name="file" required accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,application/pdf,image/*" aria-label="File" className="max-w-full text-sm" />
+        <div>
+          <Button variant="primary">
+            <UploadSimpleIcon weight="duotone" />
+            Upload document
+          </Button>
+        </div>
+        <p className="m-0 text-xs text-muted">PDF or photo, up to 10 MB. Files are private; every view is recorded in the audit log.</p>
+      </form>
+      {past.length > 0 && (
+        <section>
+          <h4 className="mt-3 mb-1 text-[17px]">Document history</h4>
+          {past.map((d) => (
+            <div key={d.id} className="py-1 text-[13px] text-muted">
+              {fmtStamp(d.createdAt)} · {d.title} · {d.status === "REPLACED" ? "replaced by a newer version" : `deleted by ${d.deletedBy}: ${d.deleteReason}`}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function Biometric({
+  m,
+  bio,
+  devices,
+  canSettings,
+  ok,
+  err,
+}: {
+  m: { id: string; devicePin: string | null; biometricConsentAt: Date | null };
+  bio: Awaited<ReturnType<typeof memberBiometrics>>;
+  devices: { id: string; name: string | null; serial: string }[];
+  canSettings: boolean;
+  ok?: string;
+  err?: string;
+}) {
+  return (
+    <section id="biometric" className="flex max-w-2xl flex-col gap-3 text-sm">
+      <h4 className="m-0 text-lg">Biometric entry</h4>
+      {ok && <Notice tone="ok">{ok}</Notice>}
+      {err && <Notice tone="alert">{err}</Notice>}
+      <p className="m-0">
+        {m.devicePin ? `Device PIN ${m.devicePin}` : "Not on any device yet"}
+        {bio.fingerprints || bio.faces ? ` · ${bio.fingerprints} fingerprint${bio.fingerprints === 1 ? "" : "s"}, ${bio.faces} face${bio.faces === 1 ? "" : "s"} stored (encrypted)` : ""}
+        {bio.devices.length ? ` · on ${bio.devices.map((d) => `${d.device.name ?? d.device.serial}${d.allowed ? "" : " (removed, plan not active)"}`).join(", ")}` : ""}
+      </p>
+      {m.biometricConsentAt && <p className="m-0 text-muted">Consent recorded {fmtStamp(m.biometricConsentAt)}.</p>}
+      {devices.length === 0 ? (
+        <p className="m-0 text-muted">
+          No door device yet.{" "}
+          {canSettings ? (
+            <Link href="/settings/devices" className="text-accent">
+              Add one in Biometric &amp; doors.
+            </Link>
+          ) : (
+            "Ask a Super Admin to add one."
+          )}
+        </p>
+      ) : (
+        <form action={enrolBiometric.bind(null, m.id)} className="flex flex-col gap-2">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Select name="deviceId" aria-label="Device">
+              {devices.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name ?? d.serial}
+                </option>
+              ))}
+            </Select>
+            <Select name="kind" aria-label="What to enrol">
+              <option value="FP">Fingerprint</option>
+              <option value="FACE">Face</option>
+            </Select>
+          </div>
+          {!m.biometricConsentAt && (
+            <label className="flex items-start gap-2">
+              <input type="checkbox" name="consent" className="mt-0.5 size-4" />
+              <span>The member has given written consent to store their fingerprint or face for gym entry, and knows they can ask for it to be deleted.</span>
+            </label>
+          )}
+          <div>
+            <Button variant="primary">Enrol on device</Button>
+          </div>
+        </form>
+      )}
+      {(m.devicePin || m.biometricConsentAt) && (
+        <form action={eraseBiometric.bind(null, m.id)}>
+          <ConfirmButton variant="danger" confirm="Delete this member's fingerprints and face data here and on every device?">
+            Delete biometric data
+          </ConfirmButton>
+        </form>
+      )}
+    </section>
+  );
+}
+
+/** The prototype's modal: a card over a dimmed page; clicking outside closes it. */
+function Dialog({ kicker, title, note, close, error, children }: { kicker: string; title: string; note?: string; close: string; error?: string; children: ReactNode }) {
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center p-5 max-lg:items-end max-lg:p-0">
+      <Link href={close} aria-label="Close" className="absolute inset-0 bg-[color-mix(in_srgb,var(--text)_8%,rgba(0,0,0,0.6))]" scroll={false} />
+      <div role="dialog" aria-modal="true" className="relative flex w-[min(480px,100%)] flex-col gap-3.5 rounded-lg bg-surface p-5 shadow-lg max-lg:rounded-t-[18px] max-lg:rounded-b-none">
+        <div>
+          <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{kicker}</div>
+          <div className="text-xl font-semibold">{title}</div>
+        </div>
+        {error && <Notice tone="alert">{error}</Notice>}
+        {children}
+        {note && <p className="m-0 text-[13px] text-muted">{note}</p>}
+      </div>
+    </div>
+  );
+}
+
+const DialogButtons = ({ close, label }: { close: string; label: string }) => (
+  <div className="flex justify-end gap-2.5">
+    <Link href={close} className={BTN.secondary} scroll={false}>
+      Cancel
+    </Link>
+    <button className={BTN.primary}>{label}</button>
+  </div>
+);

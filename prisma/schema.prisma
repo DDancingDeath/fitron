@@ -1106,3 +1106,22 @@ model Offer {
 
   @@unique([orgId, code])
 }
+
+/// A membership put on hold (member profile → Freeze). The membership's end date moves out by `days`;
+/// unfreezing early gives the unused days back. Check-in is refused while a freeze covers today.
+model MembershipFreeze {
+  id           String    @id @default(cuid())
+  orgId        String
+  memberId     String
+  membershipId String
+  fromDate     DateTime  @db.Date
+  days         Int
+  reason       String
+  /// Set when unfrozen early; the membership end moved back by the unused days
+  endedOn      DateTime? @db.Date
+  createdById  String
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+}
+

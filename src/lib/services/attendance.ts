@@ -4,6 +4,7 @@ import type { CurrentUser } from "@/lib/auth/current";
 import { DEFAULT_ACCESS, entryBlock, type AccessRules } from "@/lib/domain/access";
 import { membershipStatus } from "@/lib/domain/membership";
 import { audit } from "./audit";
+import { frozenBlocks } from "./freeze";
 import { UserError } from "./errors";
 import { memberScope, summarize } from "./members";
 import { notify } from "./notifications";
@@ -52,7 +53,7 @@ export async function checkIn(u: CurrentUser, memberId: string, opts: { method?:
   if (!m) throw new UserError("Member not found.");
   const today = todayIso();
   const s = (await summarize([m.id], today)).get(m.id)!;
-  const block = entryBlock({ suspended: m.suspended, ...s }, await getAccessRules(u.orgId), today);
+  const block = entryBlock({ suspended: m.suspended, ...s }, await getAccessRules(u.orgId), today) ?? (await frozenBlocks([m.id], today)).get(m.id) ?? null;
   const override = opts.override?.trim();
   if (block && !override) return { ok: false, blocked: block, memberId: m.id, name: m.name };
 

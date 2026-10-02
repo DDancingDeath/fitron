@@ -3,7 +3,7 @@
 import { useActionState } from "react";
 import { savePlan } from "./actions";
 import { Button, Card, Field, Input, LinkButton, Notice, Select, Textarea } from "@/components/ui";
-import { PLAN_KINDS } from "@/lib/validation/plan";
+import { PLAN_KINDS, PRICE_CATEGORIES } from "@/lib/validation/plan";
 
 export type PlanValues = {
   name: string;
@@ -15,6 +15,7 @@ export type PlanValues = {
   gstApplicable: boolean;
   description: string | null;
   features: string[];
+  prices?: { category: string; price: number }[];
 };
 
 const rs = (paise?: number) => (paise == null ? "" : String(paise / 100));
@@ -56,6 +57,11 @@ export function PlanForm({ id, values }: { id?: string; values?: PlanValues }) {
             <input type="checkbox" name="gstApplicable" defaultChecked={sent ? sent.gstApplicable === "on" : (values?.gstApplicable ?? true)} className="size-4 accent-[var(--accent)]" />
             GST applies to this plan
           </label>
+          {PRICE_CATEGORIES.map((c) => (
+            <Field key={c} label={`${c} price (₹)`} error={e[`${c.toLowerCase()}Price`]} hint="Leave empty to use the standard price">
+              <Input name={`${c.toLowerCase()}Price`} inputMode="decimal" defaultValue={pick(`${c.toLowerCase()}Price`, rs(values?.prices?.find((x) => x.category === c)?.price))} />
+            </Field>
+          ))}
           <Field label="Description" error={e.description} className="sm:col-span-2">
             <Textarea name="description" defaultValue={pick("description", values?.description ?? "")} />
           </Field>
