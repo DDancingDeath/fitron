@@ -31,9 +31,11 @@ export function TemplateForm({ tkey, body, metaTemplateName, language, autoSend 
   );
 }
 
-export function SendOneForm({ memberId, templates, invoices }: { memberId: string; templates: { key: string; name: string; body: string }[]; invoices: { id: string; number: string }[] }) {
+export function SendOneForm({ memberId, templates, invoices, invoiceId }: { memberId: string; templates: { key: string; name: string; body: string }[]; invoices: { id: string; number: string }[]; invoiceId?: string }) {
   const [state, action, pending] = useActionState(sendOneAction.bind(null, memberId), undefined);
-  const [key, setKey] = useState("campaign");
+  // Opened from "Send invoice on WhatsApp": the invoice template with that invoice attached.
+  const preset = invoiceId && invoices.some((i) => i.id === invoiceId) && templates.some((t) => t.key === "invoice") ? invoiceId : undefined;
+  const [key, setKey] = useState(preset ? "invoice" : "campaign");
   const t = templates.find((x) => x.key === key);
   return (
     <form action={action} key={state?.nonce} className="flex flex-col gap-3">
@@ -56,7 +58,7 @@ export function SendOneForm({ memberId, templates, invoices }: { memberId: strin
       )}
       {(key === "invoice" || key === "renewal") && invoices.length > 0 && (
         <Field label="Attach invoice">
-          <Select name="invoiceId" defaultValue={invoices[0]!.id}>
+          <Select name="invoiceId" defaultValue={preset ?? invoices[0]!.id}>
             {invoices.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.number}
