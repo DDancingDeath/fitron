@@ -13,6 +13,7 @@ import { fromIso, todayIso } from "./time";
 import { prefixes, writeInvoice, writePayment } from "./billing";
 import { writeAsset } from "./assets";
 import { getTax } from "./tax";
+import { activeMemberCount, assertBranchWritable, gymPlan } from "./saas";
 
 type Tx = Prisma.TransactionClient;
 
@@ -71,6 +72,14 @@ export async function commitImport(u: CurrentUser, kind: ImportKind, rows: strin
   if (!branchId) throw new UserError("Pick a branch first. Imported records go to one branch.");
   const checked = checkRows(kind, toRecords(kind, rows, map), await context(u, branchId)).filter((r) => r.errors.length === 0);
   if (!checked.length) throw new UserError("No valid rows to import.");
+  await assertBranchWritable(db, u.orgId, branchId);
+  if (kind === "members") {
+    const plan = await gymPlan(u.orgId);
+    const room = plan.terms.memberLimit === null ? Infinity : plan.terms.memberLimit - (await activeMemberCount(db, u.orgId));
+    if (checked.length > room) {
+      throw new UserError(`Your ${plan.name} plan allows ${plan.terms.memberLimit} active members, so ${Math.max(room, 0)} more fit. Move to a bigger plan in Settings › Plan & billing, or import fewer rows.`);
+    }
+  }
   const mig = await getMigration(u.orgId);
   const source = mig.source?.trim() || "previous software";
   const tax = await getTax(u.orgId);

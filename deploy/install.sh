@@ -42,6 +42,9 @@ if [ ! -f .env ]; then
   set_env WHATSAPP_VERIFY_TOKEN "$(rand 16)"
   set_env AI_MODEL "claude-sonnet-5"
   set_env FITRON_LEGAL_NAME "Fitron Technologies"
+  set_env FITRON_UPI_NAME "FITRON"
+  set_env MAIL_FROM '"FITRON <hello@fitron.in>"'
+  set_env ENQUIRY_TO "hello@fitron.in"
   set_env BACKUP_KEEP_DAYS 14
   chmod 600 .env
   echo "Saved settings to deploy/.env (passwords and keys were generated for you)."

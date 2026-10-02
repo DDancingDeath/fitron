@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
-import { branchPrice, gstSplit, nextPeriod, standings } from "./saas";
+import { branchPrice, gstSplit, gymTerms, nextPeriod, planPrice, planStanding, planWritable, standings } from "./saas";
 
 describe("Fitron branch plan", () => {
-  it("prices extra branches with 18% GST", () => {
-    expect(branchPrice("MONTHLY")).toEqual({ base: 250_000, gst: 45_000, total: 295_000 });
-    expect(branchPrice("YEARLY")).toEqual({ base: 800_000, gst: 144_000, total: 944_000 });
+  it("prices extra branches and plans from the price list, with 18% GST", () => {
+    expect(branchPrice("MONTHLY")).toEqual({ base: 49_900, gst: 8_982, total: 58_882 });
+    expect(branchPrice("YEARLY")).toEqual({ base: 4_99_000, gst: 89_820, total: 5_88_820 });
+    expect(planPrice("starter", "MONTHLY")).toEqual({ base: 99_900, gst: 17_982, total: 1_17_882 });
+    expect(planPrice("enterprise", "YEARLY").base).toBe(39_99_000);
+    expect(() => planPrice("ai-pro", "MONTHLY")).toThrow();
+  });
+
+  it("sets limits from the plan; gyms set up by hand keep the old rules", () => {
+    const trial = new Date("2026-10-08T00:00:00Z");
+    expect(gymTerms({ plan: "starter", trialEndsAt: trial })).toEqual({ custom: false, memberLimit: 100, includedBranches: 1, extraBranches: false });
+    expect(gymTerms({ plan: "enterprise", trialEndsAt: trial })).toEqual({ custom: false, memberLimit: null, includedBranches: 3, extraBranches: true });
+    expect(gymTerms({ plan: "professional", trialEndsAt: null })).toMatchObject({ custom: true, memberLimit: null, includedBranches: 3 });
+  });
+
+  it("runs trial, paid, grace, then read-only", () => {
+    expect(planStanding(null, null, "2026-10-01")).toEqual({ kind: "CUSTOM" });
+    expect(planStanding("2026-10-07", null, "2026-10-07")).toEqual({ kind: "TRIAL", until: "2026-10-07" });
+    expect(planStanding("2026-10-07", null, "2026-10-08")).toEqual({ kind: "LAPSED", since: "2026-10-08" });
+    expect(planStanding("2026-10-07", "2026-11-07", "2026-10-08")).toEqual({ kind: "PAID", until: "2026-11-07" });
+    expect(planStanding("2026-10-07", "2026-11-07", "2026-11-10")).toEqual({ kind: "GRACE", until: "2026-11-07", readOnlyFrom: "2026-11-15" });
+    const lapsed = planStanding("2026-10-07", "2026-11-07", "2026-11-15");
+    expect(lapsed).toEqual({ kind: "LAPSED", since: "2026-11-15" });
+    expect(planWritable(lapsed)).toBe(false);
   });
 
   it("continues a period without a gap, or starts today after a lapse", () => {

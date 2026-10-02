@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
 import { getBillingInvoice } from "@/lib/services/saas";
 import { gstSplit, SAAS_GST_RATE } from "@/lib/domain/saas";
+import { findPlan } from "@/lib/domain/pricing";
 import { fmtDate, fmtStamp, formatInr } from "@/lib/format";
 import { Card, LinkButton, Notice, PageHeader } from "@/components/ui";
 import { PrintButton } from "./print-button";
@@ -71,7 +72,8 @@ export default async function FitronInvoicePage({ params }: PageProps<"/settings
               <tbody>
                 <tr className="border-t border-line">
                   <td className="py-2">
-                    Fitron extra branch{branch ? ` (${branch.name})` : ""}, {sub.cycle === "YEARLY" ? "yearly" : "monthly"} plan
+                    {sub.kind === "PLAN" ? `FITRON Gym Accounting, ${findPlan(sub.plan)?.name ?? sub.plan} plan` : `FITRON extra branch${branch ? ` (${branch.name})` : ""}`},{" "}
+                    {sub.cycle === "YEARLY" ? "yearly" : "monthly"}
                     <br />
                     <span className="text-muted">
                       {fmtDate(sub.periodStart)} to {fmtDate(sub.periodEnd)}
@@ -99,6 +101,7 @@ export default async function FitronInvoicePage({ params }: PageProps<"/settings
             </div>
           </dl>
           {sub.razorpayPaymentId && <p className="text-muted">Paid online · Razorpay {sub.razorpayPaymentId}</p>}
+          {sub.utr && <p className="text-muted">Paid by UPI · UTR {sub.utr}</p>}
         </div>
       </Card>
     </>

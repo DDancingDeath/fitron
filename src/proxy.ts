@@ -6,13 +6,16 @@ export function proxy(req: NextRequest) {
   // The home page is the public marketing site.
   if (req.nextUrl.pathname === "/") return NextResponse.next();
   if (!req.cookies.has("fitron_session")) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    // Come back to the page they wanted after logging in.
+    const login = new URL("/login", req.url);
+    login.searchParams.set("next", req.nextUrl.pathname + req.nextUrl.search);
+    return NextResponse.redirect(login);
   }
   return NextResponse.next();
 }
 
 export const config = {
-  // The website is public: /site (static home page files), sign-up, contact, policies, robots and sitemap.
+  // The website is public: /site (static home page files), sign-up, email links, contact, policies, robots and sitemap.
   // Webhooks, the job runner and door devices (/iclock) authenticate with their own signatures and secrets.
-  matcher: ["/((?!login|signup|contact|privacy|terms|refund|robots.txt|sitemap.xml|site/|_next/|favicon.ico|fitron-mark.png|api/health|api/webhooks/|api/jobs/|iclock/).*)"],
+  matcher: ["/((?!login|signup|verify-email|forgot-password|reset-password|contact|privacy|terms|refund|robots.txt|sitemap.xml|site/|_next/|favicon.ico|fitron-mark.png|api/health|api/webhooks/|api/jobs/|iclock/).*)"],
 };

@@ -1,4 +1,5 @@
 import { TrialForm } from "./trial-form";
+import { GymSignupForm } from "./gym-signup-form";
 import { DEFAULT_PLAN, PRODUCT_LABEL, findPlan, rupeesLabel } from "@/lib/domain/pricing";
 
 export const metadata = { title: "Start your free trial · FITRON", description: "Start a 7-day free trial of FITRON AI Trainer or Gym Accounting. No card needed." };
@@ -7,6 +8,8 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
   const q = await searchParams;
   const plan = findPlan(typeof q.plan === "string" ? q.plan : null) ?? findPlan(DEFAULT_PLAN)!;
   const cycle = q.cycle === "YEARLY" || q.cycle === "year" ? "YEARLY" : "MONTHLY";
+  // Gym plans get a real account straight away; AI Trainer and partner plans are set up with the team.
+  const gym = plan.product === "GYM_ACCOUNTING";
   return (
     <div className="grid gap-10 lg:grid-cols-[1fr_minmax(0,26rem)]">
       <section>
@@ -20,17 +23,25 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
         <p className="mt-6 text-2xl font-semibold">
           {rupeesLabel(plan.price.MONTHLY)} <span className="text-base font-normal text-muted">/ month, or {rupeesLabel(plan.price.YEARLY)} / year, plus GST</span>
         </p>
-        <ol className="mt-8 flex max-w-lg flex-col gap-3 text-muted">
-          <li><b className="text-fg">1.</b> Send this form. It takes a minute.</li>
-          <li><b className="text-fg">2.</b> We call or WhatsApp you within one working day and set up your account{plan.product !== "AI_TRAINER" ? ", including your member list" : ""}.</li>
-          <li><b className="text-fg">3.</b> {plan.trialDays ? "Use everything free for 7 days. Pay by UPI only if you want to continue: nothing auto-debits." : "Sign the partnership agreement and go live."}</li>
-        </ol>
+        {gym ? (
+          <ol className="mt-8 flex max-w-lg flex-col gap-3 text-muted">
+            <li><b className="text-fg">1.</b> Create your account. It takes a minute.</li>
+            <li><b className="text-fg">2.</b> Confirm your email, then add your plans and members, or import them from Excel.</li>
+            <li><b className="text-fg">3.</b> Use everything free for 7 days. Pay by UPI only if you want to continue: nothing auto-debits.</li>
+          </ol>
+        ) : (
+          <ol className="mt-8 flex max-w-lg flex-col gap-3 text-muted">
+            <li><b className="text-fg">1.</b> Send this form. It takes a minute.</li>
+            <li><b className="text-fg">2.</b> We call or WhatsApp you within one working day and set up your account.</li>
+            <li><b className="text-fg">3.</b> {plan.trialDays ? "Use everything free for 7 days. Pay by UPI only if you want to continue: nothing auto-debits." : "Sign the partnership agreement and go live."}</li>
+          </ol>
+        )}
         <p className="mt-8 text-sm text-muted">
           Already have an account? <a href="/login" className="text-accent underline">Log in</a>
         </p>
       </section>
       <section className="rounded-xl border border-line bg-surface p-5 sm:p-6">
-        <TrialForm plan={plan.key} cycle={cycle} />
+        {gym ? <GymSignupForm plan={plan.key} cycle={cycle} /> : <TrialForm plan={plan.key} cycle={cycle} />}
       </section>
     </div>
   );

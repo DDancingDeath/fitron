@@ -1,14 +1,22 @@
-# Fitron
+# FITRON
 
-Gym management and accounting software for Indian gyms: members, plans and renewals, GST invoices, payments, expenses and P&L, assets, purchases, POS, classes, leads, attendance, WhatsApp reminders, UPI Autopay and Fitron AI. Multi-branch, sold as SaaS.
+One product for India's fitness market, live at **fitron.in**, in three parts that share one login system and one database:
+
+1. **Website** (fitron.in): the landing page with pricing, free-trial sign-up, contact form and policies.
+2. **FITRON AI Trainer**: an AI personal trainer for members, from ₹299 a month. Personalised workout plans, Indian meal plans by city, diet and budget, a 24/7 AI coach, habits, progress and weekly reviews.
+3. **FITRON Gym Accounting**: gym management and GST accounting for gym owners, from ₹999 a month. Members, plans and renewals, GST invoices, payments, expenses and P&L, assets, purchases, POS, classes, leads, attendance, WhatsApp reminders, UPI Autopay, door devices and the Fitron AI assistant. Multi-branch.
+
+They work together: a gym on FITRON gives its members the AI Trainer under its own brand, sees their training next to their dues, and earns 70% of members' AI Trainer subscriptions through the Gym Partnership.
+
+The AI Trainer's design is the browser demo in `prototype/ai-trainer/` (serve the folder and open `index.html`); it is being built into the app at `/trainer`.
 
 ## What's here
 
-- **The production app** (repo root): Next.js (App Router) + TypeScript + Tailwind, Postgres via Prisma. Being built from `prototype/HANDOFF.md`.
+- **The app** (repo root): Next.js (App Router) + TypeScript + Tailwind, Postgres via Prisma. The Gym Accounting console was built from `prototype/HANDOFF.md`.
   - `prisma/schema.prisma`: core schema (tenancy, staff and roles, members, plans, memberships, invoices, payments, expenses, audit log, month locks, settings, sequences).
   - `src/lib/domain/`: business rules with unit tests (invoice totals and GST, computed invoice status, membership status, date maths).
 - **The website** (fitron.in): `/` is the static landing page in `public/site` (from the design export; update it with `python3 scripts/import-site.py "FITRON Website.html"`). `/signup`, `/contact`, `/privacy`, `/terms` and `/refund` are in `src/app/(site)`. Trial requests and messages are saved in the `Enquiry` table and emailed to `ENQUIRY_TO`. Prices live in `src/lib/domain/pricing.ts`; a test checks them against the page.
-- **`prototype/`**: the working browser prototype. Serve the folder (`npx serve prototype`) and open `Fitron Gym.dc.html`. Data lives in localStorage; WhatsApp and UPI Autopay are simulated.
+- **`prototype/`**: the Gym Accounting browser prototype, and the AI Trainer demo in `prototype/ai-trainer/`. Serve the folder (`npx serve prototype`) and open `Fitron Gym.dc.html`. Data lives in localStorage; WhatsApp and UPI Autopay are simulated.
   - `prototype/HANDOFF.md`: the production build spec.
   - `prototype/connector/`: WhatsApp linked-device and Razorpay UPI Autopay service.
 

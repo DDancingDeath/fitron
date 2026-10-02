@@ -68,6 +68,7 @@ async function main() {
         phone: `9${ri(100000000, 999999999)}`,
         roleId: roles.get(role)!,
         passwordHash,
+        emailVerifiedAt: new Date(),
         ptRate: role === "Trainer" ? 40 : 0,
         branches: { create: branches.map((b) => ({ branchId: b.id })) },
       },
