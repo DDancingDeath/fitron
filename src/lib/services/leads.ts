@@ -70,6 +70,7 @@ export async function setLeadStage(u: CurrentUser, id: string, stage: LeadStage,
   const trialOn = stage === "Trial booked" ? (extra.trialOn ?? addDays(today, 1)) : null;
   const data: Prisma.LeadUpdateInput = {
     stage,
+    ...(stage !== before.stage ? { stageAt: new Date() } : {}),
     lostReason: stage === "Lost" ? extra.lostReason!.trim() : null,
     followUpOn: stage === "Lost" ? null : fromIso(trialOn ? trialOn : addDays(today, 2)),
     ...(trialOn ? { trialOn: fromIso(trialOn) } : {}),
@@ -80,10 +81,33 @@ export async function setLeadStage(u: CurrentUser, id: string, stage: LeadStage,
   });
 }
 
+/**
+ * Someone called or messaged the lead (prototype): a New lead becomes Contacted, and the next follow-up
+ * is in two days (a call keeps a follow-up already planned for later).
+ */
+export async function touchLead(u: CurrentUser, id: string, how: "call" | "whatsapp") {
+  const before = await db.lead.findFirst({ where: { ...scope(u), id } });
+  if (!before) throw new UserError("Lead not found.");
+  if (before.stage === "Won" || before.stage === "Lost") return;
+  const today = todayIso();
+  const later = before.followUpOn && before.followUpOn > fromIso(today) ? before.followUpOn : null;
+  const contacted = before.stage === "New";
+  await db.$transaction(async (tx) => {
+    const after = await tx.lead.update({
+      where: { id },
+      data: {
+        ...(contacted ? { stage: "Contacted", stageAt: new Date() } : {}),
+        followUpOn: how === "call" && later ? later : fromIso(addDays(today, 2)),
+      },
+    });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: how === "call" ? "lead.call" : "lead.message", entity: "Lead", entityId: id, before, after });
+  });
+}
+
 /** Called in the member-create transaction when a member is added from a lead. */
 export async function markLeadWon(tx: Prisma.TransactionClient, u: CurrentUser, leadId: string, memberId: string) {
   const before = await tx.lead.findFirst({ where: { ...scope(u), id: leadId } });
   if (!before || before.stage === "Won") return;
-  const after = await tx.lead.update({ where: { id: leadId }, data: { stage: "Won", memberId, followUpOn: null } });
+  const after = await tx.lead.update({ where: { id: leadId }, data: { stage: "Won", stageAt: new Date(), memberId, followUpOn: null } });
   await audit(tx, { orgId: u.orgId, userId: u.id, action: "lead.won", entity: "Lead", entityId: leadId, before, after });
 }

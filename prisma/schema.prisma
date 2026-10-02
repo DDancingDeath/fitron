@@ -505,6 +505,8 @@ model Lead {
   interest   String
   /// New | Contacted | Trial booked | Trial done | Won | Lost
   stage      String       @default("New")
+  /// When the lead entered its current stage ("In stage" on the leads board)
+  stageAt    DateTime     @default(now()) @db.Timestamptz
   followUpOn DateTime?    @db.Date
   trialOn    DateTime?    @db.Date
   ownerId    String
