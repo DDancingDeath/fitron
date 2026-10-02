@@ -12,7 +12,7 @@ import { UserError } from "./errors";
 import { summarize } from "./members";
 import { notify } from "./notifications";
 import { nextNumber } from "./sequence";
-import { fromIso, todayIso } from "./time";
+import { fromIso, nowHHMM, todayIso } from "./time";
 
 type Device = Prisma.DeviceGetPayload<object>;
 
@@ -98,7 +98,7 @@ export async function recordPunches(d: Device, punches: Punch[]) {
       continue;
     }
     const s = (await summarize([member.id], date)).get(member.id)!;
-    const block = entryBlock({ suspended: member.suspended, ...s }, rules, date) ?? (await frozenBlocks([member.id], date)).get(member.id) ?? null;
+    const block = entryBlock({ suspended: member.suspended, ...s }, rules, date, nowHHMM(at)) ?? (await frozenBlocks([member.id], date)).get(member.id) ?? null;
     await db.$transaction(async (tx) => {
       await tx.accessLog.create({ data: { deviceId: d.id, branchId: d.branchId, memberId: member.id, pin: p.pin, method, result: block ? "DENIED" : "ALLOWED", reason: block, at } });
       if (block) {

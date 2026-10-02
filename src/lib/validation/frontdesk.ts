@@ -129,4 +129,6 @@ export const accessInput = z.object({
   graceDays: z.coerce.number().int().min(0).max(60),
   blockDues: z.preprocess((v) => v === "on", z.boolean()),
   duesLimit: z.preprocess((v) => (v === "" || v == null ? "0" : v), rupees),
+  hoursFrom: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
+  hoursTo: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
 });

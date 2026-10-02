@@ -100,7 +100,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Card>
         <Card title="Entry rules">
           <form action={saveAccess} className="flex flex-col gap-3 text-sm">
-            <p className="text-muted">Who the front desk (and later the door device) turns away. Staff can still let someone in with a reason, which is logged.</p>
+            <p className="text-muted">Who the front desk (and later the door device) turns away. An Admin can still let someone in, which is logged.</p>
             <label className="flex items-center gap-2">
               <input type="checkbox" name="blockSuspended" defaultChecked={access.blockSuspended} className="size-4" /> Block suspended members
             </label>
@@ -111,6 +111,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <label className="flex flex-wrap items-center gap-2">
               <input type="checkbox" name="blockDues" defaultChecked={access.blockDues} className="size-4" /> Block when dues are over ₹
               <Input name="duesLimit" inputMode="decimal" defaultValue={access.duesLimit / 100} className="w-28!" aria-label="Dues limit" />
+            </label>
+            <label className="flex flex-wrap items-center gap-2">
+              Gym hours
+              <Input name="hoursFrom" type="time" defaultValue={access.hoursFrom ?? ""} className="w-32!" aria-label="Opens at" /> to
+              <Input name="hoursTo" type="time" defaultValue={access.hoursTo ?? ""} className="w-32!" aria-label="Closes at" />
+              <span className="text-muted">(empty = open all hours)</span>
             </label>
             <div>
               <Button variant="primary">Save</Button>

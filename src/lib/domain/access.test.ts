@@ -20,4 +20,11 @@ describe("entryBlock", () => {
     expect(entryBlock(m, { ...DEFAULT_ACCESS, blockDues: true, duesLimit: 100000 }, today)).toBe("₹1,500 outstanding");
     expect(entryBlock(m, { ...DEFAULT_ACCESS, blockDues: true, duesLimit: 200000 }, today)).toBeNull();
   });
+  it("blocks outside opening hours when they are set", () => {
+    const hours = { ...DEFAULT_ACCESS, hoursFrom: "05:30", hoursTo: "22:00" };
+    expect(entryBlock(ok, hours, today, "05:00")).toBe("Outside gym hours");
+    expect(entryBlock(ok, hours, today, "05:30")).toBeNull();
+    expect(entryBlock(ok, hours, today, "22:01")).toBe("Outside gym hours");
+    expect(entryBlock(ok, DEFAULT_ACCESS, today, "03:00")).toBeNull();
+  });
 });

@@ -5,7 +5,7 @@ import { addDays } from "@/lib/domain/dates";
 import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { cancelInvoice, getInvoice, sellMembership } from "./billing";
-import { checkIn, listDay } from "./attendance";
+import { checkIn, checkInGuest, listDay } from "./attendance";
 import { book, saveSlot, setBookingStatus, weekdayOf } from "./classes";
 import { adjustStock, posSale, saveProduct } from "./pos";
 import { createLead, getLead, setLeadStage } from "./leads";
@@ -73,7 +73,7 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     const active = await newMember();
     await sellMembership(admin, active.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: 0 });
     expect(await checkIn(admin, active.id)).toMatchObject({ ok: true });
-    await expect(checkIn(admin, active.id)).rejects.toThrow(/already inside/);
+    expect(await checkIn(admin, active.id)).toMatchObject({ ok: false, kind: "inside", blocked: expect.stringMatching(/Already inside/) });
 
     const never = await newMember();
     expect(await checkIn(admin, never.id)).toMatchObject({ ok: false, blocked: "No membership yet" });
@@ -91,5 +91,18 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await expect(setLeadStage(admin, lead.id, "Lost")).rejects.toThrow(/why/);
     const m = await createMember(admin, { name: "Asha Lead", gender: "Female", phone: "9844400001", source: "Instagram", tags: [] }, { leadId: lead.id });
     expect(await getLead(admin, lead.id)).toMatchObject({ stage: "Won", memberId: m.id });
+  });
+
+  it("a trial visitor becomes a lead, and only an Admin can let a blocked member in", async () => {
+    const gym2 = await makeGym();
+    const desk = await gym2.user("Receptionist", [gym2.a.id]);
+    expect(await checkInGuest(desk, "Trial Tara", "9876566001", "Trial")).toEqual({ lead: true });
+    expect(await db.lead.findFirst({ where: { orgId: gym2.org.id, phone: "9876566001" } })).toMatchObject({ stage: "Trial done", source: "Walk-in" });
+    expect(await checkInGuest(desk, "Trial Tara", "9876566001", "Trial")).toEqual({ lead: false });
+    expect(await checkInGuest(desk, "Day Dev", undefined, "Day pass")).toEqual({ lead: false });
+    const admin = pick(await gym2.user("Super Admin"), gym2.a.id);
+    const none = await createMember(admin, { name: "No Plan", gender: "Male", phone: "9876566002", source: "Walk-in", tags: [] });
+    expect(await checkIn(desk, none.id)).toMatchObject({ ok: false, kind: "expired" });
+    await expect(checkIn(desk, none.id, { override: "Allowed by staff" })).rejects.toThrow(/Only an Admin/);
   });
 });
