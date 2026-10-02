@@ -33,7 +33,8 @@ async function main() {
   if (existing) {
     const added = await seedFrontDesk(existing.id);
     const assets = await seedAssets(existing.id);
-    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}.`);
+    const mandates = await seedAutopay(existing.id);
+    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}${mandates ? ", autopay mandates added" : ""}.`);
     return;
   }
   const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
@@ -202,6 +203,7 @@ async function main() {
   });
   await seedFrontDesk(org.id);
   await seedAssets(org.id);
+  await seedAutopay(org.id);
   // The prototype's offer codes, so Plans & offers isn't empty in the demo.
   const offers: [string, string, string, number, number, number | null, number][] = [
     ["DIWALI26", "Festive offer on Quarterly and above", "PERCENT", 15, 39, 100, 0],
@@ -394,3 +396,47 @@ main()
     process.exit(1);
   })
   .finally(() => db.$disconnect());
+
+const UPI_HANDLES = ["okicici", "okhdfcbank", "oksbi", "ybl", "paytm"];
+
+/** Demo UPI autopay mandates on members whose membership is running: mostly active, two paused, one failed. Runs once per demo gym. */
+async function seedAutopay(orgId: string) {
+  if (await db.autopayMandate.count({ where: { orgId } })) return false;
+  const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  const owner = await db.user.findFirstOrThrow({ where: { orgId, role: { name: "Super Admin" } } });
+  const ms = await db.membership.findMany({
+    where: { member: { orgId, walkIn: false, suspended: false, deletedAt: null }, status: "VALID", endDate: { gte: new Date(`${today}T00:00:00Z`) } },
+    orderBy: { endDate: "asc" },
+    include: { member: true, plan: true },
+  });
+  const seen = new Set<string>();
+  const picks = ms.filter((m) => m.plan.months <= 3 && !seen.has(m.memberId) && seen.add(m.memberId)).slice(0, 12);
+  for (const [i, m] of picks.entries()) {
+    const n = await seqNext(orgId, "mandate", 1001);
+    const end = m.endDate.toISOString().slice(0, 10);
+    const next = new Date(`${end}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const status = i === 0 ? "Failed" : i === 2 || i === 8 ? "Paused" : "Active";
+    const started = new Date(m.startDate);
+    await db.autopayMandate.create({
+      data: {
+        orgId,
+        branchId: m.branchId,
+        memberId: m.memberId,
+        planId: m.planId,
+        code: `MD-${n}`,
+        amount: Math.round((m.plan.price - m.plan.discount) * 1.18),
+        months: m.plan.months,
+        mode: "demo",
+        vpa: `${m.member.name.split(" ")[0]!.toLowerCase()}@${UPI_HANDLES[i % UPI_HANDLES.length]}`,
+        status,
+        nextDebitOn: next,
+        retries: status === "Failed" ? 1 : 0,
+        lastResult: status === "Failed" ? "Bank did not respond · retry 1 of 3" : `Approved ${started.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
+        createdById: owner.id,
+        createdAt: started,
+      },
+    });
+  }
+  return picks.length > 0;
+}

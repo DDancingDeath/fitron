@@ -736,6 +736,8 @@ model AutopayMandate {
   mode           String
   subscriptionId String?        @unique
   shortUrl       String?
+  /// The member's UPI ID the mandate debits, e.g. riya@okicici (shown on the Autopay screen).
+  vpa            String?
   /// Pending | Active | Paused | Failed | Halted | Cancelled
   status         String         @default("Pending")
   nextDebitOn    DateTime?      @db.Date

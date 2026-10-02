@@ -46,7 +46,12 @@ async function cycleAmount(orgId: string, plan: { price: number; discount: numbe
  * Sets up autopay for a member on a plan. Live mode creates the Razorpay plan and subscription
  * and sends the approval link on WhatsApp; demo mode waits for "Approve (demo)".
  */
-export async function createMandate(u: CurrentUser, a: { memberId: string; planId: string; startOn?: string }) {
+/** A UPI ID: name@handle. */
+export const VPA = /^[\w.-]{2,}@[a-z][a-z0-9]{1,}$/i;
+
+export async function createMandate(u: CurrentUser, a: { memberId: string; planId: string; startOn?: string; vpa?: string }) {
+  const vpa = a.vpa?.trim().toLowerCase() || null;
+  if (vpa && !VPA.test(vpa)) throw new UserError("Enter a UPI ID like name@okicici.", "vpa");
   const member = await db.member.findFirst({ where: { ...memberScope(u), id: a.memberId, walkIn: false } });
   if (!member) throw new UserError("Member not found.", "member");
   const plan = await db.membershipPlan.findFirst({ where: { orgId: u.orgId, id: a.planId, status: "ACTIVE" } });
@@ -61,7 +66,7 @@ export async function createMandate(u: CurrentUser, a: { memberId: string; planI
 
   const mandate = await db.$transaction(async (tx) => {
     const n = await nextNumber(tx, u.orgId, "mandate", 1001);
-    const m = await tx.autopayMandate.create({ data: { code: `MD-${n}`, orgId: u.orgId, branchId, memberId: member.id, planId: plan.id, amount, months: plan.months, mode, nextDebitOn: fromIso(startOn), createdById: u.id } });
+    const m = await tx.autopayMandate.create({ data: { code: `MD-${n}`, orgId: u.orgId, branchId, memberId: member.id, planId: plan.id, amount, months: plan.months, mode, vpa, nextDebitOn: fromIso(startOn), createdById: u.id } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "autopay.create", entity: "AutopayMandate", entityId: m.id, after: m });
     return m;
   });
@@ -222,4 +227,27 @@ export async function runAutopayDay(orgId: string, today = todayIso()) {
     if (r === "renewed") charged++;
   }
   return { noticed, charged };
+}
+
+/** The Autopay screen's numbers (prototype KPIs): debits due in a week, collected in 30 days, debits per mandate. */
+export async function autopayStats(u: CurrentUser, mandates: { id: string; memberId: string; createdAt: Date }[], today = todayIso()) {
+  const [collected, charges] = await Promise.all([
+    db.payment.aggregate({
+      where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "SUCCESS", date: { gte: fromIso(addDays(today, -30)) }, invoice: { membership: { type: "AUTOPAY" } } },
+      _sum: { amount: true },
+      _count: { _all: true },
+    }),
+    db.membership.findMany({ where: { memberId: { in: mandates.map((m) => m.memberId) }, type: "AUTOPAY" }, select: { memberId: true, createdAt: true } }),
+  ]);
+  const debits = new Map(mandates.map((m) => [m.id, charges.filter((c) => c.memberId === m.memberId && c.createdAt >= m.createdAt).length]));
+  return { collected: collected._sum.amount ?? 0, collectedCount: collected._count._all, debits };
+}
+
+/** "Retry now" on a failed or halted demo mandate: runs the debit again straight away. */
+export async function retryDemoDebit(u: CurrentUser, id: string) {
+  const m = await db.autopayMandate.findFirst({ where: { ...scope(u), id } });
+  if (!m) throw new UserError("Mandate not found.");
+  if (m.mode !== "demo") throw new UserError("Razorpay retries live debits itself.");
+  if (!["Failed", "Halted"].includes(m.status)) throw new UserError("Only a failed debit can be retried.");
+  return recordCharge(m.id, { paymentId: `demo_${m.code}_${todayIso()}_retry${m.retries}`, amount: m.amount });
 }
