@@ -10,18 +10,20 @@ import type { Period } from "./accounting";
 import { addMonths } from "@/lib/domain/dates";
 import { assetInfo, depreciationIn, fyLabel, fyOf, scheduleByFy, ymOf } from "@/lib/domain/assets";
 import { assetsFor, toLike } from "./assets";
+import { CENTER, MORE } from "./reports-more";
 
 export type Cell = string | number | null;
-export type Column = { key: string; label: string; money?: boolean };
+/** money: paise shown as rupees; num / pct: right-aligned counts and percentages. */
+export type Column = { key: string; label: string; money?: boolean; kind?: "num" | "pct" };
 export type Report = { columns: Column[]; rows: Record<string, Cell>[]; totals?: Record<string, Cell> };
 
-type Def = { title: string; group: string; perm: Permission; usesPeriod: boolean; run: (u: CurrentUser, p: Period) => Promise<Report> };
+export type Def = { title: string; group: string; perm: Permission; usesPeriod: boolean; note?: string; run: (u: CurrentUser, p: Period) => Promise<Report> };
 
 const inPeriod = (p: Period) => ({ gte: fromIso(p.from), lte: fromIso(p.to) });
 const sumCol = (rows: Record<string, Cell>[], k: string) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
 const branchScope = (u: CurrentUser) => ({ orgId: u.orgId, branchId: { in: u.branchIds } });
 
-export const REPORTS: Record<string, Def> = {
+const BASE: Record<string, Def> = {
   collections: {
     title: "Collections",
     group: "Billing",
@@ -86,8 +88,8 @@ export const REPORTS: Record<string, Def> = {
       return { columns: [{ key: "plan", label: "Plan" }, { key: "sold", label: "Sold" }, { key: "renewals", label: "Of which renewals" }, { key: "amount", label: "Net amount", money: true }], rows, totals: { sold: sumCol(rows, "sold"), amount: sumCol(rows, "amount") } };
     },
   },
-  gst: {
-    title: "GST summary",
+  "gst-invoices": {
+    title: "GST invoice register",
     group: "Accounts",
     perm: "accounting.view",
     usesPeriod: true,
@@ -105,7 +107,7 @@ export const REPORTS: Record<string, Def> = {
     },
   },
   expenses: {
-    title: "Expenses",
+    title: "Expense list",
     group: "Accounts",
     perm: "accounting.view",
     usesPeriod: true,
@@ -289,7 +291,7 @@ export const REPORTS: Record<string, Def> = {
     },
   },
   "pur-vendor": {
-    title: "Purchases by supplier",
+    title: "Purchases by vendor",
     group: "Purchases",
     perm: "purchases.manage",
     usesPeriod: true,
@@ -312,7 +314,7 @@ export const REPORTS: Record<string, Def> = {
     },
   },
   payables: {
-    title: "Supplier dues",
+    title: "Vendor payables",
     group: "Purchases",
     perm: "purchases.manage",
     usesPeriod: false,
@@ -332,7 +334,15 @@ export const REPORTS: Record<string, Def> = {
   },
 };
 
-export const reportList = (u: CurrentUser) => Object.entries(REPORTS).filter(([, d]) => u.can(d.perm)).map(([key, d]) => ({ key, ...d }));
+export const REPORTS: Record<string, Def> = { ...BASE, ...MORE };
+for (const g of CENTER) for (const k of g.items) if (REPORTS[k]) REPORTS[k] = { ...REPORTS[k]!, group: g.group };
+
+/** Where each person's favourite reports are kept (a per-user setting). */
+export const favKey = (userId: string) => `favReports:${userId}`;
+
+/** The report centre's groups with the reports this user may open. */
+export const reportGroups = (u: CurrentUser) =>
+  CENTER.map((g) => ({ group: g.group, items: g.items.filter((k) => REPORTS[k] && u.can(REPORTS[k]!.perm)).map((k) => ({ key: k, title: REPORTS[k]!.title })) })).filter((g) => g.items.length);
 
 export function toCsv(r: Report): string {
   const esc = (v: Cell) => {
@@ -346,4 +356,14 @@ export function toCsv(r: Report): string {
   for (const row of r.rows) lines.push(r.columns.map((c) => esc(cell(c, row[c.key] ?? null))).join(","));
   if (r.totals) lines.push(r.columns.map((c, i) => esc(i === 0 ? "Total" : cell(c, r.totals![c.key] ?? null))).join(","));
   return lines.join("\n") + "\n";
+}
+
+/** The "Excel" download: an HTML table Excel opens directly, as the prototype does, with amounts in rupees. */
+export function toXls(title: string, r: Report): string {
+  const esc = (v: Cell) => (v == null ? "" : String(v).replace(/&/g, "&amp;").replace(/</g, "&lt;"));
+  const cell = (c: Column, v: Cell) => (c.money && typeof v === "number" ? (v / 100).toFixed(2) : v);
+  const head = `<tr>${r.columns.map((c) => `<th>${esc(c.label)}</th>`).join("")}</tr>`;
+  const body = r.rows.map((row) => `<tr>${r.columns.map((c) => `<td>${esc(cell(c, row[c.key] ?? null))}</td>`).join("")}</tr>`).join("");
+  const foot = r.totals ? `<tr>${r.columns.map((c, i) => `<th>${esc(i === 0 ? "Total" : cell(c, r.totals![c.key] ?? null))}</th>`).join("")}</tr>` : "";
+  return `<html><head><meta charset="utf-8"><title>${esc(title)}</title></head><body><table border="1">${head}${body}${foot}</table></body></html>`;
 }
