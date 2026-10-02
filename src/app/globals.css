@@ -1,40 +1,58 @@
 @import "tailwindcss";
 
-/* Fitron tokens from the prototype (prototype/Fitron Gym.dc.html). Dark is the default look. */
+/* light: styles that apply only in the light theme */
+@custom-variant light (&:where([data-theme="light"], [data-theme="light"] *));
+
+/*
+ * Fitron tokens, copied from the prototype (prototype/Fitron Gym.dc.html).
+ * Dark is the default; the header's sun/moon button switches to light (html[data-theme="light"]).
+ */
 :root {
   --bg: #0e0d0a;
   --surface: #181611;
-  --surface-2: #211e17;
-  --line: #2c281f;
+  --surface-2: #1f1c16;
+  --line: color-mix(in srgb, #f3ede0 14%, transparent);
+  --line-soft: color-mix(in srgb, #f3ede0 6%, transparent);
   --text: #f3ede0;
-  --muted: #a39a86;
+  --muted: #a99f8c;
+  --faint: #8a8172;
   --accent: #cfa94f;
-  --accent-ink: #1a1408;
+  --accent-hover: #e0bb5f;
+  --accent-ink: #0e0d0a;
   --accent-soft: #2a2314;
+  --accent-strong: #f2dfae;
   --alert: #ff6fa3;
   --alert-soft: #3a1322;
+  --alert-strong: #ffc6da;
   --ok: #7cc89a;
   --ok-soft: #14291d;
+  --scroll: #3a3328;
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
-    --bg: #f5f2ea;
-    --surface: #ffffff;
-    --surface-2: #f0ece2;
-    --line: #e4e0d8;
-    --text: #1f1b14;
-    --muted: #6d6556;
-    --accent: #8a6612;
-    --accent-ink: #ffffff;
-    --accent-soft: #f7eed6;
-    --alert: #c2185b;
-    --alert-soft: #fde7ef;
-    --ok: #1d7a45;
-    --ok-soft: #e3f4e9;
-    color-scheme: light;
-  }
+:root[data-theme="light"] {
+  --bg: #f5f2ea;
+  --surface: #ffffff;
+  --surface-2: #f0ece2;
+  --line: color-mix(in srgb, #1f1b14 12%, transparent);
+  --line-soft: color-mix(in srgb, #1f1b14 6%, transparent);
+  --text: #1f1b14;
+  --muted: #5d5444;
+  --faint: #766c59;
+  --accent: #8a6612;
+  --accent-hover: #76560c;
+  --accent-ink: #ffffff;
+  --accent-soft: #f7eed6;
+  --accent-strong: #4a3608;
+  --alert: #c2185b;
+  --alert-soft: #fde7ef;
+  --alert-strong: #650a2f;
+  --ok: #1d7a45;
+  --ok-soft: #e3f4e9;
+  --scroll: #d6cebd;
+  --shadow-lg: 0 12px 32px rgba(40, 30, 10, 0.14);
+  color-scheme: light;
 }
 
 @theme inline {
@@ -42,26 +60,68 @@
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
   --color-fg: var(--text);
   --color-muted: var(--muted);
+  --color-faint: var(--faint);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-strong: var(--accent-strong);
   --color-alert: var(--alert);
   --color-alert-soft: var(--alert-soft);
+  --color-alert-strong: var(--alert-strong);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --font-serif: var(--font-source-serif);
+  /* The prototype's corners are nearly square: 1px, 2px, 4px. */
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 6px;
+  --shadow-lg: var(--shadow-lg);
+}
+
+html,
+body {
+  overflow-x: clip;
 }
 
 body {
+  margin: 0;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-source-serif), Georgia, serif;
 }
 
+h1,
+h2,
+h3,
+h4 {
+  font-weight: 600;
+}
+
 input,
 select,
 textarea {
-  font-size: 16px; /* no zoom on iOS */
+  font-size: 14px;
+}
+
+select option {
+  background: var(--surface);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scroll) transparent;
+}
+
+@media (max-width: 899px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px; /* no zoom on iOS */
+  }
 }

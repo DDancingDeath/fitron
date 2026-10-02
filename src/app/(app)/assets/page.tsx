@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
+import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { listAssets } from "@/lib/services/assets";
 import { ASSET_CATEGORIES, fyLabel, fyOf } from "@/lib/domain/assets";
 import { Badge, Button, Empty, Input, LinkButton, PageHeader, Select } from "@/components/ui";
@@ -34,6 +35,7 @@ export default async function AssetsPage({ searchParams }: PageProps<"/assets">)
           </>
         }
       />
+      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/assets" />
       <form className="mb-4 flex flex-wrap gap-2">
         <Input name="q" defaultValue={f.q ?? ""} placeholder="Name, ID, supplier or serial" aria-label="Search assets" className="min-w-48 flex-1" />
         <Select name="category" defaultValue={f.category ?? ""} aria-label="Category" className="w-auto!">
