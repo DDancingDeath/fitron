@@ -3,7 +3,9 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current";
-import { planInput } from "@/lib/validation/plan";
+import { offerInput, planInput } from "@/lib/validation/plan";
+import { formAction } from "@/lib/form-action";
+import { createOffer, setOfferStatus } from "@/lib/services/offers";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { createPlan, deletePlan, setPlanStatus, updatePlan } from "@/lib/services/plans";
 import { UserError } from "@/lib/services/errors";
@@ -39,4 +41,20 @@ export async function removePlan(id: string): Promise<void> {
   }
   revalidatePath("/plans");
   redirect("/plans");
+}
+
+export async function saveOffer(_: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("plans.manage");
+  const r = await formAction(fd, offerInput, (d) => createOffer(u, d), "Offer created.");
+  if (r?.ok) {
+    revalidatePath("/plans");
+    redirect("/plans#offers");
+  }
+  return r;
+}
+
+export async function toggleOffer(id: string, status: "ACTIVE" | "PAUSED") {
+  const u = await requirePermission("plans.manage");
+  await setOfferStatus(u, id, status);
+  revalidatePath("/plans");
 }

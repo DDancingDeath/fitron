@@ -6,6 +6,8 @@ import { invoiceState, invoiceTotals, type InvoiceLine } from "@/lib/domain/bill
 import { addDays, membershipEndDate } from "@/lib/domain/dates";
 import type { InvoiceInput, PaymentInput, SellInput } from "@/lib/validation/billing";
 import { audit } from "./audit";
+import { takeOfferUse, usableOffer } from "./offers";
+import { offerDiscount } from "@/lib/domain/offers";
 import { UserError } from "./errors";
 import { assertMonthOpen } from "./locks";
 import { memberScope } from "./members";
@@ -117,8 +119,10 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
   const tax = await getTax(u.orgId);
   const taxRate = tax.enabled && plan.gstApplicable ? tax.rate : 0;
   const { isNew } = await suggestedStart(memberId);
-  const discount = input.discount;
-  if (discount > plan.price) throw new UserError("The discount is more than the plan price.", "discount");
+  if (input.discount > plan.price) throw new UserError("The discount is more than the plan price.", "discount");
+  // An offer code adds its discount on the plan price (Plans & offers); the total never goes below zero.
+  const offer = input.offerCode ? await usableOffer(u.orgId, input.offerCode) : null;
+  const discount = Math.min(plan.price, input.discount + (offer ? offerDiscount(offer, plan.price) : 0));
 
   const lines: Line[] = [
     { description: `${plan.name} membership (${plan.months} ${plan.months === 1 ? "month" : "months"})`, category: isNew ? "New Membership" : "Renewal", qty: 1, rate: plan.price, discount, taxRate, planId: plan.id },
@@ -147,9 +151,11 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
         price: plan.price,
         discount,
         pricingCategory: "Standard",
+        offerCode: offer?.code ?? null,
         invoiceId: invoice.id,
       },
     });
+    if (offer) await takeOfferUse(tx, offer.id);
     let payment = null;
     if (input.payAmount > 0) {
       payment = await writePayment(tx, u, {

@@ -44,6 +44,7 @@ model Organization {
   planCycle         String             @default("MONTHLY")
   /// Free trial end for gyms that signed up on fitron.in; null for gyms set up by hand
   trialEndsAt       DateTime?          @db.Timestamptz
+  offers            Offer[]
 }
 
 model Branch {
@@ -1080,4 +1081,28 @@ model Enquiry {
   handledAt DateTime? @db.Timestamptz
 
   @@index([createdAt])
+}
+
+/// Promo codes for registration or renewal (Plans & offers).
+model Offer {
+  id          String       @id @default(cuid())
+  orgId       String
+  org         Organization @relation(fields: [orgId], references: [id])
+  /// Upper-case, unique per gym
+  code        String
+  description String       @default("")
+  /// PERCENT (value is a percentage) | FLAT (value is paise)
+  type        String
+  value       Int
+  validTill   DateTime     @db.Date
+  /// Most uses allowed; null for no limit
+  usageLimit  Int?
+  uses        Int          @default(0)
+  /// ACTIVE | PAUSED (an offer past validTill reads Expired)
+  status      String       @default("ACTIVE")
+  createdById String
+  createdAt   DateTime     @default(now()) @db.Timestamptz
+  updatedAt   DateTime     @updatedAt @db.Timestamptz
+
+  @@unique([orgId, code])
 }
