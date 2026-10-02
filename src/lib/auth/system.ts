@@ -19,6 +19,7 @@ export async function systemUser(orgId: string, actAs?: string): Promise<Current
     id: owner.id,
     name: "Fitron (automatic)",
     email: "",
+    photoKey: null,
     orgId,
     orgName: org.name,
     role: "System",

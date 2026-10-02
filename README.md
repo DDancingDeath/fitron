@@ -54,6 +54,7 @@ This creates the gym, its first branch, the default roles and the Super Admin ac
 - Members: search and filters, add, edit, suspend, soft delete, profile with computed status and dues. Phone numbers are unique among active members.
 - Plans: create, edit (applies to new sales only), deactivate, delete only if never sold.
 - Staff: add, edit, reset password, deactivate (signs them out).
+- My profile (avatar menu, top right): edit your name and mobile, upload a photo, change your password (signs out your other devices), see your recent activity.
 - Every change is written to the audit log.
 
 Money is stored as integer paise. Invoice and membership status are computed, never stored.

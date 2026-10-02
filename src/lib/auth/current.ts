@@ -12,6 +12,8 @@ export type CurrentUser = {
   id: string;
   name: string;
   email: string;
+  /** Set when the user has uploaded a profile photo. */
+  photoKey: string | null;
   orgId: string;
   orgName: string;
   role: string;
@@ -53,6 +55,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     id: user.id,
     name: user.name,
     email: user.email,
+    photoKey: user.photoKey,
     orgId: user.orgId,
     orgName: user.org.name,
     role: user.role.name,

@@ -88,6 +88,8 @@ model User {
   sessions     Session[]
   ptRate       Int          @default(0)
   shift        String?
+  /// Profile photo in private storage; set by the user on My profile
+  photoKey     String?
   active       Boolean      @default(true)
   lastLoginAt  DateTime?    @db.Timestamptz
   /// Null until the user clicks the link in the verification email
