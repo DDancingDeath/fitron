@@ -7,7 +7,7 @@ import { createPlan } from "./plans";
 import { cancelInvoice, getInvoice, sellMembership } from "./billing";
 import { checkIn, checkInGuest, listDay } from "./attendance";
 import { book, bookedMembers, markAllAttended, saveSlot, setBookingStatus, weekdayOf } from "./classes";
-import { adjustStock, posSale, saveProduct } from "./pos";
+import { adjustStock, posSale, saveProduct, soldSince } from "./pos";
 import { createLead, getLead, setLeadStage } from "./leads";
 import { listNotifications } from "./notifications";
 import { todayIso } from "./time";
@@ -82,6 +82,18 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await adjustStock(admin, p.id, { qty: 10, unitCost: 9000 });
     expect((await db.product.findUnique({ where: { id: p.id } }))?.cost).toBe(8000);
     await expect(adjustStock(admin, p.id, { qty: -25 })).rejects.toThrow(/Only 20/);
+  });
+
+  it("a restock can be booked as an Inventory expense, and sales count toward sold (30 d)", async () => {
+    const p = await saveProduct(admin, null, { sku: "STRAP", name: "Lifting straps", category: "Accessories", price: 54900, cost: 21000, trackStock: true, reorderLevel: 5, gstApplicable: true });
+    await expect(adjustStock(admin, p.id, { qty: 8, asExpense: true })).rejects.toThrow(/cost per unit/);
+    await adjustStock(admin, p.id, { qty: 8, unitCost: 21000, vendor: "NutriHub", asExpense: true });
+    const mv = await db.stockMovement.findFirstOrThrow({ where: { productId: p.id, reason: "RESTOCK" }});
+    const exp = await db.expense.findUniqueOrThrow({ where: { id: mv.expenseId! }, include: { category: true } });
+    expect(exp).toMatchObject({ amount: 168000, vendor: "NutriHub", description: "Restock Lifting straps × 8" });
+    expect(exp.category.name).toBe("Inventory");
+    await posSale(admin, { method: "Cash", items: [{ productId: p.id, qty: 3 }] });
+    expect((await soldSince([p.id], addDays(today, -30))).get(p.id)).toBe(3);
   });
 
   it("check-in follows the entry rules, and staff can override with a reason", async () => {

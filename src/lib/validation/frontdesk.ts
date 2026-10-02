@@ -49,6 +49,9 @@ export const restockInput = z.object({
   qty: z.coerce.number({ error: "Enter a quantity." }).int().refine((n) => n !== 0, { error: "Enter a quantity." }),
   unitCost: z.preprocess((v) => (v === "" || v == null ? undefined : v), rupees.optional()),
   note: optionalText,
+  vendor: optionalText,
+  /** Restocking from the POS screen can book the purchase as an Inventory expense (prototype). */
+  asExpense: z.preprocess((v) => v === "on" || v === true, z.boolean()).optional(),
 });
 
 export const posSaleInput = z.object({
