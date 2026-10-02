@@ -6,7 +6,7 @@ import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { cancelInvoice, getInvoice, sellMembership } from "./billing";
 import { checkIn, checkInGuest, listDay } from "./attendance";
-import { book, saveSlot, setBookingStatus, weekdayOf } from "./classes";
+import { book, bookedMembers, markAllAttended, saveSlot, setBookingStatus, weekdayOf } from "./classes";
 import { adjustStock, posSale, saveProduct } from "./pos";
 import { createLead, getLead, setLeadStage } from "./leads";
 import { listNotifications } from "./notifications";
@@ -37,12 +37,27 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await expect(book(admin, slot.id, date, a.id)).rejects.toThrow(/already booked/);
     await expect(book(admin, slot.id, addDays(date, 1), a.id)).rejects.toThrow(/doesn't run/);
 
-    const { promoted } = await setBookingStatus(admin, bb.id, "Cancelled");
+    const { promoted, promotedId } = await setBookingStatus(admin, bb.id, "Cancelled");
     expect(promoted).toBe(c.name);
+    expect(promotedId).toBe(c.id);
     const statuses = await db.booking.findMany({ where: { classSlotId: slot.id }, select: { memberId: true, status: true } });
     expect(statuses.find((s) => s.memberId === c.id)?.status).toBe("Booked");
     expect((await listNotifications(admin)).some((n) => n.type === "WAITLIST")).toBe(true);
     await expect(setBookingStatus(admin, bb.id, "Attended")).rejects.toThrow(/day of the class/);
+    await expect(markAllAttended(admin, slot.id, date)).rejects.toThrow(/day of the class/);
+    expect((await bookedMembers(admin, slot.id, date)).sort()).toEqual([a.id, c.id].sort());
+  });
+
+  it("mark all attended marks every booked place in today's session", async () => {
+    const slot = await saveSlot(admin, null, { name: "Yoga", trainerId: admin.id, weekday: weekdayOf(today), startTime: "23:30", durationMin: 45, capacity: 5 });
+    const [a, b] = [await newMember(), await newMember()];
+    await book(admin, slot.id, today, a.id);
+    const bb = await book(admin, slot.id, today, b.id);
+    await setBookingStatus(admin, bb.id, "No-show");
+    expect(await markAllAttended(admin, slot.id, today)).toBe(1);
+    const rows = await db.booking.findMany({ where: { classSlotId: slot.id }, select: { memberId: true, status: true } });
+    expect(rows.find((r) => r.memberId === a.id)?.status).toBe("Attended");
+    expect(rows.find((r) => r.memberId === b.id)?.status).toBe("No-show");
   });
 
   it("POS sale decrements stock, refuses to oversell, and cancelling puts it back", async () => {

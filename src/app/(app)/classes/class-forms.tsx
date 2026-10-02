@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { PlusIcon } from "@phosphor-icons/react";
 import { bookAction, saveClass } from "./actions";
 import { Button, Field, Input, LinkButton, Notice, Select } from "@/components/ui";
 
@@ -77,6 +78,32 @@ export function BookForm({ slotId, date, members, full }: { slotId: string; date
         </datalist>
         <Button variant="primary" disabled={pending}>
           {full ? "Add to waitlist" : "Book"}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** The session panel's "Choose member… / Book place" row (prototype): active members not yet in this session. */
+export function SessionBook({ slotId, date, members, full }: { slotId: string; date: string; members: { code: string; name: string }[]; full: boolean }) {
+  const [state, action, pending] = useActionState(bookAction.bind(null, slotId, date), undefined);
+  return (
+    <form action={action} key={state?.nonce} className="flex flex-col gap-2">
+      {state?.message && <Notice tone={state.ok ? "ok" : "alert"}>{state.message}</Notice>}
+      <div className="flex flex-wrap items-center gap-2">
+        <Select name="member" defaultValue="" aria-label="Member" required className="max-w-[300px] flex-[1_1_200px]">
+          <option value="" disabled>
+            Choose member…
+          </option>
+          {members.map((m) => (
+            <option key={m.code} value={m.code}>
+              {m.name} · {m.code}
+            </option>
+          ))}
+        </Select>
+        <Button variant="primary" disabled={pending}>
+          <PlusIcon size={16} weight="duotone" />
+          {full ? "Add to waitlist" : "Book place"}
         </Button>
       </div>
     </form>

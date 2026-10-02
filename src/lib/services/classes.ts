@@ -124,6 +124,7 @@ export async function setBookingStatus(u: CurrentUser, bookingId: string, status
     const after = await tx.booking.update({ where: { id: bookingId }, data: { status } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "booking.status", entity: "Booking", entityId: bookingId, before, after });
     let promoted: string | null = null;
+    let promotedId: string | null = null;
     if (status === "Cancelled" && before.status === "Booked") {
       const next = await tx.booking.findFirst({ where: { classSlotId: before.classSlotId, date: before.date, status: "Waitlist" }, orderBy: { createdAt: "asc" }, include: { member: { select: { name: true } } } });
       if (next) {
@@ -137,11 +138,29 @@ export async function setBookingStatus(u: CurrentUser, bookingId: string, status
           link: `/classes/${before.classSlotId}?date=${date}`,
         });
         promoted = next.member.name;
+        promotedId = next.memberId;
       }
     }
-    return { promoted };
+    return { promoted, promotedId };
   });
 }
+
+/** "Mark all attended": every booked place in a session that has happened (or is today). */
+export async function markAllAttended(u: CurrentUser, slotId: string, date: string) {
+  const slot = await db.classSlot.findFirst({ where: { ...scope(u), id: slotId } });
+  if (!slot) throw new UserError("Class not found.");
+  if (date > todayIso()) throw new UserError("Mark attendance on the day of the class.");
+  const booked = await db.booking.findMany({ where: { classSlotId: slotId, date: fromIso(date), status: "Booked" } });
+  await db.$transaction(async (tx) => {
+    await tx.booking.updateMany({ where: { id: { in: booked.map((b) => b.id) } }, data: { status: "Attended" } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "booking.attended_all", entity: "ClassSlot", entityId: slotId, after: { date, count: booked.length } });
+  });
+  return booked.length;
+}
+
+/** Members holding a booked place in a session, for "Remind everyone". */
+export const bookedMembers = async (u: CurrentUser, slotId: string, date: string) =>
+  (await db.booking.findMany({ where: { classSlotId: slotId, date: fromIso(date), status: "Booked", classSlot: scope(u) }, select: { memberId: true } })).map((b) => b.memberId);
 
 export const memberBookings = (memberId: string) =>
   db.booking.findMany({ where: { memberId }, orderBy: { date: "desc" }, take: 20, include: { classSlot: { select: { id: true, name: true, startTime: true } } } });
