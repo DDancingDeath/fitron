@@ -41,7 +41,8 @@ export type GymSignup = { plan: string; cycle: Cycle; name: string; email: strin
  * categories, and the owner as Super Admin. Then emails the owner a verification link.
  * Without an email service there is no way to deliver the link, so the address is trusted.
  */
-export async function createGymAccount(d: GymSignup) {
+/** `emailVerified`: Google has already confirmed the address, so no link is sent. */
+export async function createGymAccount(d: GymSignup, emailVerified = false) {
   const plan = findPlan(d.plan);
   if (!plan || plan.product !== "GYM_ACCOUNTING") throw new UserError("Pick a Gym Accounting plan.", "plan");
   if (await db.user.findUnique({ where: { email: d.email } })) {
@@ -50,7 +51,7 @@ export async function createGymAccount(d: GymSignup) {
   const roles = await ensureRoles(db);
   await ensureExpenseCategories(db);
   const passwordHash = await hashPassword(d.password);
-  const verifyNow = !emailReady();
+  const verifyNow = emailVerified || !emailReady();
   let user;
   try {
     user = await db.$transaction(async (tx) => {

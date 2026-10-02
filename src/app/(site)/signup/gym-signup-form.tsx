@@ -7,7 +7,8 @@ import { PLANS, findPlan, rupeesLabel, type Cycle } from "@/lib/domain/pricing";
 
 const gymPlans = PLANS.filter((p) => p.product === "GYM_ACCOUNTING");
 
-export function GymSignupForm({ plan: initialPlan, cycle: initialCycle }: { plan: string; cycle: Cycle }) {
+/** `google`: the account Google verified; the email is fixed and no password is needed. */
+export function GymSignupForm({ plan: initialPlan, cycle: initialCycle, google }: { plan: string; cycle: Cycle; google?: { email: string; name: string } }) {
   const [state, action, pending] = useActionState(signUpGym, undefined);
   const sent = state?.values;
   const [plan, setPlan] = useState((sent?.plan as string) ?? initialPlan);
@@ -50,25 +51,31 @@ export function GymSignupForm({ plan: initialPlan, cycle: initialCycle }: { plan
         <Input name="business" autoComplete="organization" defaultValue={v("business")} required />
       </Field>
       <Field label="Your name" error={e.name}>
-        <Input name="name" autoComplete="name" defaultValue={v("name")} required />
+        <Input name="name" autoComplete="name" defaultValue={v("name") ?? google?.name} required />
       </Field>
-      <Field label="Email" error={e.email} hint="You'll log in with this. We send a link to confirm it.">
-        <Input name="email" type="email" autoComplete="email" defaultValue={v("email")} required />
-      </Field>
+      {google ? (
+        <Field label="Email" error={e.email} hint="Confirmed by Google. You'll sign in with Google.">
+          <Input name="email" type="email" value={google.email} readOnly />
+        </Field>
+      ) : (
+        <Field label="Email" error={e.email} hint="You'll log in with this. We send a link to confirm it.">
+          <Input name="email" type="email" autoComplete="email" defaultValue={v("email")} required />
+        </Field>
+      )}
       <Field label="Mobile" error={e.phone} hint="10 digits.">
         <Input name="phone" type="tel" inputMode="tel" autoComplete="tel-national" defaultValue={v("phone")} required />
       </Field>
       <Field label="City (optional)" error={e.city}>
         <Input name="city" autoComplete="address-level2" defaultValue={v("city")} />
       </Field>
-      <Field label="Password" error={e.password} hint="At least 10 characters.">
+      {!google && <Field label="Password" error={e.password} hint="At least 10 characters.">
         <div className="flex gap-2">
           <Input name="password" type={show ? "text" : "password"} autoComplete="new-password" required minLength={10} />
           <Button type="button" onClick={() => setShow(!show)} aria-pressed={show} className="shrink-0">
             {show ? "Hide" : "Show"}
           </Button>
         </div>
-      </Field>
+      </Field>}
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" name="terms" className="mt-1" defaultChecked={v("terms") === "on"} required />
         <span>

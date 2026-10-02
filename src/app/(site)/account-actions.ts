@@ -1,11 +1,13 @@
 "use server";
 
-import { headers } from "next/headers";
+import { randomBytes } from "node:crypto";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { createSession } from "@/lib/auth/session";
 import { formAction } from "@/lib/form-action";
 import { rateLimit } from "@/lib/rate-limit";
 import { createGymAccount, requestPasswordReset, resendVerification, resetPassword } from "@/lib/services/accounts";
+import { GOOGLE_SIGNUP_COOKIE, unsign } from "@/lib/integrations/google";
 import { failed, type FormState } from "@/lib/validation/common";
 import { emailOnlySchema, gymSignupSchema, resetPasswordSchema } from "@/lib/validation/site";
 
@@ -17,12 +19,21 @@ async function limited(fd: FormData, key: string, n: number) {
 export async function signUpGym(_: FormState, fd: FormData): Promise<FormState> {
   const blocked = await limited(fd, "signup", 5);
   if (blocked) return blocked;
+  // Signed up with Google: the email is the one Google verified, and there's no password to pick
+  // (they can set one later with "Forgot your password?").
+  const store = await cookies();
+  const google = unsign<{ email: string }>(store.get(GOOGLE_SIGNUP_COOKIE)?.value);
+  if (google) {
+    fd.set("email", google.email);
+    fd.set("password", randomBytes(24).toString("base64url"));
+  }
   let next = "";
   const state = await formAction(
     fd,
     gymSignupSchema,
     async (d) => {
-      const { user, verified } = await createGymAccount(d);
+      const { user, verified } = await createGymAccount(d, !!google);
+      if (google) store.delete(GOOGLE_SIGNUP_COOKIE);
       if (verified) {
         await createSession(user.id);
         next = "/dashboard?welcome=1";
