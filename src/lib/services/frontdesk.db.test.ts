@@ -5,7 +5,7 @@ import { addDays } from "@/lib/domain/dates";
 import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { cancelInvoice, getInvoice, sellMembership } from "./billing";
-import { checkIn, listDay } from "./attendance";
+import { attendanceBoard, checkIn, checkOut, listDay } from "./attendance";
 import { book, saveSlot, setBookingStatus, weekdayOf } from "./classes";
 import { adjustStock, posSale, saveProduct } from "./pos";
 import { createLead, getLead, setLeadStage } from "./leads";
@@ -91,5 +91,34 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await expect(setLeadStage(admin, lead.id, "Lost")).rejects.toThrow(/why/);
     const m = await createMember(admin, { name: "Asha Lead", gender: "Female", phone: "9844400001", source: "Instagram", tags: [] }, { leadId: lead.id });
     expect(await getLead(admin, lead.id)).toMatchObject({ stage: "Won", memberId: m.id });
+  });
+});
+
+describe.skipIf(!hasDb)("attendance board (database)", () => {
+  it("counts the day, flags dues, and lists active members who haven't visited", async () => {
+    const gym = await makeGym();
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const today = todayIso();
+    const planId = (await createPlan(admin, { name: "Monthly", kind: "Membership", months: 1, price: 150000, regFee: 0, discount: 0, gstApplicable: true, features: [] })).id;
+    const member = async (n: number) => createMember(admin, { name: `Board ${n}`, gender: "Male", phone: String(9844400000 + n), source: "Walk-in", tags: [] });
+    const [paid, owes, idle, lapsed] = [await member(1), await member(2), await member(3), await member(4)];
+    for (const m of [paid, owes, idle]) await sellMembership(admin, m.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: m === owes ? 0 : 177000, payMethod: "UPI" });
+    await sellMembership(admin, lapsed.id, { planId, startDate: addDays(today, -90), discount: 0, includeRegFee: false, payAmount: 177000, payMethod: "UPI" });
+
+    await checkIn(admin, paid.id);
+    await checkIn(admin, owes.id);
+    const visit = await db.attendance.findFirstOrThrow({ where: { memberId: paid.id } });
+    await db.attendance.update({ where: { id: visit.id }, data: { checkIn: new Date(Date.now() - 90 * 60_000) } });
+    await checkOut(admin, visit.id);
+
+    const b = await attendanceBoard(admin, today);
+    expect(b.stats).toMatchObject({ checkIns: 2, unique: 2, active: 3 });
+    expect(b.inside).toBe(1);
+    expect(b.stats.avgMinutes).toBeGreaterThanOrEqual(89);
+    expect(b.rows.find((r) => r.memberId === owes.id)?.flag).toEqual({ text: "₹1,770 due", alert: true });
+    expect(b.rows.find((r) => r.memberId === paid.id)).toMatchObject({ planName: "Monthly", flag: null });
+    // Only active members count as idle, and an expired one is left out.
+    expect(b.idle.map((m) => m.id)).toEqual([idle.id]);
+    expect(b.hours).toHaveLength(18);
   });
 });
