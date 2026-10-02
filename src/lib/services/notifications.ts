@@ -38,3 +38,11 @@ export const listNotifications = (u: CurrentUser) => db.notification.findMany({ 
 export async function markAllRead(u: CurrentUser) {
   await db.notification.updateMany({ where: { ...scope(u), readAt: null }, data: { readAt: new Date() } });
 }
+
+/** Marks one alert read and returns where it points, for "click to open". */
+export async function openNotification(u: CurrentUser, id: string) {
+  const n = await db.notification.findFirst({ where: { ...scope(u), id } });
+  if (!n) return null;
+  if (!n.readAt) await db.notification.update({ where: { id }, data: { readAt: new Date() } });
+  return n.link;
+}

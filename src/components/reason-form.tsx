@@ -6,14 +6,14 @@ import { Button, Field, Input, Notice } from "./ui";
 type Result = { ok?: boolean; message?: string; errors?: Record<string, string[] | undefined> } | undefined;
 
 /** A danger button that opens a "reason" field before running an irreversible-looking action. */
-export function ReasonForm({ action: act, label, confirm, done }: { action: (s: Result, fd: FormData) => Promise<Result>; label: string; confirm: string; done?: boolean }) {
+export function ReasonForm({ action: act, label, confirm, done, compact }: { action: (s: Result, fd: FormData) => Promise<Result>; label: string; confirm: string; done?: boolean; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [state, action, pending] = useActionState(act, undefined);
   if (state?.ok) return <Notice tone="ok">{state.message}</Notice>;
   if (done) return null;
   if (!open)
     return (
-      <Button type="button" variant="danger" onClick={() => setOpen(true)}>
+      <Button type="button" variant={compact ? "ghost" : "danger"} className={compact ? "text-alert-700 hover:bg-alert-soft" : undefined} onClick={() => setOpen(true)}>
         {label}
       </Button>
     );

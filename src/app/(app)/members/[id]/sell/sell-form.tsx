@@ -70,6 +70,9 @@ export function SellForm({
           <Field label="Discount (₹)" error={e.discount}>
             <Input name="discount" inputMode="decimal" value={discount} onChange={(ev) => setDiscount(ev.target.value)} placeholder="0" />
           </Field>
+          <Field label="Offer code" error={e.offerCode} hint="Its discount is added when you save">
+            <Input name="offerCode" defaultValue={(sent?.offerCode as string | undefined) ?? ""} className="uppercase" placeholder="Optional" />
+          </Field>
           {plan && plan.regFee > 0 && (
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
               <input type="checkbox" name="includeRegFee" checked={regFee} onChange={(ev) => setRegFee(ev.target.checked)} className="size-4" />

@@ -50,6 +50,6 @@ export function CancelInvoice({ invoiceId }: { invoiceId: string }) {
   );
 }
 
-export function ReversePayment({ paymentId, invoiceId }: { paymentId: string; invoiceId: string }) {
-  return <ReasonForm action={reverse.bind(null, paymentId, invoiceId) as never} label="Reverse" confirm="Reverse this payment?" />;
+export function ReversePayment({ paymentId, invoiceId, compact }: { paymentId: string; invoiceId: string; compact?: boolean }) {
+  return <ReasonForm action={reverse.bind(null, paymentId, invoiceId) as never} label="Reverse" confirm="Reverse this payment?" compact={compact} />;
 }

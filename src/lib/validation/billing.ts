@@ -18,6 +18,7 @@ export const sellInput = z
     startDate: z.iso.date({ error: "Pick a start date." }),
     discount: z.preprocess(zeroIfBlank, rupees),
     includeRegFee: z.preprocess((v) => v === "on" || v === true, z.boolean()),
+    offerCode: optionalText,
     notes: optionalText,
     ...paymentFields,
   })

@@ -9,7 +9,7 @@ export async function listPlans(u: CurrentUser, opts: { activeOnly?: boolean } =
   const plans = await db.membershipPlan.findMany({
     where: { orgId: u.orgId, ...(opts.activeOnly ? { status: "ACTIVE" } : {}) },
     orderBy: [{ status: "asc" }, { months: "asc" }, { price: "asc" }],
-    include: { _count: { select: { memberships: true } } },
+    include: { _count: { select: { memberships: true } }, prices: true },
   });
   return plans;
 }

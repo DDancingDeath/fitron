@@ -6,6 +6,8 @@ import { invoiceState, invoiceTotals, type InvoiceLine } from "@/lib/domain/bill
 import { addDays, membershipEndDate } from "@/lib/domain/dates";
 import type { InvoiceInput, PaymentInput, SellInput } from "@/lib/validation/billing";
 import { audit } from "./audit";
+import { takeOfferUse, usableOffer } from "./offers";
+import { offerDiscount } from "@/lib/domain/offers";
 import { UserError } from "./errors";
 import { assertMonthOpen } from "./locks";
 import { memberScope } from "./members";
@@ -117,8 +119,10 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
   const tax = await getTax(u.orgId);
   const taxRate = tax.enabled && plan.gstApplicable ? tax.rate : 0;
   const { isNew } = await suggestedStart(memberId);
-  const discount = input.discount;
-  if (discount > plan.price) throw new UserError("The discount is more than the plan price.", "discount");
+  if (input.discount > plan.price) throw new UserError("The discount is more than the plan price.", "discount");
+  // An offer code adds its discount on the plan price (Plans & offers); the total never goes below zero.
+  const offer = input.offerCode ? await usableOffer(u.orgId, input.offerCode) : null;
+  const discount = Math.min(plan.price, input.discount + (offer ? offerDiscount(offer, plan.price) : 0));
 
   const lines: Line[] = [
     { description: `${plan.name} membership (${plan.months} ${plan.months === 1 ? "month" : "months"})`, category: isNew ? "New Membership" : "Renewal", qty: 1, rate: plan.price, discount, taxRate, planId: plan.id },
@@ -147,9 +151,11 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
         price: plan.price,
         discount,
         pricingCategory: "Standard",
+        offerCode: offer?.code ?? null,
         invoiceId: invoice.id,
       },
     });
+    if (offer) await takeOfferUse(tx, offer.id);
     let payment = null;
     if (input.payAmount > 0) {
       payment = await writePayment(tx, u, {
@@ -284,7 +290,11 @@ export async function listInvoices(u: CurrentUser, f: { q?: string; status?: str
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: f.openOnly || f.memberId ? undefined : 500,
-    include: { member: { select: { id: true, name: true, code: true, phone: true } }, payments: { select: { amount: true, status: true } } },
+    include: {
+      member: { select: { id: true, name: true, code: true, phone: true } },
+      payments: { select: { amount: true, status: true } },
+      items: { select: { description: true, productId: true } },
+    },
   });
   const today = todayIso();
   let rows = invoices.map((i) => ({
@@ -305,7 +315,16 @@ export async function listPayments(u: CurrentUser, f: { q?: string; method?: str
       ...(f.memberId ? { memberId: f.memberId } : {}),
       ...(f.method ? { method: f.method } : {}),
       ...(f.from || f.to ? { date: { ...(f.from ? { gte: fromIso(f.from) } : {}), ...(f.to ? { lte: fromIso(f.to) } : {}) } } : {}),
-      ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { txnRef: { contains: q, mode: "insensitive" } }, { member: { name: { contains: q, mode: "insensitive" } } }] } : {}),
+      ...(q
+        ? {
+            OR: [
+              { code: { contains: q, mode: "insensitive" } },
+              { txnRef: { contains: q, mode: "insensitive" } },
+              { invoice: { number: { contains: q, mode: "insensitive" } } },
+              { member: { name: { contains: q, mode: "insensitive" } } },
+            ],
+          }
+        : {}),
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
     take: 500,
