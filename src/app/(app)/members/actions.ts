@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current";
 import { memberInput } from "@/lib/validation/member";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
-import { createMember, deleteMember, setSuspended, updateMember } from "@/lib/services/members";
+import { createMember, deleteMember, restoreMember, setSuspended, updateMember } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
 import { enrol, eraseBiometrics } from "@/lib/services/biometric";
 import { DOC_KINDS, deleteDocument, replaceDocument, uploadDocument } from "@/lib/services/documents";
@@ -47,6 +47,18 @@ export async function removeMember(id: string) {
   await deleteMember(u, id);
   revalidatePath("/members");
   redirect("/members");
+}
+
+export async function bringBackMember(id: string) {
+  const u = await requirePermission("members.delete");
+  try {
+    await restoreMember(u, id);
+  } catch (e) {
+    if (e instanceof UserError) redirect(`/members?deleted=1&error=${encodeURIComponent(e.message)}`);
+    throw e;
+  }
+  revalidatePath("/members");
+  redirect(`/members/${id}`);
 }
 
 export async function enrolBiometric(id: string, fd: FormData) {

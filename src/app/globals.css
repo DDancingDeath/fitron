@@ -27,6 +27,14 @@
   --ok: #7cc89a;
   --ok-soft: #14291d;
   --scroll: #3a3328;
+  /* Tag outlines and text (prototype accent-500/700 and accent-2-300/400/700). */
+  --accent-500: #b8892a;
+  --accent-700: #e9cc82;
+  --alert-300: #8a2a52;
+  --alert-400: #c2437a;
+  --alert-700: #ff9dc0;
+  --neutral-200: #28241d;
+  --neutral-800: #cfc6b4;
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
   color-scheme: dark;
 }
@@ -51,6 +59,13 @@
   --ok: #1d7a45;
   --ok-soft: #e3f4e9;
   --scroll: #d6cebd;
+  --accent-500: #a88228;
+  --accent-700: #624809;
+  --alert-300: #f294b5;
+  --alert-400: #e0608f;
+  --alert-700: #850c3d;
+  --neutral-200: #e6e0d3;
+  --neutral-800: #3f382c;
   --shadow-lg: 0 12px 32px rgba(40, 30, 10, 0.14);
   color-scheme: light;
 }
@@ -74,6 +89,13 @@
   --color-alert-strong: var(--alert-strong);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
+  --color-accent-500: var(--accent-500);
+  --color-accent-700: var(--accent-700);
+  --color-alert-300: var(--alert-300);
+  --color-alert-400: var(--alert-400);
+  --color-alert-700: var(--alert-700);
+  --color-neutral-200: var(--neutral-200);
+  --color-neutral-800: var(--neutral-800);
   --font-serif: var(--font-source-serif);
   /* The prototype's corners are nearly square: 1px, 2px, 4px. */
   --radius-sm: 1px;

@@ -95,3 +95,40 @@ export function Empty({ children }: { children: ReactNode }) {
 }
 
 export { cx };
+
+// The prototype's .table: uppercase small headers, hairline rows, a faint hover.
+export const TABLE = "w-full border-collapse text-sm";
+export const TH = "border-b border-line p-2.5 text-left text-[11px] font-normal tracking-[0.08em] whitespace-nowrap text-fg/60 uppercase";
+export const TD = "border-b border-line-soft p-2.5 align-middle";
+export const TR = "hover:bg-fg/4";
+
+/** "Showing 1–12 of 64" with Previous and Next, as under every prototype list. */
+export function Pager({ page, pageSize, total, href }: { page: number; pageSize: number; total: number; href: (page: number) => string }) {
+  if (!total) return null;
+  const start = (page - 1) * pageSize + 1;
+  const end = Math.min(total, page * pageSize);
+  const btn = "inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <span className="text-[13px] text-muted">
+        Showing {start}–{end} of {total}
+      </span>
+      <div className="flex gap-2">
+        {page > 1 ? (
+          <Link href={href(page - 1)} className={cx(btn, "hover:bg-fg/7")}>
+            Previous
+          </Link>
+        ) : (
+          <span className={cx(btn, "opacity-45")}>Previous</span>
+        )}
+        {end < total ? (
+          <Link href={href(page + 1)} className={cx(btn, "hover:bg-fg/7")}>
+            Next
+          </Link>
+        ) : (
+          <span className={cx(btn, "opacity-45")}>Next</span>
+        )}
+      </div>
+    </div>
+  );
+}

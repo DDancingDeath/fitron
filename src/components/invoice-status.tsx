@@ -1,16 +1,12 @@
 import type { InvoiceStatus } from "@/lib/domain/billing";
-import { Badge, type Tone } from "./ui";
+import { Tag } from "./tag";
 
 const LABEL: Record<InvoiceStatus, string> = { PAID: "Paid", PARTIALLY_PAID: "Partly paid", UNPAID: "Unpaid", CANCELLED: "Cancelled" };
-const TONE: Record<InvoiceStatus, Tone> = { PAID: "ok", PARTIALLY_PAID: "accent", UNPAID: "alert", CANCELLED: "neutral" };
+const TAG: Record<InvoiceStatus, string> = { PAID: "PAID", PARTIALLY_PAID: "PARTIALLY PAID", UNPAID: "UNPAID", CANCELLED: "CANCELLED" };
 
 export const INVOICE_STATUS_LABEL = LABEL;
 
+/** One tag, as in the prototype: an invoice past its due date with a balance reads OVERDUE. */
 export function InvoiceStatusBadge({ status, overdueDays = 0 }: { status: InvoiceStatus; overdueDays?: number }) {
-  return (
-    <span className="inline-flex gap-1">
-      <Badge tone={TONE[status]}>{LABEL[status]}</Badge>
-      {overdueDays > 0 && <Badge tone="alert">{overdueDays}d overdue</Badge>}
-    </span>
-  );
+  return <Tag label={overdueDays > 0 && status !== "CANCELLED" && status !== "PAID" ? "OVERDUE" : TAG[status]} />;
 }

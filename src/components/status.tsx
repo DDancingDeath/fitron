@@ -1,5 +1,5 @@
 import type { MembershipStatus } from "@/lib/domain/membership";
-import { Badge, type Tone } from "./ui";
+import { Tag } from "./tag";
 
 export const STATUS_LABEL: Record<MembershipStatus, string> = {
   ACTIVE: "Active",
@@ -8,12 +8,5 @@ export const STATUS_LABEL: Record<MembershipStatus, string> = {
   EXPIRED: "Expired",
   SUSPENDED: "Suspended",
 };
-const TONE: Record<MembershipStatus, Tone> = {
-  ACTIVE: "ok",
-  EXPIRING_SOON: "accent",
-  PAYMENT_PENDING: "alert",
-  EXPIRED: "alert",
-  SUSPENDED: "neutral",
-};
-
-export const MemberStatus = ({ status }: { status: MembershipStatus }) => <Badge tone={TONE[status]}>{STATUS_LABEL[status]}</Badge>;
+/** Member status as the prototype's uppercase tag ("EXPIRING SOON"). */
+export const MemberStatus = ({ status }: { status: MembershipStatus }) => <Tag label={STATUS_LABEL[status].toUpperCase()} />;
