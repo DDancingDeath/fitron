@@ -13,3 +13,6 @@ export const fromIso = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
 /** The instant a given Indian clock time happens on a date: ("2026-09-28", "22:00") → Date. */
 export const istInstant = (date: string, hhmm: string) => new Date(new Date(`${date}T${hhmm}:00.000Z`).getTime() - IST_OFFSET_MS);
+
+/** The instant `n` days before now. */
+export const daysAgo = (n: number, now = new Date()) => new Date(now.getTime() - n * 86_400_000);
