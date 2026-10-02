@@ -42,6 +42,7 @@ export async function makeGym() {
       branch: branches.length > 1 ? "ALL" : branches[0]!.id,
       branchIds: branches.map((x) => x.id),
       can: (p: Permission) => perms.has(p),
+      planBlocked: false,
     };
   }
 

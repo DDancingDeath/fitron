@@ -80,9 +80,25 @@ function UpiPanel({ c, onClose }: { c: Upi; onClose: () => void }) {
 }
 
 /** Pay FITRON for the gym's plan or an extra branch (new slot, or renewing one). */
-export function PayButton({ what, label, prices, success }: { what: PaymentFor; label: string; prices: { MONTHLY: number; YEARLY: number }; success: string }) {
+export function PayButton({
+  what,
+  label,
+  prices,
+  success,
+  fixedCycle,
+  wide,
+}: {
+  what: PaymentFor;
+  label: string;
+  prices: { MONTHLY: number; YEARLY: number };
+  success: string;
+  /** Set when the cycle is picked outside the button (the plan cards' Monthly/Yearly switch). */
+  fixedCycle?: "YEARLY" | "MONTHLY";
+  wide?: boolean;
+}) {
   const router = useRouter();
-  const [cycle, setCycle] = useState<"YEARLY" | "MONTHLY">("YEARLY");
+  const [picked, setCycle] = useState<"YEARLY" | "MONTHLY">("YEARLY");
+  const cycle = fixedCycle ?? picked;
   const [msg, setMsg] = useState<{ tone: "ok" | "alert"; text: string } | null>(null);
   const [upi, setUpi] = useState<Upi | null>(null);
   const [pending, start] = useTransition();
@@ -143,11 +159,13 @@ export function PayButton({ what, label, prices, success }: { what: PaymentFor; 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        <Select value={cycle} onChange={(e) => setCycle(e.target.value as "YEARLY" | "MONTHLY")} aria-label="Billing cycle" className="w-auto">
-          <option value="YEARLY">Yearly · {formatInr(prices.YEARLY)}</option>
-          <option value="MONTHLY">Monthly · {formatInr(prices.MONTHLY)}</option>
-        </Select>
-        <Button variant="primary" onClick={pay} disabled={pending} type="button">
+        {!fixedCycle && (
+          <Select value={cycle} onChange={(e) => setCycle(e.target.value as "YEARLY" | "MONTHLY")} aria-label="Billing cycle" className="w-auto">
+            <option value="YEARLY">Yearly · {formatInr(prices.YEARLY)}</option>
+            <option value="MONTHLY">Monthly · {formatInr(prices.MONTHLY)}</option>
+          </Select>
+        )}
+        <Button variant="primary" onClick={pay} disabled={pending} type="button" className={wide ? "w-full" : undefined}>
           {pending ? "Working…" : label}
         </Button>
       </div>

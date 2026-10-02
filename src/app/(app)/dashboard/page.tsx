@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { canOpen } from "@/lib/nav";
 import type { ReactNode } from "react";
 import {
   ArrowsClockwiseIcon,
@@ -94,9 +95,9 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] lg:gap-3.5">
         {hero.map((k) => (
-          <Link
+          <Tile
             key={k.label}
-            href={k.href}
+            href={canOpen(u, k.href) ? k.href : undefined}
             className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-t-2 border-line border-t-accent bg-[linear-gradient(180deg,var(--accent-soft),var(--surface)_60%)] px-[22px] py-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-md max-lg:p-3.5"
           >
             <span className="flex w-full items-center justify-between">
@@ -110,7 +111,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               {k.delta && <span className={cx("rounded-full px-[7px] py-px", k.delta.good ? "bg-accent-soft text-accent-strong" : "bg-alert-soft text-alert-strong")}>{k.delta.text}</span>}
               <span>{k.sub}</span>
             </span>
-          </Link>
+          </Tile>
         ))}
       </div>
 
@@ -127,7 +128,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
               </>
             );
             const cls = "flex flex-col gap-[3px] border-b border-line-soft py-3.5 text-left";
-            return k.href ? (
+            return k.href && canOpen(u, k.href) ? (
               <Link key={k.label} href={k.href} className={cls}>
                 {body}
               </Link>
@@ -346,6 +347,16 @@ function Section({ title, sub, action, legend, titleSize = "text-lg", children }
     </section>
   );
 }
+
+/** A link when there's somewhere this person may go, otherwise the same box without one. */
+const Tile = ({ href, className, children }: { href?: string; className: string; children: ReactNode }) =>
+  href ? (
+    <Link href={href} className={className}>
+      {children}
+    </Link>
+  ) : (
+    <div className={className}>{children}</div>
+  );
 
 const GhostLink = ({ href, children }: { href: string; children: ReactNode }) => (
   <Link href={href} className="-mt-1.5 -mr-2 inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold whitespace-nowrap text-accent hover:bg-accent/10">

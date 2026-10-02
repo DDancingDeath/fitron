@@ -15,6 +15,8 @@ export type PlanDef = {
   /** Gym plans: more than one branch allowed. */
   multiBranch?: boolean;
   trialDays: number;
+  /** Gym plans: the card on the landing page's pricing section, word for word (pricing.test.ts checks the page). */
+  card?: { audience: string; limit: string; includes?: string; features: readonly string[]; recommended?: boolean };
 };
 
 export const TRIAL_DAYS = 7;
@@ -22,9 +24,27 @@ export const TRIAL_DAYS = 7;
 export const PLANS = [
   { key: "ai-pro", product: "AI_TRAINER", name: "AI Pro", tagline: "Structured workouts and personalised fitness guidance.", price: { MONTHLY: 29_900, YEARLY: 1_99_900 }, trialDays: TRIAL_DAYS },
   { key: "ai-premium", product: "AI_TRAINER", name: "AI Premium", tagline: "Advanced AI coaching and long-term progress tracking.", price: { MONTHLY: 49_900, YEARLY: 4_99_900 }, trialDays: TRIAL_DAYS },
-  { key: "starter", product: "GYM_ACCOUNTING", name: "Starter", tagline: "For small gyms and fitness studios. Up to 100 active members.", price: { MONTHLY: 99_900, YEARLY: 9_99_000 }, memberLimit: 100, multiBranch: false, trialDays: TRIAL_DAYS },
-  { key: "professional", product: "GYM_ACCOUNTING", name: "Professional", tagline: "For growing gyms. Up to 300 active members.", price: { MONTHLY: 1_99_900, YEARLY: 19_99_000 }, memberLimit: 300, multiBranch: false, trialDays: TRIAL_DAYS },
-  { key: "enterprise", product: "GYM_ACCOUNTING", name: "Enterprise", tagline: "For large gyms and chains. Unlimited members, multi-branch.", price: { MONTHLY: 3_99_900, YEARLY: 39_99_000 }, memberLimit: null, multiBranch: true, trialDays: TRIAL_DAYS },
+  { key: "starter", product: "GYM_ACCOUNTING", name: "Starter", tagline: "For small gyms and fitness studios. Up to 100 active members.", price: { MONTHLY: 99_900, YEARLY: 9_99_000 }, memberLimit: 100, multiBranch: false, trialDays: TRIAL_DAYS,
+    card: {
+      audience: "For small gyms and fitness studios.",
+      limit: "Up to 100 active members",
+      features: ["Member registration and digital profiles", "Membership plans and renewal tracking", "Payment and outstanding fee management", "Revenue and expense recording", "Basic financial reports", "Membership expiry notifications", "Member data import and export"],
+    } },
+  { key: "professional", product: "GYM_ACCOUNTING", name: "Professional", tagline: "For growing gyms. Up to 300 active members.", price: { MONTHLY: 1_99_900, YEARLY: 19_99_000 }, memberLimit: 300, multiBranch: false, trialDays: TRIAL_DAYS,
+    card: {
+      audience: "For growing gyms.",
+      limit: "Up to 300 active members",
+      includes: "Everything in Starter, plus",
+      features: ["Advanced accounting dashboard", "Monthly profit and loss reports", "Cash, UPI and payment tracking", "Automated WhatsApp payment reminders*", "Staff and trainer management", "Advanced expense categorisation", "Excel and PDF financial exports", "AI Trainer integration for members"],
+      recommended: true,
+    } },
+  { key: "enterprise", product: "GYM_ACCOUNTING", name: "Enterprise", tagline: "For large gyms and chains. Unlimited members, multi-branch.", price: { MONTHLY: 3_99_900, YEARLY: 39_99_000 }, memberLimit: null, multiBranch: true, trialDays: TRIAL_DAYS,
+    card: {
+      audience: "For large gyms, chains and multi-location businesses.",
+      limit: "Unlimited members · multi-branch",
+      includes: "Everything in Professional, plus",
+      features: ["Unlimited member capacity", "Multi-branch management", "Consolidated financial reporting", "Branch-wise revenue and expenses", "Advanced staff roles and permissions", "Centralised management dashboard", "Advanced financial analytics", "Priority technical support"],
+    } },
   { key: "partner-referral", product: "PARTNER", name: "Referral Partner", tagline: "Promote the AI Trainer and earn 70% of eligible subscriptions.", price: { MONTHLY: 99_900, YEARLY: 9_99_000 }, trialDays: 0 },
   { key: "partner-software", product: "PARTNER", name: "Software Partner", tagline: "Gym Accounting Professional plus 70% AI Trainer revenue share.", price: { MONTHLY: 1_99_900, YEARLY: 19_99_000 }, trialDays: 0 },
   { key: "partner-enterprise", product: "PARTNER", name: "Enterprise Partner", tagline: "Gym Accounting Enterprise plus 70% AI Trainer revenue share.", price: { MONTHLY: 3_99_900, YEARLY: 39_99_000 }, trialDays: 0 },

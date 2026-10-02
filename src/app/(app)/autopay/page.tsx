@@ -155,7 +155,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
                 return (
                   <tr key={m.id} className={cx(TR, isBad && "bg-alert-soft/60")}>
                     <td className={cx(TD, "whitespace-nowrap")}>
-                      <Link href={`/members/${m.member.id}`} className="flex items-center gap-2.5 hover:text-accent">
+                      <Link href={u.can("members.view") ? `/members/${m.member.id}` : `/autopay/${m.id}`} className="flex items-center gap-2.5 hover:text-accent">
                         <span className="grid size-8 shrink-0 place-items-center rounded-full bg-accent-soft text-xs font-bold text-accent-strong">{initials(m.member.name)}</span>
                         <span>
                           <span className="block font-semibold">{m.member.name}</span>
@@ -190,7 +190,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
                             Approval link
                           </a>
                         )}
-                        {isBad && u.can("payments.collect") && (
+                        {isBad && u.can("payments.collect") && u.can("members.view") && (
                           <LinkButton href={`/members/${m.member.id}`} className="text-[12.5px]">
                             Collect manually
                           </LinkButton>

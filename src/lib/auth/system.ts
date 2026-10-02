@@ -28,5 +28,7 @@ export async function systemUser(orgId: string, actAs?: string): Promise<Current
     branch: "ALL",
     branchIds: org.branches.map((b) => b.id),
     can: (p: Permission) => perms.has(p),
+    // Automatic jobs (renewals, webhooks) keep running; the plan only gates people.
+    planBlocked: false,
   };
 }

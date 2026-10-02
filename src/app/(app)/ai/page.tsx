@@ -7,6 +7,7 @@ import { todayIso } from "@/lib/services/time";
 import { Button } from "@/components/ui";
 import { Tag } from "@/components/tag";
 import { riskBand } from "@/lib/domain/risk";
+import { canOpen } from "@/lib/nav";
 import { AiChat } from "./chat";
 import { refreshRiskAction } from "./actions";
 
@@ -55,7 +56,7 @@ export default async function AiPage() {
                   <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
                     <div className="text-sm font-semibold">{a.title}</div>
                     <div className="text-[13px] leading-relaxed text-fg/85">{a.detail}</div>
-                    {a.href && (
+                    {a.href && canOpen(u, a.href) && (
                       <Link href={a.href} className="mt-1.5 inline-flex min-h-8 items-center gap-1.5 self-start rounded-md border border-line px-3 text-[13px] font-semibold hover:bg-fg/7">
                         Open
                         <ArrowRightIcon size={14} weight="duotone" />

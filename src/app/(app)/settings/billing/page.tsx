@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import { activeMemberCount, billingHistory, branchStandings, gymPlan, paymentRef } from "@/lib/services/saas";
 import { fitronKeyId } from "@/lib/integrations/razorpay";
 import { fitronUpi, isFitronAdmin } from "@/lib/integrations/upi";
-import { PLANS, rupeesLabel } from "@/lib/domain/pricing";
-import { branchPrice, GRACE_DAYS, planPrice, type PlanStanding, type Standing } from "@/lib/domain/saas";
+import { PLANS } from "@/lib/domain/pricing";
+import { branchPrice, GRACE_DAYS, gymPlanCards, type PlanStanding, type Standing } from "@/lib/domain/saas";
+import { PlanCards } from "@/components/plan-cards";
 import { Badge, Card, Empty, Notice, PageHeader } from "@/components/ui";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, formatInr } from "@/lib/format";
@@ -30,7 +31,6 @@ function PlanBadge({ s, checking }: { s: PlanStanding; checking: boolean }) {
 }
 
 const STATUS: Record<string, string> = { PAID: "", SUBMITTED: " · being checked", REJECTED: " · not matched" };
-const GYM_PLANS = PLANS.filter((p) => p.product === "GYM_ACCOUNTING");
 const prices = (f: (c: "MONTHLY" | "YEARLY") => { total: number }) => ({ MONTHLY: f("MONTHLY").total, YEARLY: f("YEARLY").total });
 
 export default async function BillingPage() {
@@ -78,29 +78,7 @@ export default async function BillingPage() {
                 </p>
                 {s.kind === "LAPSED" && !plan.checking && <p className="text-alert">Your plan has ended, so no new members or invoices can be added. Nothing is deleted; paying switches it back on at once.</p>}
                 {s.kind === "GRACE" && <p className="text-muted">Your paid period ended on {fmtDate(s.until)}. Renew before {fmtDate(s.readOnlyFrom)} to keep adding members and invoices.</p>}
-                <ul className="grid gap-3 sm:grid-cols-3">
-                  {GYM_PLANS.map((p) => {
-                    const current = p.key === plan.key;
-                    return (
-                      <li key={p.key} className={`flex flex-col gap-2 rounded-lg border p-3 ${current ? "border-accent" : "border-line"}`}>
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="font-semibold">{p.name}</span>
-                          {current && <Badge tone="accent">Current</Badge>}
-                        </div>
-                        <p className="text-muted">{p.tagline}</p>
-                        <p>
-                          {rupeesLabel(p.price.MONTHLY)}/month or {rupeesLabel(p.price.YEARLY)}/year
-                        </p>
-                        <PayButton
-                          what={{ kind: "PLAN", plan: p.key }}
-                          label={current ? (renewing ? "Renew" : "Pay") : "Switch"}
-                          prices={prices((c) => planPrice(p.key, c))}
-                          success={`Paid. You're on ${p.name}.`}
-                        />
-                      </li>
-                    );
-                  })}
-                </ul>
+                <PlanCards plans={gymPlanCards()} current={plan.key} labels={{ current: renewing ? "Renew" : "Pay", other: "Switch" }} />
                 <p className="text-muted">
                   A new plan applies as soon as it&apos;s paid. The paid period starts after your current one (or after the free trial), so you never lose days.
                 </p>

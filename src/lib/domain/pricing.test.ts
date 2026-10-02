@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PLANS, findPlan, rupeesLabel } from "./pricing";
+import { PLANS, findPlan, rupeesLabel, type PlanDef } from "./pricing";
 
 describe("pricing", () => {
   it("formats rupees the Indian way", () => {
@@ -19,6 +19,18 @@ describe("pricing", () => {
     for (const p of PLANS) {
       for (const paise of Object.values(p.price)) expect(page, `${p.name} ${paise}`).toContain(rupeesLabel(paise).slice(1));
     }
+  });
+
+  it("shows the same plan cards as the pricing page", () => {
+    // The page's HTML may escape characters or wrap text across lines; compare its visible text.
+    const page = readFileSync(new URL("../../../public/site/index.html", import.meta.url), "utf8")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&middot;|&#183;/g, "·")
+      .replace(/\s+/g, " ");
+    const gym: readonly PlanDef[] = PLANS.filter((p) => p.product === "GYM_ACCOUNTING");
+    expect(gym.every((p) => p.card)).toBe(true);
+    for (const p of gym) for (const line of [p.card!.audience, p.card!.limit, ...(p.card!.includes ? [p.card!.includes] : []), ...p.card!.features]) expect(page, `${p.name}: ${line}`).toContain(line);
   });
 
   it("links every trial button on the pricing page to a real plan", () => {

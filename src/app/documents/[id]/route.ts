@@ -1,10 +1,11 @@
-import { getCurrentUser } from "@/lib/auth/current";
+import { getCurrentUser, PLAN_ENDED } from "@/lib/auth/current";
 import { readDocument } from "@/lib/services/documents";
 
 // Member documents are private: streamed only to signed-in staff who may manage documents, and audited.
 export async function GET(req: Request, ctx: RouteContext<"/documents/[id]">) {
   const u = await getCurrentUser();
   if (!u) return new Response("Sign in again.", { status: 401 });
+  if (u.planBlocked) return new Response(PLAN_ENDED, { status: 402 });
   if (!u.can("documents.manage")) return new Response("Your role can't open member documents.", { status: 403 });
   const { id } = await ctx.params;
   const r = await readDocument(u, id);

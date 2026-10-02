@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth/current";
+import { getCurrentUser, PLAN_ENDED } from "@/lib/auth/current";
 import { listDay } from "@/lib/services/attendance";
 import { toCsv } from "@/lib/services/reports";
 import { todayIso } from "@/lib/services/time";
@@ -8,6 +8,7 @@ import { fmtTime } from "@/lib/format";
 export async function GET(req: Request) {
   const u = await getCurrentUser();
   if (!u) return new Response("Sign in first.", { status: 401 });
+  if (u.planBlocked) return new Response(PLAN_ENDED, { status: 402 });
   if (!u.can("attendance.manage")) return new Response("Not allowed.", { status: 403 });
   const d = new URL(req.url).searchParams.get("date");
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayIso();

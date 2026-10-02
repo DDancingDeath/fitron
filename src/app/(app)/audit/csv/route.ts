@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth/current";
+import { getCurrentUser, PLAN_ENDED } from "@/lib/auth/current";
 import { listAudit } from "@/lib/services/accounting";
 import { toCsv } from "@/lib/services/reports";
 import { todayIso } from "@/lib/services/time";
@@ -9,6 +9,7 @@ import { AUDIT_MODULES, entitiesOf, moduleOf, severityOf, type Severity } from "
 export async function GET(req: Request) {
   const u = await getCurrentUser();
   if (!u) return new Response("Sign in first.", { status: 401 });
+  if (u.planBlocked) return new Response(PLAN_ENDED, { status: 402 });
   if (!u.can("audit.view")) return new Response("Not allowed.", { status: 403 });
   const p = new URL(req.url).searchParams;
   const today = todayIso();

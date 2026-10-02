@@ -1,5 +1,5 @@
 import * as z from "zod";
-import { getCurrentUser } from "@/lib/auth/current";
+import { getCurrentUser, PLAN_ENDED } from "@/lib/auth/current";
 import { aiReady } from "@/lib/integrations/anthropic";
 import { chat, type ChatEvent } from "@/lib/services/ai";
 import { rateLimit } from "@/lib/rate-limit";
@@ -18,6 +18,7 @@ const body = z.object({
 export async function POST(req: Request) {
   const u = await getCurrentUser();
   if (!u) return Response.json({ error: "Sign in again." }, { status: 401 });
+  if (u.planBlocked) return Response.json({ error: PLAN_ENDED }, { status: 402 });
   if (!u.can("ai.use")) return Response.json({ error: "Your role doesn't include Fitron AI." }, { status: 403 });
   if (!aiReady()) return Response.json({ error: "Fitron AI isn't switched on yet. The server needs an ANTHROPIC_API_KEY." }, { status: 503 });
   if (!rateLimit(`ai:${u.id}`, 15, 60_000)) return Response.json({ error: "That's a lot of questions in a minute. Wait a moment and try again." }, { status: 429 });

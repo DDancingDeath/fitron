@@ -103,7 +103,7 @@ export async function dailyBrief(u: CurrentUser, today = todayIso()): Promise<Al
   if (u.can("products.manage") || u.can("pos.sell")) {
     const products = await db.product.findMany({ where: { ...scope, active: true, stock: { not: null } }, select: { name: true, stock: true, reorderLevel: true } });
     const low = products.filter(isLow);
-    if (low.length) out.push({ tone: "neutral", title: `${low.length} product${low.length === 1 ? "" : "s"} to reorder`, detail: low.slice(0, 4).map((p) => `${p.name} (${p.stock})`).join(", "), href: "/products" });
+    if (low.length) out.push({ tone: "neutral", title: `${low.length} product${low.length === 1 ? "" : "s"} to reorder`, detail: low.slice(0, 4).map((p) => `${p.name} (${p.stock})`).join(", "), href: u.can("products.manage") ? "/products" : "/pos" });
   }
   return out;
 }
