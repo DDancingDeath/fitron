@@ -3,7 +3,7 @@ import { GOOGLE_BACK, GOOGLE_FLOWS, GOOGLE_FLOW_COOKIE, authUrl, googleReady, ne
 import { appUrl } from "@/lib/services/accounts";
 import { safeNext } from "@/lib/auth/next";
 
-// Starts "Continue with Google". ?for=staff (console login) or signup (new gym).
+// Starts "Continue with Google". ?for=staff (console login), signup (new gym) or trainer (AI Trainer member).
 
 
 export function GET(req: NextRequest) {

@@ -206,6 +206,8 @@ export async function submitUtr(u: CurrentUser, id: string, raw: string) {
   const sub = await db.branchSubscription.findFirst({ where: { id, orgId: u.orgId, mode: "UPI" } });
   if (!sub) throw new UserError("Payment not found.");
   if (sub.status !== "PENDING") throw new UserError("This payment already has a UTR. Start a new payment if you paid again.");
+  // A UTR is one bank transfer: it can't pay for both a gym plan and an AI Trainer plan.
+  if (await db.trainerPayment.findFirst({ where: { utr }, select: { id: true } })) throw new UserError("This UTR was already entered for another payment. Check the number in your UPI app.");
   try {
     await db.$transaction(async (tx) => {
       const after = await tx.branchSubscription.update({ where: { id }, data: { status: "SUBMITTED", utr, submittedAt: new Date() } });

@@ -21,3 +21,20 @@ export async function claude(req: { system: string; messages: Msg[]; tools: read
   }
   return (await res.json()) as { content: Block[]; stop_reason: string };
 }
+
+/** One plain reply, no tools (the AI Trainer coach). Returns the text, or "" if the model declined. */
+export async function claudeText(req: { system: string; messages: { role: "user" | "assistant"; content: string }[]; maxTokens?: number; timeoutMs?: number }) {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": process.env.ANTHROPIC_API_KEY!.trim(), "anthropic-version": "2023-06-01" },
+    body: JSON.stringify({ model: aiModel(), max_tokens: req.maxTokens ?? 1024, system: req.system, messages: req.messages }),
+    signal: AbortSignal.timeout(req.timeoutMs ?? 20_000),
+  });
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(`Claude API ${res.status}: ${text.slice(0, 300)}`);
+  }
+  const out = (await res.json()) as { content: Block[]; stop_reason: string };
+  if (out.stop_reason === "refusal") return "";
+  return out.content.filter((b): b is Extract<Block, { type: "text" }> => b.type === "text").map((b) => b.text).join("").trim();
+}

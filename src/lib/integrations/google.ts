@@ -8,10 +8,10 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypt
 const env = (k: string) => process.env[k]?.trim() || "";
 export const googleReady = () => !!(env("GOOGLE_CLIENT_ID") && env("GOOGLE_CLIENT_SECRET"));
 
-/** Where each flow starts: the console login or the gym sign-up. */
-export const GOOGLE_FLOWS = ["staff", "signup"] as const;
+/** Where each flow starts: the console login, the gym sign-up, or the AI Trainer member app. */
+export const GOOGLE_FLOWS = ["staff", "signup", "trainer"] as const;
 export type GoogleFlow = (typeof GOOGLE_FLOWS)[number];
-export const GOOGLE_BACK: Record<GoogleFlow, string> = { staff: "/login", signup: "/signup" };
+export const GOOGLE_BACK: Record<GoogleFlow, string> = { staff: "/login", signup: "/signup", trainer: "/trainer" };
 /** Carries state, PKCE verifier and flow from /auth/google to its callback (10 minutes). */
 export const GOOGLE_FLOW_COOKIE = "fitron_google_flow";
 /** Carries a Google-verified identity to the gym sign-up form (30 minutes). */

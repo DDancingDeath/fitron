@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import { TrialForm } from "./trial-form";
 import { GoogleButton, googleMessage } from "@/components/google-button";
 import { Notice } from "@/components/ui";
@@ -12,6 +13,8 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
   const q = await searchParams;
   const plan = findPlan(typeof q.plan === "string" ? q.plan : null) ?? findPlan(DEFAULT_PLAN)!;
   const cycle = q.cycle === "YEARLY" || q.cycle === "year" ? "YEARLY" : "MONTHLY";
+  // AI Trainer plans sign up inside the member app itself (email link or Google), with the plan picked.
+  if (plan.product === "AI_TRAINER") redirect(`/trainer?plan=${plan.key}`);
   // Gym plans get a real account straight away; AI Trainer and partner plans are set up with the team.
   const gym = plan.product === "GYM_ACCOUNTING";
   // Back from Google: the verified email and name fill the form.

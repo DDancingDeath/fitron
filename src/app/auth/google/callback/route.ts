@@ -4,6 +4,7 @@ import { createSession } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
 import { GOOGLE_BACK, GOOGLE_FLOW_COOKIE, GOOGLE_SIGNUP_COOKIE, exchangeCode, sign, unsign, type GoogleFlow, type GoogleProfile } from "@/lib/integrations/google";
 import { appUrl } from "@/lib/services/accounts";
+import { signInTrainerWithGoogle } from "@/lib/services/trainer-google";
 
 // Google sends the visitor back here. The state must match the one we set in /auth/google,
 // and the code is redeemed with our PKCE verifier, so a forged or replayed callback goes nowhere.
@@ -31,6 +32,11 @@ export async function GET(req: NextRequest) {
   } catch (e) {
     console.error("[google] sign-in failed:", e);
     return done(to(`${back}?google=failed`));
+  }
+
+  if (f.flow === "trainer") {
+    await signInTrainerWithGoogle(me);
+    return done(to(safeNext(f.next, "/trainer")));
   }
 
   if (f.flow === "signup") {

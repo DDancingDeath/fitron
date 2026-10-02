@@ -149,7 +149,7 @@ You don't need to set `APP_URL`: it's set from your domain automatically. FITRON
 
 How it behaves: staff whose email is already a FITRON login sign straight in. A new gym owner can press **Sign up with Google** on the sign-up page; Google confirms the email, so no confirmation link is sent and no password is needed (they can set one later with "Forgot your password?"). A Google account with no FITRON login is told to ask their gym's owner to add them.
 
-## 9. Confirm UPI payments from gyms
+## 9. Confirm UPI payments from gyms and AI Trainer members
 
 When a gym pays you, this is what happens:
 
@@ -160,6 +160,8 @@ When a gym pays you, this is what happens:
 5. Sign in, open `https://your-address/fitron-admin` (also linked from Settings › Plan & billing), find that UTR and amount in your bank or UPI app, and press **Money received**. If it isn't there, type why and press **Reject**.
 
 Confirming switches the gym to the plan at once, issues FITRON's invoice, and emails the gym. Rejecting emails the gym the reason so they can check and pay again.
+
+**AI Trainer members** (the app at `https://your-address/trainer`) pay the same way: they pick AI Pro or AI Premium, monthly or yearly, scan the QR (reference like `FTR-AB12CD34`), and type the UTR. Their payments are listed on the same `/fitron-admin` page under **AI Trainer members waiting**. Confirming starts their plan the day after their free trial or current paid period ends, and emails them. A UTR used by a gym can't be used by a member, and the other way round.
 
 Plans and limits (from the pricing page): Starter is up to 100 active members and one branch, Professional up to 300 and one branch, Enterprise has no member limit and 3 branches, and more branches cost ₹499 a month. After a trial or paid period ends there are 7 days' grace, then the gym can still see everything but can't add members or invoices until it pays. Gyms you set up by hand with `npm run setup` aren't on a trial and have no limits.
 

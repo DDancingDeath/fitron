@@ -2,10 +2,11 @@
 
 import { useActionState } from "react";
 import { Button, Input } from "@/components/ui";
-import { reviewAction } from "./actions";
+import { reviewAction, reviewTrainerAction } from "./actions";
 
-export function ReviewForm({ id }: { id: string }) {
-  const [state, action, pending] = useActionState(reviewAction, null);
+/** `trainer`: an AI Trainer member's payment rather than a gym's. */
+export function ReviewForm({ id, trainer = false }: { id: string; trainer?: boolean }) {
+  const [state, action, pending] = useActionState(trainer ? reviewTrainerAction : reviewAction, null);
   if (state?.done) return <p className="text-sm text-ok">{state.done}</p>;
   return (
     <form action={action} className="flex flex-col gap-2">
