@@ -3,6 +3,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { IMPORT_KINDS, IMPORTS, type ImportKind } from "@/lib/domain/import";
 import { getMigration, getOpening } from "@/lib/services/importer";
 import { Badge, Card, Notice, PageHeader, cx } from "@/components/ui";
+import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtStamp } from "@/lib/format";
 import { todayIso } from "@/lib/services/time";
 import { ImportWizard, OpeningForm, SourceForm } from "./import-forms";
@@ -19,6 +20,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/settings/
   return (
     <>
       <PageHeader title="Migrate & import" subtitle="Bring members, payments, expenses, stock and equipment from your old software or Excel." />
+      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/import" />
       <Card className="mb-6">
         <SourceForm source={mig.source ?? ""} />
       </Card>

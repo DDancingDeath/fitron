@@ -8,6 +8,7 @@ import { UserError } from "./errors";
 import { memberScope, summarize } from "./members";
 import { notify } from "./notifications";
 import { getSetting } from "./settings";
+import { sendTemplate } from "./whatsapp";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
 
 export const getAccessRules = async (orgId: string): Promise<AccessRules> => ({ ...DEFAULT_ACCESS, ...((await getSetting<Partial<AccessRules>>(orgId, "access")) ?? {}) });
@@ -129,3 +130,79 @@ export async function dailyCounts(u: CurrentUser, days = 14) {
 }
 
 export const memberVisits = (memberId: string, take = 30) => db.attendance.findMany({ where: { memberId }, orderBy: { checkIn: "desc" }, take });
+
+/** Hour of day (0–23) of a check-in, Indian time. */
+const istHour = (d: Date) => new Date(d.getTime() + 330 * 60_000).getUTCHours();
+/** Minutes a visit has lasted: until check-out, or until now for someone still inside today. */
+const minutesInside = (a: { checkIn: Date; checkOut: Date | null }, now: Date, isToday: boolean) =>
+  Math.max(0, Math.round(((a.checkOut ?? (isToday ? now : a.checkIn)).getTime() - a.checkIn.getTime()) / 60_000));
+
+/**
+ * Everything the prototype's attendance screen shows: the day's visits with each member's plan and
+ * flags, the day's figures, average check-ins by hour over 30 days, and active members who haven't
+ * come in for 14 days or more.
+ */
+export async function attendanceBoard(u: CurrentUser, date: string) {
+  const today = todayIso();
+  const isToday = date === today;
+  const now = new Date();
+  const from30 = new Date(fromIso(today).getTime() - 29 * 86_400_000);
+  const [day, inside, recent, members, lastVisits] = await Promise.all([
+    listDay(u, date),
+    db.attendance.count({ where: { ...attScope(u), date: fromIso(today), checkOut: null } }),
+    db.attendance.findMany({ where: { ...attScope(u), date: { gte: from30 } }, select: { checkIn: true } }),
+    db.member.findMany({ where: { ...memberScope(u), walkIn: false }, select: { id: true, code: true, name: true, suspended: true } }),
+    db.attendance.groupBy({ by: ["memberId"], where: { ...attScope(u), memberId: { not: null } }, _max: { date: true } }),
+  ]);
+  const sums = await summarize(members.map((m) => m.id), today);
+  const left = (end: string | null) => (end ? Math.round((fromIso(end).getTime() - fromIso(today).getTime()) / 86_400_000) : null);
+
+  const rows = day.rows.map((r) => {
+    const s = r.memberId ? sums.get(r.memberId) : undefined;
+    const daysLeft = s ? left(s.latestEnd) : null;
+    return {
+      ...r,
+      planName: s?.planName ?? null,
+      flag: s && s.outstanding > 0 ? { text: `₹${Math.round(s.outstanding / 100).toLocaleString("en-IN")} due`, alert: true } : daysLeft !== null && daysLeft >= 0 && daysLeft <= 7 ? { text: `Ends in ${daysLeft} d`, alert: false } : null,
+      minutes: minutesInside(r, now, isToday),
+    };
+  });
+  const done = rows.filter((r) => r.checkOut);
+  const byHour = new Map<number, number>();
+  for (const r of rows) byHour.set(istHour(r.checkIn), (byHour.get(istHour(r.checkIn)) ?? 0) + 1);
+  const peakHour = [...byHour].sort((a, b) => b[1] - a[1] || a[0] - b[0])[0]?.[0] ?? null;
+
+  const hours30 = new Map<number, number>();
+  for (const r of recent) hours30.set(istHour(r.checkIn), (hours30.get(istHour(r.checkIn)) ?? 0) + 1);
+  const hours = Array.from({ length: 18 }, (_, i) => i + 5).map((h) => ({ hour: h, count: hours30.get(h) ?? 0, perDay: Math.round(((hours30.get(h) ?? 0) / 30) * 10) / 10 }));
+
+  const active = members.filter((m) => !m.suspended && (left(sums.get(m.id)!.latestEnd) ?? -1) >= 0);
+  const last = new Map(lastVisits.map((v) => [v.memberId!, v._max.date ? toIso(v._max.date) : null]));
+  const idle = active
+    .map((m) => ({ ...m, lastVisit: last.get(m.id) ?? null }))
+    .filter((m) => !m.lastVisit || Math.round((fromIso(today).getTime() - fromIso(m.lastVisit).getTime()) / 86_400_000) >= 14)
+    .sort((a, b) => (a.lastVisit ?? "0").localeCompare(b.lastVisit ?? "0"))
+    .slice(0, 5);
+
+  return {
+    rows,
+    inside,
+    stats: {
+      checkIns: rows.length,
+      unique: day.members,
+      avgMinutes: done.length ? Math.round(done.reduce((a, r) => a + r.minutes, 0) / done.length) : null,
+      peakHour,
+      active: active.length,
+    },
+    hours,
+    idle,
+  };
+}
+
+/** A friendly "we miss you" WhatsApp to a member who hasn't visited in a while. */
+export async function nudgeMember(u: CurrentUser, memberId: string) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false }, select: { id: true, name: true } });
+  if (!m) throw new UserError("Member not found.");
+  const sent = await sendTemplate({ orgId: u.orgId, memberId: m.id, key: "campaign", userId: u.id, body: "Hi {{member_name}}, we have missed you at {{gym_name}}! Come in this week and let's get back on track." });
+  return { name: m.name, sent: !!sent };
+}

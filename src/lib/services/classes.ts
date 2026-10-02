@@ -10,6 +10,8 @@ import { isUniqueViolation, UserError } from "./errors";
 import { memberScope } from "./members";
 import { notify } from "./notifications";
 import { fromIso, toIso, todayIso } from "./time";
+import { sendTemplate } from "./whatsapp";
+import { fmtClock, fmtDate } from "@/lib/format";
 
 export const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -40,7 +42,7 @@ export async function weekSchedule(u: CurrentUser, start: string) {
     const date = addDays(start, s.weekday);
     const c = counts.filter((x) => x.classSlotId === s.id && toIso(x.date) === date);
     const n = (st: string[]) => c.filter((x) => st.includes(x.status)).reduce((a, x) => a + x._count._all, 0);
-    return { ...s, date, trainerName: names.get(s.trainerId) ?? "—", booked: n(HOLDS), waitlist: n(["Waitlist"]) };
+    return { ...s, date, trainerName: names.get(s.trainerId) ?? "—", booked: n(HOLDS), waitlist: n(["Waitlist"]), attended: n(["Attended"]), noShow: n(["No-show"]) };
   });
 }
 
@@ -134,7 +136,7 @@ export async function setBookingStatus(u: CurrentUser, bookingId: string, status
           branchId: before.classSlot.branchId,
           type: "WAITLIST",
           text: `${next.member.name} moved off the waitlist into ${before.classSlot.name} on ${date}.`,
-          link: `/classes/${before.classSlotId}?date=${date}`,
+          link: `/classes?week=${weekStart(date)}&sel=${before.classSlotId}&date=${date}`,
         });
         promoted = next.member.name;
       }
@@ -145,3 +147,29 @@ export async function setBookingStatus(u: CurrentUser, bookingId: string, status
 
 export const memberBookings = (memberId: string) =>
   db.booking.findMany({ where: { memberId }, orderBy: { date: "desc" }, take: 20, include: { classSlot: { select: { id: true, name: true, startTime: true } } } });
+
+/** "Mark all attended": every booked member of a session that has started (today or earlier). */
+export async function markAllAttended(u: CurrentUser, slotId: string, date: string) {
+  const slot = await db.classSlot.findFirst({ where: { ...scope(u), id: slotId } });
+  if (!slot) throw new UserError("Class not found.");
+  if (date > todayIso()) throw new UserError("Mark attendance on the day of the class.");
+  return db.$transaction(async (tx) => {
+    const booked = await tx.booking.findMany({ where: { classSlotId: slotId, date: fromIso(date), status: "Booked" }, select: { id: true } });
+    await tx.booking.updateMany({ where: { id: { in: booked.map((b) => b.id) } }, data: { status: "Attended" } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "booking.attendedAll", entity: "ClassSlot", entityId: slotId, after: { date, count: booked.length } });
+    return booked.length;
+  });
+}
+
+/** "Remind everyone": the class template on WhatsApp to each member booked into a session. */
+export async function remindClass(u: CurrentUser, slotId: string, date: string) {
+  const slot = await db.classSlot.findFirst({ where: { ...scope(u), id: slotId } });
+  if (!slot) throw new UserError("Class not found.");
+  const booked = await db.booking.findMany({ where: { classSlotId: slotId, date: fromIso(date), status: "Booked" }, select: { memberId: true } });
+  let sent = 0;
+  for (const b of booked) {
+    const r = await sendTemplate({ orgId: u.orgId, memberId: b.memberId, key: "class", userId: u.id, vars: { class_name: slot.name, class_time: `${fmtDate(date)}, ${fmtClock(slot.startTime)}` } });
+    if (r) sent++;
+  }
+  return { sent, skipped: booked.length - sent };
+}

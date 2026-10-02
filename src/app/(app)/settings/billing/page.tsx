@@ -7,6 +7,7 @@ import { fitronUpi, isFitronAdmin } from "@/lib/integrations/upi";
 import { PLANS, rupeesLabel } from "@/lib/domain/pricing";
 import { branchPrice, GRACE_DAYS, planPrice, type PlanStanding, type Standing } from "@/lib/domain/saas";
 import { Badge, Card, Empty, Notice, PageHeader } from "@/components/ui";
+import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, formatInr } from "@/lib/format";
 import { PayButton } from "./pay-button";
 
@@ -48,6 +49,7 @@ export default async function BillingPage() {
   return (
     <>
       <PageHeader title="Plan & billing" subtitle="Your FITRON Gym Accounting plan, extra branches and payments to FITRON. Prices are plus 18% GST." />
+      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/billing" />
       <div className="mb-4 flex flex-col gap-2">
         {demo && <Notice>Demo mode: FITRON&apos;s UPI ID isn&apos;t set on this server, so payments are simulated and no money is charged.</Notice>}
         {upi && <Notice tone="neutral">You pay by UPI to {upi.name} ({upi.id}) and enter the UTR. We check it and email you, usually within a working day; your gym keeps working meanwhile.</Notice>}

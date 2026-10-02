@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState, useRef, useState } from "react";
-import { Button, Notice, Textarea } from "@/components/ui";
+import { CircleNotchIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
+import { Button, Notice } from "@/components/ui";
 import { dismissProposalAction, sendProposalAction } from "./actions";
 
 type Proposal = { id: string; summary: string; members: number; body: string };
@@ -50,7 +51,7 @@ export function AiChat({ ready }: { ready: boolean }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
-  const input = useRef<HTMLTextAreaElement>(null);
+  const input = useRef<HTMLInputElement>(null);
 
   async function ask(q: string) {
     if (!q.trim() || busy) return;
@@ -98,67 +99,67 @@ export function AiChat({ ready }: { ready: boolean }) {
 
   if (!ready)
     return (
-      <Notice>
-        Fitron AI answers questions about your members, money and classes, and drafts WhatsApp messages for you to approve. To switch it on, the server needs an ANTHROPIC_API_KEY. The brief and risk list on this page work without it.
-      </Notice>
+      <div className="p-[18px]">
+        <Notice>
+          Fitron AI answers questions about your members, money and classes, and drafts WhatsApp messages for you to approve. To switch it on, the server needs an ANTHROPIC_API_KEY. The brief and risk list on this page work without it.
+        </Notice>
+      </div>
     );
 
   return (
-    <div className="flex flex-col gap-3">
-      {turns.length === 0 && (
-        <div className="flex flex-wrap gap-2">
-          {SUGGESTIONS.map((s) => (
-            <Button key={s} type="button" onClick={() => ask(s)}>
-              {s}
-            </Button>
-          ))}
-        </div>
-      )}
-      <div className="flex flex-col gap-3">
+    <>
+      <div className="flex max-h-[520px] flex-1 flex-col gap-3 overflow-y-auto p-[18px]">
+        {turns.length === 0 && <p className="self-start rounded-2xl bg-bg px-[15px] py-[11px] text-sm leading-relaxed">Hi! Ask me about members, money, renewals or classes. I only read what your role can see, and I never send anything without your OK.</p>}
         {turns.map((t, i) =>
           t.role === "user" ? (
-            <p key={i} className="self-end rounded-lg bg-accent-soft px-3 py-2 text-sm">
+            <p key={i} className="max-w-[86%] self-end rounded-2xl bg-accent px-[15px] py-[11px] text-sm leading-relaxed whitespace-pre-wrap text-accent-ink">
               {t.content}
             </p>
           ) : (
-            <div key={i} className="rounded-lg border border-line px-3 py-2 text-sm">
+            <div key={i} className="max-w-[86%] self-start rounded-2xl bg-bg px-[15px] py-[11px] text-sm leading-relaxed">
               {t.steps && t.steps.length > 0 && <p className="mb-1 text-xs text-muted">{t.steps.join(" · ")}</p>}
               {t.content && <div className="whitespace-pre-line">{t.content}</div>}
               {t.proposals?.map((p) => <ProposalCard key={p.id} p={p} />)}
               {t.error && <p className="text-alert">{t.error}</p>}
-              {!t.content && !t.error && busy && i === turns.length - 1 && <p className="text-muted">{step}</p>}
+              {!t.content && !t.error && busy && i === turns.length - 1 && (
+                <p className="flex items-center gap-2 text-[13px] text-muted">
+                  <CircleNotchIcon size={16} weight="duotone" className="animate-spin text-accent" />
+                  {step}
+                </p>
+              )}
             </div>
           ),
         )}
       </div>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const q = input.current!.value;
-          input.current!.value = "";
-          void ask(q);
-        }}
-        className="flex flex-col gap-2 sm:flex-row sm:items-end"
-      >
-        <Textarea
-          ref={input}
-          rows={2}
-          placeholder="Ask about members, dues, revenue or classes. Hindi works too."
-          aria-label="Ask Fitron AI"
-          className="flex-1"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              e.currentTarget.form?.requestSubmit();
-            }
+      <div className="flex flex-col gap-2.5 border-t border-line px-[18px] pt-3 pb-4">
+        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
+          {SUGGESTIONS.map((s) => (
+            <button key={s} type="button" onClick={() => ask(s)} disabled={busy} className="flex-none rounded-full border border-line px-3 py-1.5 text-[13px] whitespace-nowrap hover:border-accent hover:text-accent">
+              {s}
+            </button>
+          ))}
+        </div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const q = input.current!.value;
+            input.current!.value = "";
+            void ask(q);
           }}
-          maxLength={4000}
-        />
-        <Button variant="primary" disabled={busy}>
-          {busy ? "Working…" : "Ask"}
-        </Button>
-      </form>
-      <p className="text-xs text-muted">Fitron AI only reads what your role can see. It never sends anything without your OK.</p>
-    </div>
+          className="flex items-center gap-2 rounded-[14px] border border-fg/30 bg-bg py-1.5 pr-1.5 pl-3.5"
+        >
+          <input
+            ref={input}
+            placeholder="Ask anything about your gym…"
+            aria-label="Ask Fitron AI"
+            className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] text-fg outline-0 placeholder:text-fg/60"
+            maxLength={4000}
+          />
+          <Button variant="primary" disabled={busy} aria-label="Send" className="rounded-[10px] px-3.5">
+            <PaperPlaneTiltIcon size={18} weight="duotone" />
+          </Button>
+        </form>
+      </div>
+    </>
   );
 }

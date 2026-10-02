@@ -43,7 +43,7 @@ export function MandateForm({ members, plans }: { members: { id: string; label: 
   );
 }
 
-export function MandateButton({ id, action: act, label, variant = "default", confirm }: { id: string; action: "pause" | "resume" | "cancel" | "approve-demo"; label: string; variant?: "default" | "primary" | "danger"; confirm?: string }) {
+export function MandateButton({ id, action: act, label, variant = "default", confirm }: { id: string; action: "pause" | "resume" | "cancel" | "approve-demo"; label: string; variant?: "default" | "primary" | "danger" | "ghost"; confirm?: string }) {
   const [state, action, pending] = useActionState(changeAction.bind(null, id, act), undefined);
   return (
     <form

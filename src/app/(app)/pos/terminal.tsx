@@ -2,11 +2,11 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { sellAction } from "./actions";
-import { Button, Field, Input, Notice, Select, cx } from "@/components/ui";
-import { formatInr } from "@/lib/format";
+import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { formatInr, formatRupees } from "@/lib/format";
 import { METHODS } from "@/lib/validation/billing";
 
-type P = { id: string; name: string; category: string; price: number; stock: number | null; low: boolean; gst: boolean };
+type P = { id: string; sku: string; name: string; category: string; price: number; stock: number | null; low: boolean; gst: boolean };
 
 export function Terminal({ products, members, taxRate }: { products: P[]; members: { id: string; label: string }[]; taxRate: number }) {
   const [state, action, pending] = useActionState(sellAction, undefined);
@@ -34,11 +34,23 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
       return { ...c, [p.id]: next };
     });
 
+  // Enter adds the product whose SKU was typed or scanned, or the only match.
+  const scan = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const t = q.trim().toLowerCase();
+    const hit = products.find((p) => p.sku.toLowerCase() === t) ?? (shown.length === 1 ? shown[0] : undefined);
+    if (hit) {
+      add(hit);
+      setQ("");
+    }
+  };
+
   return (
-    <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
-      <section>
-        <div className="mb-3 flex flex-col gap-2 sm:flex-row">
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products" aria-label="Search products" />
+    <div className="flex flex-wrap items-start gap-10">
+      <section className="flex min-w-0 flex-[1_1_380px] flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Input value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={scan} placeholder="Search product or scan barcode, then Enter" aria-label="Search products" />
           <Select value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Category" className="sm:w-48">
             <option value="">All categories</option>
             {cats.map((c) => (
@@ -46,7 +58,7 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
             ))}
           </Select>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-3">
           {shown.map((p) => {
             const out = p.stock !== null && p.stock <= (cart[p.id] ?? 0);
             return (
@@ -55,18 +67,21 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
                 type="button"
                 disabled={out}
                 onClick={() => add(p)}
-                className={cx("rounded-xl border bg-surface p-3 text-left transition", out ? "cursor-not-allowed border-line opacity-50" : "border-line hover:border-accent")}
+                className="flex min-h-24 flex-col gap-1 rounded-md bg-surface p-3 text-left hover:bg-accent-soft disabled:cursor-not-allowed disabled:opacity-50"
               >
-                <span className="block font-semibold leading-tight">{p.name}</span>
-                <span className="mt-1 block text-sm text-muted">{formatInr(p.price)}</span>
-                <span className={cx("mt-1 block text-xs", p.low ? "text-alert" : "text-muted")}>{p.stock === null ? "No stock tracking" : p.stock === 0 ? "Out of stock" : `${p.stock} in stock`}</span>
+                <span className="text-[11px] tracking-[0.08em] text-muted uppercase">{p.category}</span>
+                <span className="flex-1 text-sm font-semibold">{p.name}</span>
+                <span className="flex justify-between text-[13px]">
+                  <span>{formatRupees(p.price)}</span>
+                  <span className={p.low || p.stock === 0 ? "text-alert-700" : "text-muted"}>{p.stock === null ? "Service" : `${p.stock} left`}</span>
+                </span>
               </button>
             );
           })}
         </div>
       </section>
-      <form action={action} className="flex flex-col gap-3 self-start rounded-xl border border-line bg-surface p-4 lg:sticky lg:top-4">
-        <h2 className="font-semibold">Bill</h2>
+      <form action={action} className="flex w-full min-w-0 flex-col gap-3 rounded-lg bg-surface px-[18px] py-4 lg:sticky lg:top-4 lg:w-[320px] lg:flex-none">
+        <h3 className="text-xl">Current sale</h3>
         {state?.message && <Notice tone="alert">{state.message}</Notice>}
         {lines.length === 0 ? (
           <p className="text-sm text-muted">Tap a product to add it.</p>
@@ -96,8 +111,8 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
           <dd className="text-right text-lg font-semibold tabular-nums">{formatInr(totals.total)}</dd>
         </dl>
         <input type="hidden" name="items" value={JSON.stringify(lines.map((l) => ({ productId: l.p.id, qty: l.qty })))} />
-        <Field label="Member (leave blank for a walk-in customer)" error={state?.errors?.member}>
-          <Input name="member" list="pos-members" placeholder="Member ID or name" autoComplete="off" />
+        <Field label="Customer (blank for a walk-in)" error={state?.errors?.member}>
+          <Input name="member" list="pos-members" placeholder="Search name, member ID or phone" autoComplete="off" />
           <datalist id="pos-members">
             {members.map((m) => (
               <option key={m.id} value={m.label} />
@@ -117,7 +132,7 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
           </Field>
         </div>
         <Button variant="primary" disabled={pending || lines.length === 0}>
-          {pending ? "Recording…" : `Take ${formatInr(totals.total)}`}
+          {pending ? "Recording…" : `Charge ${formatInr(totals.total)}`}
         </Button>
         {lines.length > 0 && (
           <Button type="button" variant="ghost" onClick={() => setCart({})}>

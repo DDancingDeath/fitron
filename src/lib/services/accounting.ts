@@ -5,7 +5,9 @@ import { addDays, addMonths } from "@/lib/domain/dates";
 import { audit } from "./audit";
 import { UserError } from "./errors";
 import { getSetting } from "./settings";
-import { fromIso, todayIso } from "./time";
+import { fromIso, istInstant, todayIso } from "./time";
+import type { Prisma } from "@/generated/prisma/client";
+import { HIGH_WORDS, MEDIUM_WORDS, type Severity } from "@/lib/domain/audit";
 import { depreciationIn, disposalsIn } from "@/lib/domain/assets";
 import { assetsFor, toLike } from "./assets";
 
@@ -157,20 +159,33 @@ export async function unlockMonth(u: CurrentUser, month: string) {
   });
 }
 
-export async function listAudit(u: CurrentUser, f: { q?: string; userId?: string; entity?: string; page?: number }) {
-  const pageSize = 50;
+export async function listAudit(u: CurrentUser, f: { q?: string; userId?: string; entity?: string; entities?: string[]; severity?: Severity; from?: string; to?: string; page?: number; pageSize?: number }) {
+  const pageSize = f.pageSize ?? 50;
   const page = Math.max(1, f.page ?? 1);
-  const where = {
+  const has = (words: string[]) => words.map((w) => ({ action: { contains: w, mode: "insensitive" as const } }));
+  const where: Prisma.AuditLogWhereInput = {
     orgId: u.orgId,
     ...(f.userId ? { userId: f.userId } : {}),
-    ...(f.entity ? { entity: f.entity } : {}),
-    ...(f.q ? { OR: [{ action: { contains: f.q, mode: "insensitive" as const } }, { entityId: { contains: f.q } }] } : {}),
+    ...(f.entity ? { entity: f.entity } : f.entities ? { entity: { in: f.entities } } : {}),
+    ...(f.from || f.to ? { createdAt: { ...(f.from ? { gte: istInstant(f.from, "00:00") } : {}), ...(f.to ? { lt: istInstant(addDays(f.to, 1), "00:00") } : {}) } } : {}),
+    AND: [
+      ...(f.q ? [{ OR: [{ action: { contains: f.q, mode: "insensitive" as const } }, { entityId: { contains: f.q } }, { entity: { contains: f.q, mode: "insensitive" as const } }] }] : []),
+      ...(f.severity === "High" ? [{ OR: has(HIGH_WORDS) }] : []),
+      ...(f.severity === "Medium" ? [{ NOT: { OR: has(HIGH_WORDS) } }, { OR: has(MEDIUM_WORDS) }] : []),
+      ...(f.severity === "Low" ? [{ NOT: { OR: [...has(HIGH_WORDS), ...has(MEDIUM_WORDS)] } }] : []),
+    ],
   };
   const [rows, total, users] = await Promise.all([
     db.auditLog.findMany({ where, orderBy: { id: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
     db.auditLog.count({ where }),
-    db.user.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true } }),
+    db.user.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true, role: { select: { name: true } } } }),
   ]);
-  const names = new Map(users.map((x) => [x.id, x.name]));
-  return { rows: rows.map((r) => ({ ...r, id: String(r.id), userName: r.userId ? (names.get(r.userId) ?? "Unknown") : "System" })), total, page, pageSize, users };
+  const names = new Map(users.map((x) => [x.id, x]));
+  return {
+    rows: rows.map((r) => ({ ...r, id: String(r.id), userName: r.userId ? (names.get(r.userId)?.name ?? "Unknown") : "System", roleName: r.userId ? (names.get(r.userId)?.role.name ?? "") : "Automatic" })),
+    total,
+    page,
+    pageSize,
+    users,
+  };
 }
