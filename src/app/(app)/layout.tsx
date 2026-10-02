@@ -4,7 +4,8 @@ import { NAV } from "@/lib/nav";
 import { NavLinks } from "@/components/nav-links";
 import { MobileNav } from "@/components/mobile-nav";
 import { BranchSwitcher } from "@/components/branch-switcher";
-import { logout } from "@/app/login/actions";
+import { UserMenu } from "@/components/user-menu";
+import { photoUrl } from "@/components/avatar";
 import { Logo } from "@/components/logo";
 import { unreadCount } from "@/lib/services/notifications";
 import { gymPlan } from "@/lib/services/saas";
@@ -53,13 +54,16 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
               </svg>
               {unread > 0 && <span className="absolute -right-1.5 -top-1.5 min-w-5 rounded-full bg-alert px-1 text-center text-[11px] font-semibold leading-5 text-bg">{unread > 99 ? "99+" : unread}</span>}
             </Link>
-            <div className="hidden text-right text-sm leading-tight sm:block">
-              <div className="font-semibold">{u.name}</div>
-              <div className="text-muted">{u.role}</div>
-            </div>
-            <form action={logout}>
-              <button className="min-h-9 rounded-md border border-line px-3 text-sm">Log out</button>
-            </form>
+            <UserMenu
+              user={{
+                name: u.name,
+                email: u.email,
+                role: u.role,
+                branch: u.branch === "ALL" ? "All branches" : (u.branches.find((b) => b.id === u.branch)?.name ?? ""),
+                photo: photoUrl(u.id, u.photoKey),
+                canSettings: u.can("settings.manage"),
+              }}
+            />
           </div>
         </header>
         {banner && (

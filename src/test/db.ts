@@ -33,6 +33,7 @@ export async function makeGym() {
       id: u.id,
       name: u.name,
       email: u.email,
+      photoKey: null,
       orgId: org.id,
       orgName: org.name,
       role,
