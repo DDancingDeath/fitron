@@ -31,4 +31,15 @@ describe.skipIf(!hasDb)("offer codes (database)", () => {
     await expect(sellMembership(admin, m2.id, { ...sale, offerCode: "DIWALI10" })).rejects.toThrow(/not valid/);
     await expect(sellMembership(admin, m2.id, { ...sale, offerCode: "NOPE" })).rejects.toThrow(/not valid/);
   });
+
+  it("charges the category price when one is picked, and remembers the category", async () => {
+    const gym = await makeGym();
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const plan = await createPlan(admin, { name: "Monthly", kind: "Membership", months: 1, price: 150000, regFee: 0, discount: 0, gstApplicable: false, features: [], studentPrice: 120000 });
+    const m = await createMember(admin, { name: "Student One", gender: "Male", phone: "9876544101", source: "Walk-in", tags: [] });
+    await expect(sellMembership(admin, m.id, { planId: plan.id, startDate: todayIso(), discount: 0, includeRegFee: false, payAmount: 0, pricingCategory: "Female" })).rejects.toThrow(/no Female price/);
+    const r = await sellMembership(admin, m.id, { planId: plan.id, startDate: todayIso(), discount: 0, includeRegFee: false, payAmount: 0, pricingCategory: "Student" });
+    expect(r.membership).toMatchObject({ price: 120000, pricingCategory: "Student" });
+    expect(r.invoice.total).toBe(120000);
+  });
 });

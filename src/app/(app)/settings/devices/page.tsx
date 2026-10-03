@@ -195,6 +195,12 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
               <Field label="Dues limit (₹)">
                 <Input name="duesLimit" inputMode="decimal" defaultValue={rules.duesLimit / 100} />
               </Field>
+              <Field label="Gym opens at" hint="Empty = open all hours">
+                <Input name="hoursFrom" type="time" defaultValue={rules.hoursFrom ?? ""} />
+              </Field>
+              <Field label="Gym closes at">
+                <Input name="hoursTo" type="time" defaultValue={rules.hoursTo ?? ""} />
+              </Field>
             </div>
             <div className="mt-3">
               <Button variant="primary">Save rules</Button>

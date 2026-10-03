@@ -72,3 +72,17 @@ export async function voidExpense(u: CurrentUser, id: string, reason: string) {
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "expense.void", entity: "Expense", entityId: id, before, after });
   });
 }
+
+/** Active expenses per month for the "Monthly expense trend" chart, optionally for one category. */
+export async function expenseTrend(u: CurrentUser, months: string[], categoryId?: string) {
+  const rows = await db.expense.findMany({
+    where: { ...scope(u), status: "ACTIVE", ...(categoryId ? { categoryId } : {}), date: { gte: fromIso(`${months[0]}-01`) } },
+    select: { date: true, amount: true },
+  });
+  const by = new Map(months.map((m) => [m, 0]));
+  for (const r of rows) {
+    const k = toIso(r.date).slice(0, 7);
+    if (by.has(k)) by.set(k, by.get(k)! + r.amount);
+  }
+  return months.map((m) => ({ month: m, amount: by.get(m)! }));
+}

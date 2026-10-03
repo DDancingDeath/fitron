@@ -11,7 +11,8 @@ import { assertMonthOpen } from "./locks";
 import { memberScope } from "./members";
 import { notify } from "./notifications";
 import { getTax } from "./tax";
-import { todayIso } from "./time";
+import { nextNumber } from "./sequence";
+import { fromIso, todayIso } from "./time";
 
 type Tx = Prisma.TransactionClient;
 
@@ -74,18 +75,32 @@ export async function setProductActive(u: CurrentUser, id: string, active: boole
  * Stock received (+) or written off (−). Received stock at a new unit cost moves the
  * product's cost to the weighted average.
  */
-export async function adjustStock(u: CurrentUser, id: string, a: { qty: number; unitCost?: number; note?: string }) {
+export async function adjustStock(u: CurrentUser, id: string, a: { qty: number; unitCost?: number; note?: string; vendor?: string; asExpense?: boolean }) {
   const p = await db.product.findFirst({ where: { ...scope(u), id } });
   if (!p) throw new UserError("Product not found.");
   if (p.stock == null) throw new UserError("This product doesn't track stock.");
   if (p.stock + a.qty < 0) throw new UserError(`Only ${p.stock} in stock.`, "qty");
+  const asExpense = a.asExpense && a.qty > 0;
+  if (asExpense && !a.unitCost) throw new UserError("Enter the cost per unit to record the expense.", "unitCost");
+  const category = asExpense ? await db.expenseCategory.findFirst({ where: { name: "Inventory" } }) : null;
   await db.$transaction(async (tx) => {
     const fresh = await tx.product.findUniqueOrThrow({ where: { id } });
     const stock = fresh.stock! + a.qty;
     if (stock < 0) throw new UserError(`Only ${fresh.stock} in stock.`, "qty");
     const cost = a.qty > 0 && a.unitCost != null && stock > 0 ? Math.round((Math.max(fresh.stock!, 0) * fresh.cost + a.qty * a.unitCost) / (Math.max(fresh.stock!, 0) + a.qty)) : fresh.cost;
     const after = await tx.product.update({ where: { id }, data: { stock, cost } });
-    await tx.stockMovement.create({ data: { productId: id, qty: a.qty, reason: a.qty > 0 ? "RESTOCK" : "ADJUST", unitCost: a.unitCost ?? null, note: a.note ?? null, createdById: u.id } });
+    let expenseId: string | null = null;
+    if (asExpense && category) {
+      const today = todayIso();
+      await assertMonthOpen(tx, u, p.branchId, today);
+      const n = await nextNumber(tx, u.orgId, "expense", 1);
+      const e = await tx.expense.create({
+        data: { code: `EXP-${n}`, orgId: u.orgId, branchId: p.branchId, date: fromIso(today), categoryId: category.id, description: `Restock ${p.name} × ${a.qty}`, vendor: a.vendor ?? null, amount: a.qty * a.unitCost!, method: "Bank Transfer", createdById: u.id },
+      });
+      await audit(tx, { orgId: u.orgId, userId: u.id, action: "expense.create", entity: "Expense", entityId: e.id, after: e });
+      expenseId = e.id;
+    }
+    await tx.stockMovement.create({ data: { productId: id, qty: a.qty, reason: a.qty > 0 ? "RESTOCK" : "ADJUST", unitCost: a.unitCost ?? null, note: a.note ?? a.vendor ?? null, expenseId, createdById: u.id } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "product.stock", entity: "Product", entityId: id, before: fresh, after });
   });
 }
@@ -143,4 +158,10 @@ export async function posSale(u: CurrentUser, input: PosSaleInput) {
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "pos.sale", entity: "Invoice", entityId: invoice.id, after: { invoice, payment } });
     return invoice;
   });
+}
+
+/** Units of each product sold since a date (the Inventory table's "Sold (30 d)"); cancelled invoices don't count. */
+export async function soldSince(productIds: string[], from: string) {
+  const rows = await db.invoiceItem.groupBy({ by: ["productId"], where: { productId: { in: productIds }, invoice: { status: "ISSUED", date: { gte: fromIso(from) } } }, _sum: { qty: true } });
+  return new Map(rows.map((r) => [r.productId!, r._sum.qty ?? 0]));
 }

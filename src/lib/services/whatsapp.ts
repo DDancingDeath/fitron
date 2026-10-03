@@ -150,8 +150,8 @@ export function sendLater(o: Omit<SendOpts, "auto">) {
   }
 }
 
-export async function listMessages(u: CurrentUser, f: { status?: string; key?: string; q?: string; memberId?: string; page?: number }) {
-  const pageSize = 50;
+export async function listMessages(u: CurrentUser, f: { status?: string; key?: string; q?: string; memberId?: string; page?: number; pageSize?: number }) {
+  const pageSize = f.pageSize ?? 50;
   const page = Math.max(1, f.page ?? 1);
   const where: Prisma.WhatsAppMessageWhereInput = {
     orgId: u.orgId,

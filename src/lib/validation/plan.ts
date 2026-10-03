@@ -3,6 +3,10 @@ import { optionalText, rupees } from "./common";
 
 export const PLAN_KINDS = ["Membership", "Personal Training", "Add-on"] as const;
 
+/** Prices a plan can have besides its standard one (the prototype's Female / Student / Male prices). */
+export const PRICE_CATEGORIES = ["Female", "Student", "Male"] as const;
+const optionalRupees = z.preprocess((v) => (v === "" || v == null ? undefined : v), rupees.optional());
+
 export const planInput = z.object({
   name: z.string().trim().min(2, { error: "Enter a plan name." }).max(80),
   kind: z.enum(PLAN_KINDS),
@@ -16,6 +20,9 @@ export const planInput = z.object({
     .string()
     .optional()
     .transform((s) => (s ?? "").split("\n").map((t) => t.trim()).filter(Boolean)),
+  femalePrice: optionalRupees,
+  studentPrice: optionalRupees,
+  malePrice: optionalRupees,
 });
 
 export type PlanInput = z.infer<typeof planInput>;

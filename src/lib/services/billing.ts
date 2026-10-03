@@ -114,18 +114,22 @@ export async function suggestedStart(memberId: string, today = todayIso()) {
  */
 export async function sellMembership(u: CurrentUser, memberId: string, input: SellInput, opts: { type?: "AUTOPAY" } = {}) {
   const member = await findMember(u, memberId);
-  const plan = await db.membershipPlan.findFirst({ where: { orgId: u.orgId, id: input.planId, status: "ACTIVE" } });
+  const plan = await db.membershipPlan.findFirst({ where: { orgId: u.orgId, id: input.planId, status: "ACTIVE" }, include: { prices: true } });
   if (!plan) throw new UserError("Pick an active plan.", "planId");
+  // Category prices (Female, Student…) replace the standard price when the plan has one.
+  const category = input.pricingCategory && input.pricingCategory !== "Standard" ? plan.prices.find((x) => x.category === input.pricingCategory) : undefined;
+  if (input.pricingCategory && input.pricingCategory !== "Standard" && !category) throw new UserError(`${plan.name} has no ${input.pricingCategory} price.`, "pricingCategory");
+  const price = category?.price ?? plan.price;
   const tax = await getTax(u.orgId);
   const taxRate = tax.enabled && plan.gstApplicable ? tax.rate : 0;
   const { isNew } = await suggestedStart(memberId);
-  if (input.discount > plan.price) throw new UserError("The discount is more than the plan price.", "discount");
+  if (input.discount > price) throw new UserError("The discount is more than the plan price.", "discount");
   // An offer code adds its discount on the plan price (Plans & offers); the total never goes below zero.
   const offer = input.offerCode ? await usableOffer(u.orgId, input.offerCode) : null;
-  const discount = Math.min(plan.price, input.discount + (offer ? offerDiscount(offer, plan.price) : 0));
+  const discount = Math.min(price, input.discount + (offer ? offerDiscount(offer, price) : 0));
 
   const lines: Line[] = [
-    { description: `${plan.name} membership (${plan.months} ${plan.months === 1 ? "month" : "months"})`, category: isNew ? "New Membership" : "Renewal", qty: 1, rate: plan.price, discount, taxRate, planId: plan.id },
+    { description: `${plan.name} membership (${plan.months} ${plan.months === 1 ? "month" : "months"})`, category: isNew ? "New Membership" : "Renewal", qty: 1, rate: price, discount, taxRate, planId: plan.id },
   ];
   if (input.includeRegFee && plan.regFee > 0) lines.push({ description: "Registration fee", category: "Registration", qty: 1, rate: plan.regFee, discount: 0, taxRate });
   const total = invoiceTotals(lines).total;
@@ -148,9 +152,9 @@ export async function sellMembership(u: CurrentUser, memberId: string, input: Se
         type: opts.type ?? (isNew ? "NEW" : "RENEWAL"),
         startDate: fromIso(input.startDate),
         endDate: fromIso(endDate),
-        price: plan.price,
+        price,
         discount,
-        pricingCategory: "Standard",
+        pricingCategory: category?.category ?? "Standard",
         offerCode: offer?.code ?? null,
         invoiceId: invoice.id,
       },

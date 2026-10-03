@@ -129,7 +129,7 @@ export default async function AssetPage({ params }: PageProps<"/assets/[id]">) {
             )}
           </Card>
           {inUse && (
-            <Card title="Sold or scrapped?">
+            <Card title="Sold or scrapped?" id="dispose">
               <DisposeForm id={a.id} today={todayIso()} minDate={toIso(a.purchaseDate)} />
             </Card>
           )}

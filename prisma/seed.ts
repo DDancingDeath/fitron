@@ -33,7 +33,9 @@ async function main() {
   if (existing) {
     const added = await seedFrontDesk(existing.id);
     const assets = await seedAssets(existing.id);
-    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}.`);
+    const mandates = await seedAutopay(existing.id);
+    const running = await seedRunningCosts(existing.id);
+    console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}${mandates ? ", autopay mandates added" : ""}${running ? ", a year of running costs added" : ""}.`);
     return;
   }
   const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
@@ -202,6 +204,8 @@ async function main() {
   });
   await seedFrontDesk(org.id);
   await seedAssets(org.id);
+  await seedAutopay(org.id);
+  await seedRunningCosts(org.id);
   // The prototype's offer codes, so Plans & offers isn't empty in the demo.
   const offers: [string, string, string, number, number, number | null, number][] = [
     ["DIWALI26", "Festive offer on Quarterly and above", "PERCENT", 15, 39, 100, 0],
@@ -372,7 +376,7 @@ async function seedAssets(orgId: string) {
     const date = addDays(today, -ago);
     const lines = products.map((p) => ({ p, qty: p.sku === "SHAKER" ? 20 : 6, rate: Math.round(p.cost / 1.18 / 100) * 100 }));
     const total = lines.reduce((s, l) => s + Math.round(l.qty * Math.round(l.rate) * 1.18), 0);
-    const paid = Math.round((total * paidShare) / 100) * 100;
+    const paid = paidShare >= 1 ? total : Math.round((total * paidShare) / 100) * 100;
     const method = paid >= total ? "Bank Transfer" : "Credit";
     const pur = await db.purchase.create({ data: { orgId, branchId: main.id, code: `PUR-${await seqNext(orgId, "purchase", 1001)}`, date: d(date), vendor, billNo, total, createdById: owner.id } });
     for (const l of lines) {
@@ -394,3 +398,87 @@ main()
     process.exit(1);
   })
   .finally(() => db.$disconnect());
+
+const UPI_HANDLES = ["okicici", "okhdfcbank", "oksbi", "ybl", "paytm"];
+
+/** Demo UPI autopay mandates on members whose membership is running: mostly active, two paused, one failed. Runs once per demo gym. */
+async function seedAutopay(orgId: string) {
+  if (await db.autopayMandate.count({ where: { orgId } })) return false;
+  const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  const owner = await db.user.findFirstOrThrow({ where: { orgId, role: { name: "Super Admin" } } });
+  const ms = await db.membership.findMany({
+    where: { member: { orgId, walkIn: false, suspended: false, deletedAt: null }, status: "VALID", endDate: { gte: new Date(`${today}T00:00:00Z`) } },
+    orderBy: { endDate: "asc" },
+    include: { member: true, plan: true },
+  });
+  const seen = new Set<string>();
+  const picks = ms.filter((m) => m.plan.months <= 3 && !seen.has(m.memberId) && seen.add(m.memberId)).slice(0, 12);
+  for (const [i, m] of picks.entries()) {
+    const n = await seqNext(orgId, "mandate", 1001);
+    const end = m.endDate.toISOString().slice(0, 10);
+    const next = new Date(`${end}T00:00:00Z`);
+    next.setUTCDate(next.getUTCDate() + 1);
+    const status = i === 0 ? "Failed" : i === 2 || i === 8 ? "Paused" : "Active";
+    const started = new Date(m.startDate);
+    await db.autopayMandate.create({
+      data: {
+        orgId,
+        branchId: m.branchId,
+        memberId: m.memberId,
+        planId: m.planId,
+        code: `MD-${n}`,
+        amount: Math.round((m.plan.price - m.plan.discount) * 1.18),
+        months: m.plan.months,
+        mode: "demo",
+        vpa: `${m.member.name.split(" ")[0]!.toLowerCase()}@${UPI_HANDLES[i % UPI_HANDLES.length]}`,
+        status,
+        nextDebitOn: next,
+        retries: status === "Failed" ? 1 : 0,
+        lastResult: status === "Failed" ? "Bank did not respond · retry 1 of 3" : `Approved ${started.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`,
+        createdById: owner.id,
+        createdAt: started,
+      },
+    });
+  }
+  return picks.length > 0;
+}
+
+/** Monthly running costs per branch: [category, description, vendor, method, ₹ at City Centre, day of month]. */
+const RUNNING: [string, string, string, string, number, number][] = [
+  ["Rent", "Premises rent", "Landlord", "Bank Transfer", 9000, 5],
+  ["Electricity", "Electricity bill", "JBVNL", "UPI", 2500, 12],
+  ["Internet", "Broadband", "Airtel", "UPI", 1180, 8],
+  ["Trainer Salary", "Trainer salaries", "Payroll", "Bank Transfer", 7000, 1],
+  ["Staff Salary", "Front desk and housekeeping salaries", "Payroll", "Bank Transfer", 4000, 1],
+  ["Cleaning", "Cleaning supplies", "Local store", "Cash", 600, 18],
+  ["Software", "Fitron subscription", "Fitron", "UPI", 1499, 2],
+];
+
+/** A year of rent, salaries and bills so Expenses, P&L and the dashboard have history. Runs once per demo gym. */
+async function seedRunningCosts(orgId: string) {
+  if (await db.expense.count({ where: { orgId, category: { name: "Rent" } } })) return false;
+  // Cash and bank on the day the gym's books start, so the cash book and month-end show real balances.
+  const opening = { cash: 4000000, bank: 150000000, asOf: "2024-04-01" };
+  await db.setting.upsert({ where: { orgId_key: { orgId, key: "opening" } }, create: { orgId, key: "opening", value: opening }, update: {} });
+  const branches = await db.branch.findMany({ where: { orgId }, orderBy: { createdAt: "asc" } });
+  const owner = await db.user.findFirstOrThrow({ where: { orgId, role: { name: "Super Admin" } } });
+  const cats = new Map((await db.expenseCategory.findMany()).map((c) => [c.name, c.id]));
+  const today = new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10);
+  const [y, m] = [Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 1];
+  let rnd = 7;
+  const jitter = () => ((rnd = (rnd * 9301 + 49297) % 233280) / 233280) * 0.3 + 0.85;
+  for (let back = 11; back >= 0; back--) {
+    for (const [bi, b] of branches.entries()) {
+      for (const [cat, desc, vendor, method, rupees, day] of RUNNING) {
+        if (cat === "Software" && bi > 0) continue;
+        const date = new Date(Date.UTC(y, m - back, day));
+        if (date.toISOString().slice(0, 10) > today) continue;
+        const base = bi === 0 ? rupees : Math.round(rupees * 0.6);
+        const amount = (["Electricity", "Cleaning"].includes(cat) ? Math.round(base * jitter()) : base) * 100;
+        const n = await seqNext(orgId, "expense", 1);
+        await db.expense.create({ data: { orgId, branchId: b.id, code: `EXP-${n}`, date, categoryId: cats.get(cat)!, description: desc, vendor, amount, method, createdById: owner.id } });
+      }
+    }
+  }
+  return true;
+}

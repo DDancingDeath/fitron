@@ -8,7 +8,7 @@ import { membershipEndDate } from "@/lib/domain/dates";
 import { formatInr, fmtDate } from "@/lib/format";
 import { METHODS } from "@/lib/validation/billing";
 
-type Plan = { id: string; name: string; months: number; price: number; regFee: number; gstApplicable: boolean };
+type Plan = { id: string; name: string; months: number; price: number; regFee: number; gstApplicable: boolean; prices: { category: string; price: number }[] };
 
 const toPaise = (s: string) => {
   const n = Number(s.replace(/[₹,\s]/g, ""));
@@ -35,15 +35,17 @@ export function SellForm({
   const [planId, setPlanId] = useState(sent?.planId ?? defaultPlanId ?? plans[0]?.id ?? "");
   const [start, setStart] = useState(sent?.startDate ?? defaultStart);
   const [discount, setDiscount] = useState(sent?.discount ?? "");
+  const [category, setCategory] = useState(sent?.pricingCategory ?? "Standard");
   const [regFee, setRegFee] = useState(sent ? sent.includeRegFee === "on" : isNew);
   const [pay, setPay] = useState<string | null>(sent?.payAmount ?? null);
   const e = state?.errors ?? {};
 
   const plan = plans.find((p) => p.id === planId);
   const rate = plan?.gstApplicable ? taxRate : 0;
+  const price = plan?.prices.find((x) => x.category === category)?.price ?? plan?.price ?? 0;
   const lines = plan
     ? [
-        { qty: 1, rate: plan.price, discount: toPaise(discount), taxRate: rate },
+        { qty: 1, rate: price, discount: toPaise(discount), taxRate: rate },
         ...(regFee && plan.regFee > 0 ? [{ qty: 1, rate: plan.regFee, discount: 0, taxRate: rate }] : []),
       ]
     : [];
@@ -56,7 +58,15 @@ export function SellForm({
       <Card title="Plan">
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Plan" error={e.planId}>
-            <Select name="planId" value={planId} onChange={(ev) => setPlanId(ev.target.value)} required>
+            <Select
+              name="planId"
+              value={planId}
+              onChange={(ev) => {
+                setPlanId(ev.target.value);
+                setCategory("Standard");
+              }}
+              required
+            >
               {plans.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name} · {formatInr(p.price)}
@@ -64,6 +74,18 @@ export function SellForm({
               ))}
             </Select>
           </Field>
+          {plan && plan.prices.length > 0 && (
+            <Field label="Pricing" error={e.pricingCategory}>
+              <Select name="pricingCategory" value={category} onChange={(ev) => setCategory(ev.target.value)}>
+                <option value="Standard">Standard · {formatInr(plan.price)}</option>
+                {plan.prices.map((x) => (
+                  <option key={x.category} value={x.category}>
+                    {x.category} · {formatInr(x.price)}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
           <Field label="Starts on" error={e.startDate} hint={plan ? `Ends ${fmtDate(membershipEndDate(start, plan.months))}` : undefined}>
             <Input name="startDate" type="date" value={start} onChange={(ev) => setStart(ev.target.value)} required />
           </Field>
@@ -71,7 +93,7 @@ export function SellForm({
             <Input name="discount" inputMode="decimal" value={discount} onChange={(ev) => setDiscount(ev.target.value)} placeholder="0" />
           </Field>
           <Field label="Offer code" error={e.offerCode} hint="Its discount is added when you save">
-            <Input name="offerCode" defaultValue={(sent?.offerCode as string | undefined) ?? ""} className="uppercase" placeholder="Optional" />
+            <Input name="offerCode" defaultValue={(sent?.offerCode as string | undefined) ?? ""} className="[&:not(:placeholder-shown)]:uppercase" placeholder="Optional" />
           </Field>
           {plan && plan.regFee > 0 && (
             <label className="flex items-center gap-2 self-end pb-2 text-sm">

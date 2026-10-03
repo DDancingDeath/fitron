@@ -4,7 +4,7 @@ export const VARS = ["member_name", "member_id", "plan_name", "start_date", "exp
 export type TemplateVars = Partial<Record<(typeof VARS)[number], string>>;
 
 /** Reminder templates are skipped if the same one went to the member inside the de-dup window (rule 5). */
-export const REMINDER_KEYS = ["due", "exp7", "exp3", "exp1", "expired", "birthday", "autopay"];
+export const REMINDER_KEYS = ["due", "exp7", "exp3", "exp1", "expired", "birthday", "autopay", "winback"];
 
 export const DEFAULT_TEMPLATES: { key: string; name: string; trigger: string; autoSend: boolean; body: string }[] = [
   { key: "welcome", name: "Welcome message", trigger: "New membership sold", autoSend: true, body: "Hi {{member_name}}, welcome to {{gym_name}}!\n\nYour member ID is {{member_id}}.\nPlan: {{plan_name}}\nValid: {{start_date}} to {{expiry_date}}\n\nSee you on the floor." },
@@ -19,6 +19,7 @@ export const DEFAULT_TEMPLATES: { key: string; name: string; trigger: string; au
   { key: "mandate", name: "Autopay approval link", trigger: "Autopay set up", autoSend: true, body: "Hi {{member_name}}, approve UPI autopay for your {{plan_name}} membership (₹{{amount}} each renewal) in any UPI app: {{link}}\n\n{{gym_name}}" },
   { key: "autopay", name: "Autopay debit notice", trigger: "24 h before autopay debit", autoSend: true, body: "Hi {{member_name}}, ₹{{amount}} will be debited tomorrow via UPI autopay for your {{plan_name}} membership.\n\n{{gym_name}}" },
   { key: "class", name: "Class booking confirmation", trigger: "Class booked", autoSend: false, body: "Hi {{member_name}}, you're booked for {{class_name}} on {{class_time}}. Please arrive 5 minutes early.\n\n{{gym_name}}" },
+  { key: "winback", name: "Win-back offer", trigger: "Fitron AI · member at risk", autoSend: false, body: "Hi {{member_name}}, we have missed you at {{gym_name}}! Come back this week and your next session with a trainer is on us." },
   { key: "birthday", name: "Birthday wishes", trigger: "On birthday (daily job)", autoSend: true, body: "Happy birthday, {{member_name}}! Everyone at {{gym_name}} wishes you a strong year ahead." },
   { key: "campaign", name: "Custom message", trigger: "Sent by staff", autoSend: false, body: "Hi {{member_name}}, " },
 ];

@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
-import { daysBetween } from "@/lib/domain/dates";
+import { addDays, daysBetween } from "@/lib/domain/dates";
 import { invoiceState } from "@/lib/domain/billing";
 import { runAutopayDay } from "./autopay";
 import { isUniqueViolation } from "./errors";
@@ -92,6 +92,24 @@ export const JOBS: Job[] = [
       let sent = 0;
       for (const m of await reachable(orgId)) {
         if (m.dob && toIso(m.dob).slice(5) === md && (await sendTemplate({ orgId, memberId: m.id, key: "birthday", auto: true }))) sent++;
+      }
+      return { sent };
+    },
+  },
+  {
+    name: "reminders.winback",
+    label: "Win-back offers to members who stopped coming",
+    async run(orgId, today) {
+      // Active members with no visit in 14 days, at most once a month (prototype's win-back rule; off until switched on).
+      const members = await reachable(orgId);
+      const sums = await summarize(members.map((m) => m.id), today);
+      const active = members.filter((m) => (sums.get(m.id)?.latestEnd ?? "") >= today).map((m) => m.id);
+      const seen = new Set((await db.attendance.findMany({ where: { memberId: { in: active }, date: { gte: fromIso(addDays(today, -14)) } }, select: { memberId: true }, distinct: ["memberId"] })).map((a) => a.memberId));
+      const since = new Date(Date.now() - 30 * 86_400_000);
+      let sent = 0;
+      for (const id of active.filter((x) => !seen.has(x))) {
+        if (await db.whatsAppMessage.findFirst({ where: { memberId: id, templateKey: "winback", sentAt: { gte: since }, status: { not: "Failed" } } })) continue;
+        if (await sendTemplate({ orgId, memberId: id, key: "winback", auto: true, force: true })) sent++;
       }
       return { sent };
     },

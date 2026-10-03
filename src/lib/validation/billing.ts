@@ -19,6 +19,7 @@ export const sellInput = z
     discount: z.preprocess(zeroIfBlank, rupees),
     includeRegFee: z.preprocess((v) => v === "on" || v === true, z.boolean()),
     offerCode: optionalText,
+    pricingCategory: optionalText,
     notes: optionalText,
     ...paymentFields,
   })
