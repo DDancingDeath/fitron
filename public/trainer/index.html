@@ -464,6 +464,7 @@
         <div class="card" style="margin:26px 0;border-color:var(--line);border-left:3px solid var(--gold)"><span class="kick">AI Coach Insight</span><p style="font-size:16px;font-style:italic;margin:8px 0 0;line-height:1.5">{{ reviewInsight }}</p></div>
         <h4 class="disp" style="font-size:18px;margin-bottom:10px">Next week's focus <span class="mut" style="font-size:12px;font-family:var(--ui);font-weight:500">· from your plan</span></h4><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ reviewFocus }}" as="f" hint-placeholder-count="4"><span class="chip">{{ f }}</span></sc-for></div>
         <div style="margin-top:20px"><span class="chip"><i class="ph-duotone ph-trophy"></i>{{ reviewAchievement }}</span></div>
+        <sc-if value="{{ hasPast }}" hint-placeholder-val="{{ false }}"><h4 class="disp" style="font-size:18px;margin:28px 0 6px">Past weeks</h4><div class="card" style="padding-top:4px;padding-bottom:4px"><sc-for list="{{ pastReviews }}" as="r" hint-placeholder-count="3"><div class="row"><span>{{ r.label }}</span><span class="disp" style="font-weight:700">{{ r.workouts }} · {{ r.consistency }}</span></div></sc-for></div></sc-if>
       </div>
       </sc-if>
 
@@ -1170,13 +1171,7 @@ class Component extends DCLogic {
       { date:'2 Jul 2026', name:'Neha Gupta', amount:'₹299', method:'Card', plan:'Monthly', status:'Refunded' },
     ],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
-    notifs: [
-      { icon:'drop', text:"Time to drink water — you're behind today's hydration goal.", time:'Just now' },
-      { icon:'barbell', text:'Your workout starts in 30 minutes. Ready?', time:'6:00 PM' },
-      { icon:'flame', text:"You've completed 4 workouts this week. Keep going!", time:'Today' },
-      { icon:'fork-knife', text:'Lunch time — grilled chicken bowl on your plan.', time:'1:00 PM' },
-      { icon:'moon', text:'Wind-down reminder — aim for 7 hours of sleep tonight.', time:'Yesterday' },
-    ],
+    notifs: [], notifGone: [],
     selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
     schedule: [
       { key:'wake', time:'7:00 AM', label:'Wake-up', short:'Wake-up', icon:'sun-horizon' },
@@ -1232,7 +1227,8 @@ class Component extends DCLogic {
   notify(title, body) { if (this.state.focusMode || this.state.notificationsOn === false) return; try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {} }
   waterGoal() { return parseFloat(String((this.state.ob || {}).water || '')) || 3; }
 
-  nav = (s) => this.setState(st => {
+  nav = (s) => { if (s === 'review' && this.state.me) this._api('reviews').then(r => { if (r.ok) this.setState({ pastReviews: r.data.reviews || [] }); }).catch(() => {}); this._nav(s); };
+  _nav = (s) => this.setState(st => {
     // the paywall gate: an unpaid, trial-less account sees only the subscription screen
     if (st.planLocked && !['subscription', 'settings', 'profile', 'login'].includes(s)) {
       return { screen: 'subscription', subMode: 'plans', moreOpen: false, planMsg: st.me && st.me.trialUsed ? 'Your free trial has ended. Choose a plan to open this section.' : 'Start your free 7-day trial or choose a plan to open this section.' };
@@ -1242,8 +1238,8 @@ class Component extends DCLogic {
   setDevice = (d) => this.setState({ device: d });
   toggleMore = () => this.setState(st => ({ moreOpen: !st.moreOpen }));
   toggleNotif = () => this.setState(st => ({ notifOpen: !st.notifOpen }));
-  removeNotif = (i) => this.setState(st => ({ notifs: st.notifs.filter((_, j) => j !== i) }));
-  clearNotifs = () => this.setState({ notifs: [] });
+  removeNotif = (id) => this.setState(st => ({ notifGone: [...(st.notifGone || []), id] }));
+  clearNotifs = () => this.setState(st => ({ notifGone: st.notifs.map(n => n.id) }));
   // the water ring and the "drink water" habit are the same fact — hitting the goal ticks the habit
   addWater = (l) => this.setState(st => {
     const w = Math.round(Math.min(this.waterGoal(), st.water + l) * 10) / 10;
@@ -1483,6 +1479,23 @@ class Component extends DCLogic {
       return { ok: r.ok, status: r.status, data, error: (data && data.error) || (r.ok ? '' : 'Something went wrong. Try again.') };
     } catch (e) { return { ok: false, status: 0, data: {}, error: 'No connection. Check your internet and try again.' }; }
   }
+  // What needs the member's attention, from the server's own picture of the account and the week.
+  _liveNotifs(st) { return (st.notifs || []).filter(n => !(st.notifGone || []).includes(n.id)); }
+  _notices(d) {
+    const m = d.member || {}, P = d.progress || {}, W = P.week || {}, t = d.today, out = [];
+    const days = (iso) => iso ? Math.ceil((new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso) - Date.now()) / 864e5) : null;
+    const pay = d.payments || [], pending = pay.find(x => x.status === 'SUBMITTED'), rejected = pay[0] && pay[0].status === 'REJECTED' ? pay[0] : null;
+    if (pending) out.push({ id: 'pay-' + pending.id, icon: 'hourglass', text: 'Payment under review — UTR ' + pending.utr + '. Your plan activates once FITRON matches it, usually within a working day.', time: 'Pending' });
+    else if (rejected) out.push({ id: 'rej-' + rejected.id, icon: 'warning', text: "We couldn't confirm your last payment (UTR " + rejected.utr + '). Check the UTR, or pay again.', time: 'Action needed' });
+    const tl = m.access === 'TRIAL' ? days(m.trialEndsAt) : null;
+    if (tl !== null && tl <= 3) out.push({ id: 'trial-' + m.trialEndsAt, icon: 'clock', text: tl <= 0 ? 'Your free trial ends today. Choose a plan to keep your coach.' : 'Your free trial ends in ' + tl + ' day' + (tl === 1 ? '' : 's') + '. Choose a plan to keep your coach.', time: 'Trial' });
+    const pl = m.access === 'ACTIVE' && !m.planCancelled ? days(m.paidUntil) : null;
+    if (pl !== null && pl <= 7) out.push({ id: 'renew-' + m.paidUntil, icon: 'calendar-check', text: 'Your plan ends ' + (pl <= 0 ? 'today' : 'in ' + pl + ' day' + (pl === 1 ? '' : 's')) + '. Pay before then to stay on — nothing is debited automatically.', time: 'Renewal' });
+    if (m.access === 'LOCKED' && m.onboarded) out.push({ id: 'locked', icon: 'lock-key', text: 'Your plan has ended. Pick a plan to open your workouts, meals and coach again.', time: 'Plan' });
+    if (P.streak >= 3) out.push({ id: 'streak-' + P.streak, icon: 'flame', text: P.streak + '-day habit streak. Tick today\'s habits to keep it going.', time: 'Today' });
+    if (W.planned) out.push({ id: 'week-' + W.workouts, icon: 'barbell', text: W.workouts >= W.planned ? 'Every planned session done this week — ' + W.workouts + ' of ' + W.planned + '.' : W.workouts + ' of ' + W.planned + ' planned workouts done this week.' + (t && t.workoutDone ? '' : " Today's session is still open."), time: 'This week' });
+    return out;
+  }
   _fmtDate(iso) { if (!iso) return ''; const d = new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
   _authMsg() {
     try {
@@ -1536,7 +1549,7 @@ class Component extends DCLogic {
     if (!extra && !body.profile && !body.day) return;
     this._savedP = p; this._savedD = d;
     const r = await this._api('state', 'PUT', body);
-    if (r.ok && r.data.member) { this._applyMember(r.data.member); this.setState({ prog: r.data.progress, review: r.data.review, coachUse: r.data.coach }); }
+    if (r.ok && r.data.member) { this._applyMember(r.data.member); this.setState({ prog: r.data.progress, review: r.data.review, coachUse: r.data.coach, notifs: this._notices(r.data) }); }
     else if (!r.ok) { this._savedP = ''; this._savedD = ''; if (r.status === 401) this.setState({ me: null, screen: 'login', linkErr: 'You were signed out. Sign in again to keep saving.' }); }
   }
   applyUser(d) {
@@ -1557,7 +1570,7 @@ class Component extends DCLogic {
       return { ...keep, ob, avatar: p.avatar || st.avatar, groc: p.groc || st.groc, chats: this._ch,
         consent: { ...st.consent, ...(p.consentPrefs || {}) },
         water: t ? t.water : 0, habits: { workout:false, water:false, steps:false, protein:false, meals:false, sleep:false, ...(t ? t.habits : {}) }, workoutLogged: !!(t && t.workoutDone),
-        prog: d.progress, review: d.review, coachUse: d.coach, role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
+        prog: d.progress, review: d.review, coachUse: d.coach, notifs: this._notices(d), role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
         signup: !m.onboarded, screen: !m.onboarded ? 'onboard' : (locked ? 'subscription' : (inApp ? st.screen : 'home')),
         onboardStep: !m.onboarded ? 1 : st.onboardStep,
         subMode: m.access === 'LOCKED' ? 'plans' : 'manage',
@@ -1999,6 +2012,9 @@ class Component extends DCLogic {
         { icon: 'trophy', text: P && P.byFocus && P.byFocus[0] ? 'Most trained: ' + P.byFocus[0].focus : 'Your first logged session is on its way' },
       ],
     });
+    const past = (st.pastReviews || []).filter(r => !R || r.weekStart !== R.weekStart).slice(0, 8);
+    v.pastReviews = past.map(r => ({ label: 'Week of ' + this._fmtDate(r.weekStart), workouts: r.workouts + '/' + r.planned + ' workouts', consistency: r.consistency + '%' }));
+    v.hasPast = past.length > 0;
     if (R) {
       const f = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), ws = new Date(R.weekStart + 'T00:00:00'), we = new Date(ws); we.setDate(we.getDate() + 6);
       Object.assign(v, {
@@ -2339,8 +2355,8 @@ class Component extends DCLogic {
             { label: 'Log out', icon: 'sign-out', note: 'See you again soon', tone: 'tone-out', go: this.logout },
           ],
       fsVidOpen: st.fsVid != null, fsVidId: st.fsVid || '', closeFs: this.closeFs,
-      notifOpen: !!st.notifOpen, toggleNotif: this.toggleNotif, clearNotifs: this.clearNotifs, notifEmpty: st.notifs.length === 0,
-      notifList: st.notifs.map((n, i) => ({ ...n, remove: () => this.removeNotif(i) })),
+      notifOpen: !!st.notifOpen, toggleNotif: this.toggleNotif, clearNotifs: this.clearNotifs, notifEmpty: this._liveNotifs(st).length === 0,
+      notifList: this._liveNotifs(st).map(n => ({ ...n, remove: () => this.removeNotif(n.id) })),
       showHome: s==='home', homeDesk: s==='home' && D, homeMobile: s==='home' && !D,
       showPlanner: s==='planner', showWorkout: s==='workout', showFood: s==='food', showProgress: s==='progress',
       showHabits: s==='habits', showCoach: s==='coach', showReview: s==='review', showSub: s==='subscription',
@@ -2370,7 +2386,7 @@ class Component extends DCLogic {
       pfEditLabel: st.pfEdit ? 'Done' : 'Edit',
       pfToggleEdit: this.pfToggleEdit, pfEditBody: this.pfEditBody,
       pfAch: (() => {
-        const w = 124, k = 36;
+        const P = st.prog || {}, w = P.totalWorkouts || 0, k = P.bestStreak || 0;
         const b = (icon, label, on) => ({ icon, label, cls: on ? 'pf-ab' : 'pf-ab off' });
         return [
           b('sneaker-move', 'First workout', w >= 1),
