@@ -302,6 +302,8 @@ export type Ctx = {
   lockedMonths: Set<string>;
   /** Old ID → member already imported */
   oldIds: Set<string>;
+  /** Settings › Reminders: months assumed when a member row has neither expiry nor duration. */
+  defaultMonths?: number;
 };
 
 export type CheckedRow = { n: number; errors: string[]; warnings: string[]; data: Record<string, unknown>; raw: Record<string, string> };
@@ -338,8 +340,8 @@ export function checkRows(kind: ImportKind, rows: Record<string, string>[], ctx:
         warnings.push("No start date; today assumed");
       }
       if (!end && !months) {
-        months = 1;
-        warnings.push("No expiry or duration; 1 month assumed");
+        months = ctx.defaultMonths ?? 1;
+        warnings.push(`No expiry or duration; ${months} month${months === 1 ? "" : "s"} assumed`);
       }
       if (!end) end = addDays(addMonths(start, months), -1);
       if (end < start) errors.push("Expiry is before the start");

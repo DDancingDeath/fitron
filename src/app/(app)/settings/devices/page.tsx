@@ -189,7 +189,7 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
               </label>
             ))}
             <div className="mt-3 grid grid-cols-2 gap-3">
-              <Field label="Grace days after expiry">
+              <Field label="Grace days after expiry" hint="Also under Settings › Reminders.">
                 <Input name="graceDays" type="number" min={0} max={60} defaultValue={rules.graceDays} />
               </Field>
               <Field label="Dues limit (₹)">

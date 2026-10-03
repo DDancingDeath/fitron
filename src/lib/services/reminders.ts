@@ -6,10 +6,24 @@ import { memberScope, summarize } from "./members";
 import { listReceivables } from "./billing";
 import { sendTemplate } from "./whatsapp";
 import { UserError } from "./errors";
+import { getAccessRules } from "./attendance";
+import { putSetting } from "./settings";
 import { todayIso } from "./time";
+import type { ReminderInput } from "@/lib/validation/settings";
+
+/**
+ * Settings › Reminders. The schedule goes to Setting "reminders"; the grace period is the door rule
+ * in Setting "access" (one value, edited here and under Check-in devices) and is only rewritten when
+ * it changes. Each write is its own audited setting.update.
+ */
+export async function saveReminderSettings(u: CurrentUser, v: ReminderInput) {
+  const { graceDays, ...reminders } = v;
+  await putSetting(u, "reminders", reminders);
+  if (graceDays !== (await getAccessRules(u.orgId)).graceDays) await putSetting(u, "access", { graceDays });
+}
 
 /** The expiry template for how many days are left (the prototype's renewal reminders). */
-export const expiryKey = (daysLeft: number) => (daysLeft <= 0 ? "expired" : daysLeft === 1 ? "exp1" : daysLeft <= 3 ? "exp3" : "exp7");
+export const expiryKey = (daysLeft: number) => (daysLeft <= 0 ? "expired" : daysLeft === 1 ? "exp1" : daysLeft <= 3 ? "exp3" : daysLeft <= 7 ? "exp7" : "exp15");
 
 async function ownMember(u: CurrentUser, memberId: string) {
   const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false }, select: { id: true, name: true } });
@@ -65,7 +79,7 @@ export async function remindRenewals(u: CurrentUser, memberIds: string[]) {
 /** Each member's last renewal reminder (which one, when, and how it went), for the Renewals table. */
 export async function lastRenewalReminders(memberIds: string[]) {
   const msgs = await db.whatsAppMessage.findMany({
-    where: { memberId: { in: memberIds }, templateKey: { in: ["exp7", "exp3", "exp1", "expired"] } },
+    where: { memberId: { in: memberIds }, templateKey: { in: ["exp15", "exp7", "exp3", "exp1", "expired"] } },
     orderBy: { sentAt: "desc" },
     distinct: ["memberId"],
     select: { memberId: true, templateKey: true, sentAt: true, status: true },

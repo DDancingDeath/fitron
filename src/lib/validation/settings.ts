@@ -1,5 +1,6 @@
 import * as z from "zod";
 import { indianPhone } from "./common";
+import { EXPIRY_CHIPS } from "@/lib/domain/reminders";
 
 const blank = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 const opt = (max: number) => z.preprocess(blank, z.string().trim().max(max).optional());
@@ -82,3 +83,18 @@ export const branchInput = z.object({
   phone: indianPhone,
   gstin,
 });
+
+const arr = (v: unknown) => (Array.isArray(v) ? v : v == null ? [] : [v]);
+
+/** Settings › Reminders. Grace days are saved to Setting "access", the rest to "reminders". */
+export const reminderInput = z.object({
+  expiryDays: z
+    .preprocess(arr, z.array(z.coerce.number().int().refine((n) => (EXPIRY_CHIPS as readonly number[]).includes(n), { error: "Pick from the listed days." })))
+    .transform((ds) => [...new Set(ds)].sort((a, b) => b - a)),
+  dedupDays: z.coerce.number().int().min(0).max(30),
+  dueEveryDays: z.coerce.number().int().min(0).max(30),
+  defaultMonths: z.coerce.number().int().min(1, { error: "At least 1 month." }).max(60),
+  graceDays: z.coerce.number().int().min(0).max(60),
+  birthdays: z.preprocess((v) => v === "on", z.boolean()),
+});
+export type ReminderInput = z.infer<typeof reminderInput>;

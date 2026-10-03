@@ -3,6 +3,9 @@ import { db } from "@/lib/db";
 import { hasDb, makeGym, pick } from "@/test/db";
 import { getGymProfile, getSetting, putSetting, saveGymProfile, saveTax } from "./settings";
 import { getTax } from "./tax";
+import { DEFAULT_REMINDERS, getReminderSettings, getWaSettings } from "./whatsapp";
+import { getAccessRules } from "./attendance";
+import { saveReminderSettings } from "./reminders";
 import { nextInvoiceNumber, sellMembership } from "./billing";
 import { createMember } from "./members";
 import { createPlan } from "./plans";
@@ -89,5 +92,40 @@ describe.skipIf(!hasDb)("gym profile and Billing & GST settings (database)", () 
     expect(invoice.number).toBe("INV-1001");
     expect(await nextInvoiceNumber(fresh.org.id)).toBe(1002);
     expect(await nextInvoiceNumber(fresh.org.id)).toBe(1002);
+  });
+
+  it("reads the reminder schedule: defaults, then what the old WhatsApp form saved, then the Reminders row", async () => {
+    const fresh = await makeGym();
+    expect(await getReminderSettings(fresh.org.id)).toEqual(DEFAULT_REMINDERS);
+    await db.setting.create({ data: { orgId: fresh.org.id, key: "whatsapp", value: { mode: "connector", expiryDays: [3], dedupDays: 9 } } });
+    expect(await getReminderSettings(fresh.org.id)).toEqual({ ...DEFAULT_REMINDERS, expiryDays: [3], dedupDays: 9 });
+    expect(await getWaSettings(fresh.org.id)).toMatchObject({ mode: "connector", expiryDays: [3], dedupDays: 9, dueEveryDays: 3 });
+    await db.setting.create({ data: { orgId: fresh.org.id, key: "reminders", value: { expiryDays: [15, 0], dedupDays: 2 } } });
+    expect(await getReminderSettings(fresh.org.id)).toEqual({ ...DEFAULT_REMINDERS, expiryDays: [15, 0], dedupDays: 2 });
+  });
+
+  it("saves the Reminders tab: schedule to one row, grace to the door rules, each one audited", async () => {
+    const fresh = await makeGym();
+    const u = await fresh.user("Super Admin");
+    await putSetting(u, "access", { blockExpired: false, duesLimit: 50000, graceDays: 1 });
+    const remBefore = await auditRows(u.orgId, "reminders");
+    const accBefore = await auditRows(u.orgId, "access");
+
+    await saveReminderSettings(u, { expiryDays: [15, 0], dedupDays: 5, dueEveryDays: 0, defaultMonths: 3, graceDays: 4, birthdays: false });
+    expect(await getWaSettings(u.orgId)).toEqual({ mode: "demo", expiryDays: [15, 0], dedupDays: 5, dueEveryDays: 0, defaultMonths: 3, birthdays: false });
+    expect(await getAccessRules(u.orgId)).toMatchObject({ graceDays: 4, blockExpired: false, duesLimit: 50000, blockSuspended: true });
+    expect(await auditRows(u.orgId, "reminders")).toBe(remBefore + 1);
+    expect(await auditRows(u.orgId, "access")).toBe(accBefore + 1);
+    const rows = await db.auditLog.findMany({ where: { orgId: u.orgId, entity: "Setting", entityId: { in: ["reminders", "access"] } }, orderBy: { id: "desc" }, take: 2 });
+    expect(rows.map((r) => r.action)).toEqual(["setting.update", "setting.update"]);
+    expect(rows.every((r) => r.userId === u.id)).toBe(true);
+    expect(rows.find((r) => r.entityId === "reminders")?.after).toMatchObject({ expiryDays: [15, 0], defaultMonths: 3, birthdays: false });
+    expect(rows.find((r) => r.entityId === "access")?.before).toMatchObject({ graceDays: 1 });
+
+    // Same grace again: only the reminders row is rewritten.
+    await saveReminderSettings(u, { expiryDays: [7], dedupDays: 5, dueEveryDays: 2, defaultMonths: 3, graceDays: 4, birthdays: true });
+    expect(await auditRows(u.orgId, "reminders")).toBe(remBefore + 2);
+    expect(await auditRows(u.orgId, "access")).toBe(accBefore + 1);
+    expect(await getReminderSettings(u.orgId)).toMatchObject({ expiryDays: [7], dueEveryDays: 2, birthdays: true });
   });
 });

@@ -13,6 +13,7 @@ import { fromIso, todayIso } from "./time";
 import { prefixes, writeInvoice, writePayment } from "./billing";
 import { writeAsset } from "./assets";
 import { getTax } from "./tax";
+import { getReminderSettings } from "./whatsapp";
 import { activeMemberCount, assertBranchWritable, gymPlan } from "./saas";
 
 type Tx = Prisma.TransactionClient;
@@ -24,12 +25,13 @@ export const getMigration = async (orgId: string) => (await getSetting<Migration
 export const getOpening = async (orgId: string) => (await getSetting<Opening>(orgId, "opening")) ?? {};
 
 async function context(u: CurrentUser, branchId: string): Promise<Ctx> {
-  const [members, plans, products, cats, locks] = await Promise.all([
+  const [members, plans, products, cats, locks, reminders] = await Promise.all([
     db.member.findMany({ where: { orgId: u.orgId, deletedAt: null, walkIn: false }, select: { id: true, phone: true, oldId: true, name: true, branchId: true } }),
     db.membershipPlan.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true, months: true, price: true } }),
     db.product.findMany({ where: { branchId }, select: { name: true, sku: true } }),
     db.expenseCategory.findMany({ select: { id: true, name: true } }),
     u.can("months.unlock") ? [] : db.monthLock.findMany({ where: { branchId }, select: { month: true } }),
+    getReminderSettings(u.orgId),
   ]);
   // Payments can only be matched to members this user can see.
   const visible = members.filter((m) => u.branchIds.includes(m.branchId));
@@ -47,6 +49,7 @@ async function context(u: CurrentUser, branchId: string): Promise<Ctx> {
     expenseCats: cats,
     lockedMonths: new Set(locks.map((l) => l.month)),
     oldIds: new Set(members.filter((m) => m.oldId).map((m) => m.oldId!)),
+    defaultMonths: reminders.defaultMonths,
   };
 }
 

@@ -4,6 +4,8 @@ import { getMember } from "@/lib/services/members";
 import { listPlans } from "@/lib/services/plans";
 import { suggestedStart } from "@/lib/services/billing";
 import { getTax } from "@/lib/services/tax";
+import { getReminderSettings } from "@/lib/services/whatsapp";
+import { defaultPlanFor } from "@/lib/domain/membership";
 import { Empty, PageHeader } from "@/components/ui";
 import { MemberStatus } from "@/components/status";
 import { fmtDate } from "@/lib/format";
@@ -16,7 +18,7 @@ export default async function SellPage({ params }: PageProps<"/members/[id]/sell
   const { id } = await params;
   const m = await getMember(u, id);
   if (!m) notFound();
-  const [plans, { start, isNew }, tax] = await Promise.all([listPlans(u, { activeOnly: true }), suggestedStart(m.id), getTax(u.orgId)]);
+  const [plans, { start, isNew }, tax, { defaultMonths }] = await Promise.all([listPlans(u, { activeOnly: true }), suggestedStart(m.id), getTax(u.orgId), getReminderSettings(u.orgId)]);
   return (
     <>
       <PageHeader
@@ -30,7 +32,7 @@ export default async function SellPage({ params }: PageProps<"/members/[id]/sell
       {plans.length === 0 ? (
         <Empty>There are no active plans. Create one under Plans &amp; offers first.</Empty>
       ) : (
-        <SellForm memberId={m.id} plans={plans} defaultPlanId={plans.find((p) => p.name === m.planName)?.id} defaultStart={start} isNew={isNew} taxRate={tax.enabled ? tax.rate : 0} />
+        <SellForm memberId={m.id} plans={plans} defaultPlanId={plans.find((p) => p.name === m.planName)?.id ?? defaultPlanFor(plans, defaultMonths)?.id} defaultStart={start} isNew={isNew} taxRate={tax.enabled ? tax.rate : 0} />
       )}
     </>
   );

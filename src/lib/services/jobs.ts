@@ -16,7 +16,7 @@ import { getWaSettings, refreshQueued, sendTemplate } from "./whatsapp";
 type Result = Record<string, number | string>;
 type Job = { name: string; label: string; run: (orgId: string, today: string) => Promise<Result> };
 
-const EXPIRY_KEY: Record<number, string> = { 7: "exp7", 3: "exp3", 1: "exp1", 0: "expired" };
+const EXPIRY_KEY: Record<number, string> = { 15: "exp15", 7: "exp7", 3: "exp3", 1: "exp1", 0: "expired" };
 
 /** Members who can get reminders: not deleted, not suspended, not the walk-in customer. */
 const reachable = (orgId: string) => db.member.findMany({ where: { orgId, deletedAt: null, walkIn: false, suspended: false }, select: { id: true, dob: true } });

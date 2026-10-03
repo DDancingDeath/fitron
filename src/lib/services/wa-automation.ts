@@ -15,7 +15,7 @@ import { getWaSettings, listTemplates, type WaSettings } from "./whatsapp";
  * and what they will skip, worked out the same way the daily job does, without sending anything.
  */
 
-export const EXPIRY_KEYS: Record<string, number> = { exp7: 7, exp3: 3, exp1: 1, expired: 0 };
+export const EXPIRY_KEYS: Record<string, number> = { exp15: 15, exp7: 7, exp3: 3, exp1: 1, expired: 0 };
 const REMINDER_JOBS = ["reminders.expiry", "reminders.dues", "reminders.birthday", "reminders.winback"];
 type Row = { key: string; send: number; skipped: number };
 
@@ -23,11 +23,11 @@ type Row = { key: string; send: number; skipped: number };
 export function ruleText(key: string, trigger: string, s: WaSettings) {
   if (key in EXPIRY_KEYS) {
     const d = EXPIRY_KEYS[key]!;
-    if (!s.expiryDays.includes(d)) return "Off · turn this day on in WhatsApp settings";
+    if (!s.expiryDays.includes(d)) return "Off · turn this day on under Settings › Reminders";
     return `Daily · ${d === 0 ? "on the expiry date" : `${d} day${d === 1 ? "" : "s"} before expiry`} · skips members on UPI autopay`;
   }
-  if (key === "due") return s.dueEveryDays ? `Daily · every ${s.dueEveryDays} days while a balance is overdue` : "Off · turn it on in WhatsApp settings";
-  if (key === "birthday") return s.birthdays ? "Daily · on the member's birthday" : "Off · turn it on in WhatsApp settings";
+  if (key === "due") return s.dueEveryDays ? `Daily · every ${s.dueEveryDays} days while a balance is overdue` : "Off · turn it on under Settings › Reminders";
+  if (key === "birthday") return s.birthdays ? "Daily · on the member's birthday" : "Off · turn it on under Settings › Reminders";
   if (key === "autopay") return "Daily · the day before each UPI autopay debit";
   if (key === "winback") return "Daily · active members who haven't visited for 14 days · once a month";
   if (key === "campaign") return "Sent by staff from New campaign";

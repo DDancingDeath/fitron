@@ -22,7 +22,7 @@ const BUCKETS: [string, string, (d: number) => boolean][] = [
   ["15", "Within 15 days", (d) => d >= 0 && d <= 15],
   ["expired", "Expired · 60 days", (d) => d < 0 && d >= -60],
 ];
-const SHORT: Record<string, string> = { exp7: "7 days", exp3: "3 days", exp1: "1 day", expired: "Expiry message" };
+const SHORT: Record<string, string> = { exp15: "15 days", exp7: "7 days", exp3: "3 days", exp1: "1 day", expired: "Expiry message" };
 
 export default async function RenewalsPage({ searchParams }: PageProps<"/renewals">) {
   const u = await requirePermission("memberships.renew");

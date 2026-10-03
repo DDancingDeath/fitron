@@ -36,6 +36,7 @@ export const ACCOUNTING_TABS: Tab[] = [
 export const SETTINGS_TABS: Tab[] = [
   { href: "/settings", label: "Gym profile" },
   { href: "/settings?tab=billing", label: "Billing & GST" },
+  { href: "/settings?tab=reminders", label: "Reminders" },
   { href: "/settings?tab=wa", label: "WhatsApp" },
   { href: "/settings?tab=int", label: "Integrations & AI" },
   { href: "/settings/import", label: "Migrate & import", perm: "import.run" },

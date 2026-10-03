@@ -3,13 +3,17 @@ import { db } from "@/lib/db";
 import { getGymProfile, getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
 import { nextInvoiceNumber } from "@/lib/services/billing";
-import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui";
+import { Button, Field, Input, LinkButton, Notice, Select, Textarea } from "@/components/ui";
 import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveWhatsApp } from "./actions";
-import { getWaSettings } from "@/lib/services/whatsapp";
+import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp } from "./actions";
+import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
+import { getAccessRules } from "@/lib/services/attendance";
+import { JOBS, recentRuns } from "@/lib/services/jobs";
+import { todayIso } from "@/lib/services/time";
+import { EXPIRY_CHIPS, expiryChipLabel, scheduledJobRows } from "@/lib/domain/reminders";
 import { getAutopayMode } from "@/lib/services/autopay";
 import { providerStatus } from "@/lib/integrations/whatsapp";
 import { razorpayReady } from "@/lib/integrations/razorpay";
@@ -31,12 +35,13 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             gym: "gym",
             numbering: "gym",
             tax: "billing",
+            reminders: "reminders",
             whatsapp: "wa",
             autopay: "int",
             branches: "branches",
           } as Record<string, string>
         )[section ?? ""];
-  const tab = ["gym", "billing", "wa", "int", "branches"].includes(asked ?? "") ? asked! : "gym";
+  const tab = ["gym", "billing", "reminders", "wa", "int", "branches"].includes(asked ?? "") ? asked! : "gym";
   const [gym, tax, nextInvoice, numbering, branches, wa, autopayMode] = await Promise.all([
     getGymProfile(u.orgId),
     getTax(u.orgId),
@@ -54,6 +59,22 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     getAutopayMode(u.orgId),
   ]);
   const waStatus = await providerStatus(wa.mode);
+  const reminders =
+    tab === "reminders"
+      ? await (async () => {
+          const [settings, access, templates, runs] = await Promise.all([getReminderSettings(u.orgId), getAccessRules(u.orgId), listTemplates(u.orgId), recentRuns(u.orgId)]);
+          const today = todayIso();
+          return {
+            settings,
+            graceDays: access.graceDays,
+            jobs: scheduledJobRows(settings, {
+              winbackOn: templates.find((t) => t.key === "winback")?.autoSend ?? false,
+              jobs: JOBS.map((j) => ({ name: j.name, label: j.label })),
+              runs: runs.filter((r) => r.day === today).map((r) => ({ name: r.name, startedAt: r.startedAt, result: r.result as Record<string, unknown> | null, error: r.error, finishedAt: r.finishedAt })),
+            }),
+          };
+        })()
+      : null;
   const trainerCode = tab === "gym" ? (await db.organization.findUniqueOrThrow({ where: { id: u.orgId }, select: { trainerCode: true } })).trainerCode : null;
   const rzpMissing = razorpayReady();
 
@@ -158,6 +179,67 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           </Panel>
         </div>
       )}
+      {tab === "reminders" && reminders && (
+        <div className="flex max-w-[720px] flex-col gap-[22px]">
+          {!u.has("whatsapp") && <Notice>Automatic WhatsApp reminders are on the Professional plan. Default membership duration and the grace period apply on every plan.</Notice>}
+          <form action={saveReminders} className="flex flex-col gap-[22px]">
+            <div>
+              <h4 className="mb-2 text-lg">Expiry reminders</h4>
+              <div className="flex flex-wrap gap-2">
+                {EXPIRY_CHIPS.map((d) => (
+                  <label key={d}>
+                    <input type="checkbox" name="expiryDays" value={d} defaultChecked={reminders.settings.expiryDays.includes(d)} className="peer sr-only" />
+                    <span className="inline-block cursor-pointer rounded-md border border-line px-3 py-[7px] text-[13px] peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:ring-2">
+                      {expiryChipLabel(d)}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-x-6 gap-y-[18px] [grid-template-columns:repeat(auto-fill,minmax(220px,1fr))]">
+              <Field label="Don’t repeat a reminder within (days)" hint="The same reminder is never sent to a member twice inside this window.">
+                <Input name="dedupDays" type="number" min={0} max={30} required defaultValue={reminders.settings.dedupDays} />
+              </Field>
+              <Field label="Payment due reminder every (days)" hint="0 = off. Sent while an invoice is overdue.">
+                <Input name="dueEveryDays" type="number" min={0} max={30} required defaultValue={reminders.settings.dueEveryDays} />
+              </Field>
+              <Field label="Default membership duration (months)" hint="Pre-selects the plan of this length when selling, and the length of a new plan.">
+                <Input name="defaultMonths" type="number" min={1} max={60} required defaultValue={reminders.settings.defaultMonths} />
+              </Field>
+              <Field label="Grace period after expiry (days)" hint="Expired members may still check in for this many days. The same number is under Check-in devices › Door access rules.">
+                <Input name="graceDays" type="number" min={0} max={60} required defaultValue={reminders.graceDays} />
+              </Field>
+            </div>
+            <label className="flex items-center gap-2.5 text-[15px]">
+              <input type="checkbox" name="birthdays" defaultChecked={reminders.settings.birthdays} className="size-[18px] accent-accent" />
+              Send birthday wishes automatically
+            </label>
+            <div>
+              <Button variant="primary">Save</Button>
+            </div>
+            <p className="text-xs text-muted">
+              Changes are recorded in the audit log. Reminders go out from the daily jobs each morning using the WhatsApp templates (
+              <Link href="/whatsapp/templates" className="underline">
+                Edit templates
+              </Link>
+              ).
+            </p>
+          </form>
+          <div>
+            <h4 className="mb-2 text-lg">Scheduled jobs</h4>
+            {reminders.jobs.map((j, i) => (
+              <div key={i} className="flex justify-between gap-3 border-b border-line py-[7px] text-sm">
+                <span>{j.k}</span>
+                <span className="text-right text-muted">{j.v}</span>
+              </div>
+            ))}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+              <LinkButton href="/settings/jobs">Daily jobs</LinkButton>
+              <span className="text-xs text-muted">Run them now or see past days under Daily jobs.</span>
+            </div>
+          </div>
+        </div>
+      )}
       {tab === "wa" && (
         <div className="max-w-[720px]">
           <Panel title="WhatsApp" id="whatsapp">
@@ -174,25 +256,13 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={waStatus.qr} alt="WhatsApp link QR code" className="size-48 rounded bg-white p-2" />
               )}
-              <fieldset className="flex flex-wrap items-center gap-3">
-                <legend className="mb-1 text-muted">Expiry reminders</legend>
-                {[7, 3, 1, 0].map((d) => (
-                  <label key={d} className="flex items-center gap-1.5">
-                    <input type="checkbox" name="expiryDays" value={d} defaultChecked={wa.expiryDays.includes(d)} className="size-4" /> {d === 0 ? "On the day" : `${d} day${d > 1 ? "s" : ""} before`}
-                  </label>
-                ))}
-              </fieldset>
-              <label className="flex flex-wrap items-center gap-2">
-                Remind about dues every
-                <Input name="dueEveryDays" type="number" min={0} max={30} defaultValue={wa.dueEveryDays} className="w-20!" aria-label="Dues reminder interval" /> days (0 = off)
-              </label>
-              <label className="flex flex-wrap items-center gap-2">
-                Don&apos;t repeat a reminder within
-                <Input name="dedupDays" type="number" min={0} max={30} defaultValue={wa.dedupDays} className="w-20!" aria-label="De-duplication days" /> days
-              </label>
-              <label className="flex items-center gap-2">
-                <input type="checkbox" name="birthdays" defaultChecked={wa.birthdays} className="size-4" /> Send birthday wishes
-              </label>
+              <p className="text-xs text-muted">
+                Reminder days, cadence and birthday wishes are under{" "}
+                <Link href="/settings?tab=reminders" className="underline">
+                  Settings › Reminders
+                </Link>
+                .
+              </p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary">Save</Button>
                 <Link href="/whatsapp/templates" className="inline-flex min-h-10 items-center rounded-md border border-line px-4">

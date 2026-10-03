@@ -21,3 +21,11 @@ export function membershipStatus(input: {
   if (input.outstanding > 0) return "PAYMENT_PENDING";
   return "ACTIVE";
 }
+
+/**
+ * The plan to preselect when selling to a member without one: the first active plan of the gym's
+ * default membership duration (Settings › Reminders). Plans come ordered status, months, price.
+ */
+export function defaultPlanFor<T extends { id: string; months: number }>(plans: T[], defaultMonths: number): T | undefined {
+  return plans.find((p) => p.months === defaultMonths);
+}

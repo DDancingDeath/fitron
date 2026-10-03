@@ -5,6 +5,7 @@ import type { CurrentUser } from "@/lib/auth/current";
 import { systemUser } from "@/lib/auth/system";
 import type { Prisma } from "@/generated/prisma/client";
 import { DEFAULT_TEMPLATES, placeholders, REMINDER_KEYS, render, rupeesText, waNumber, type TemplateVars } from "@/lib/domain/whatsapp";
+import { DEFAULT_REMINDERS, type ReminderSettings } from "@/lib/domain/reminders";
 import { connectorResults, sendWhatsApp, type WaMode } from "@/lib/integrations/whatsapp";
 import { fmtDate } from "@/lib/format";
 import { audit } from "./audit";
@@ -16,18 +17,23 @@ import { getSetting } from "./settings";
 import { getTax } from "./tax";
 import { todayIso } from "./time";
 
-export type WaSettings = {
-  mode: WaMode;
-  /** Rule 5: don't repeat a reminder template to a member within this many days. */
-  dedupDays: number;
-  /** Days before expiry that get a reminder (0 = on the day). */
-  expiryDays: number[];
-  /** Send a dues reminder every N days while a balance is open. 0 = off. */
-  dueEveryDays: number;
-  birthdays: boolean;
-};
-export const DEFAULT_WA: WaSettings = { mode: "demo", dedupDays: 3, expiryDays: [7, 3, 1, 0], dueEveryDays: 3, birthdays: true };
-export const getWaSettings = async (orgId: string): Promise<WaSettings> => ({ ...DEFAULT_WA, ...((await getSetting<Partial<WaSettings>>(orgId, "whatsapp")) ?? {}) });
+export type { ReminderSettings };
+export { DEFAULT_REMINDERS };
+
+/** The reminder schedule (Settings › Reminders). Values a gym saved on the old WhatsApp form still count until the new row exists. */
+export async function getReminderSettings(orgId: string): Promise<ReminderSettings> {
+  const [legacy, row] = await Promise.all([getSetting<Partial<ReminderSettings>>(orgId, "whatsapp"), getSetting<Partial<ReminderSettings>>(orgId, "reminders")]);
+  const inherited: Partial<ReminderSettings> = {};
+  for (const k of ["expiryDays", "dedupDays", "dueEveryDays", "birthdays"] as const) if (legacy?.[k] !== undefined) Object.assign(inherited, { [k]: legacy[k] });
+  return { ...DEFAULT_REMINDERS, ...inherited, ...(row ?? {}) };
+}
+
+export type WaSettings = { mode: WaMode } & ReminderSettings;
+export const DEFAULT_WA: WaSettings = { mode: "demo", ...DEFAULT_REMINDERS };
+export const getWaSettings = async (orgId: string): Promise<WaSettings> => ({
+  mode: (await getSetting<{ mode?: WaMode }>(orgId, "whatsapp"))?.mode ?? "demo",
+  ...(await getReminderSettings(orgId)),
+});
 
 /** The gym's templates, creating the defaults the first time. */
 export async function listTemplates(orgId: string) {

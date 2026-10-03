@@ -90,6 +90,17 @@ describe("row checks", () => {
     expect(rows[3]!.n).toBe(5);
   });
 
+  it("members with neither expiry nor duration get the gym's default membership duration", () => {
+    const row = { name: "Ravi", phone: "9123456781", start: "01-07-2026" };
+    const three = checkRows("members", [row], ctx({ defaultMonths: 3 }))[0]!;
+    expect(three.warnings).toContain("No expiry or duration; 3 months assumed");
+    expect(three.data).toMatchObject({ months: 3, start: "2026-07-01", end: "2026-09-30", planName: "Quarterly" });
+    const one = checkRows("members", [row], ctx({ defaultMonths: 1 }))[0]!;
+    expect(one.warnings).toContain("No expiry or duration; 1 month assumed");
+    expect(one.data).toMatchObject({ months: 1, end: "2026-07-31" });
+    expect(checkRows("members", [row], ctx())[0]!.warnings).toContain("No expiry or duration; 1 month assumed");
+  });
+
   it("payments match a member by phone, old ID or a unique name; locked months are refused", () => {
     const rows = checkRows(
       "payments",

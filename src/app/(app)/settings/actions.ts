@@ -6,10 +6,11 @@ import * as z from "zod";
 import { requirePermission } from "@/lib/auth/current";
 import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } from "@/lib/services/settings";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
-import { branchInput, gymInput, numberingInput, taxInput } from "@/lib/validation/settings";
+import { branchInput, gymInput, numberingInput, reminderInput, taxInput } from "@/lib/validation/settings";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
 import { ensureTrainerCode } from "@/lib/services/trainer-gym";
+import { saveReminderSettings } from "@/lib/services/reminders";
 import { simpleAction } from "@/lib/form-action";
 import type { FormState } from "@/lib/validation/common";
 
@@ -83,22 +84,25 @@ export async function saveAccess(fd: FormData) {
   });
 }
 
-const waInput = z.object({
-  mode: z.enum(["demo", "cloud", "connector"]),
-  dedupDays: z.coerce.number().int().min(0).max(30),
-  expiryDays: z.preprocess((v) => (Array.isArray(v) ? v : v == null ? [] : [v]), z.array(z.coerce.number().int().refine((n) => [0, 1, 3, 7].includes(n)))),
-  dueEveryDays: z.coerce.number().int().min(0).max(30),
-  birthdays: z.preprocess((v) => v === "on", z.boolean()),
-});
+const waInput = z.object({ mode: z.enum(["demo", "cloud", "connector"]) });
 
+/** Settings › WhatsApp: only how messages go out. The reminder schedule is saved from the Reminders tab. */
 export async function saveWhatsApp(fd: FormData) {
   const u = await requirePermission("settings.manage");
+  await save(waInput, fd, "whatsapp", async (v) => {
+    await putSetting(u, "whatsapp", v);
+  });
+}
+
+/** Settings › Reminders: every field drives the daily jobs, the sell form and door access for real. */
+export async function saveReminders(fd: FormData) {
+  const u = await requirePermission("settings.manage");
   const raw = { ...Object.fromEntries(fd), expiryDays: fd.getAll("expiryDays") };
-  const parsed = waInput.safeParse(raw);
-  if (!parsed.success) back({ error: firstError(parsed.error), section: "whatsapp" });
-  await putSetting(u, "whatsapp", parsed.data!);
+  const parsed = reminderInput.safeParse(raw);
+  if (!parsed.success) back({ error: firstError(parsed.error), section: "reminders" });
+  await saveReminderSettings(u, parsed.data!);
   revalidatePath("/", "layout");
-  back({ saved: "whatsapp" });
+  back({ saved: "reminders" });
 }
 
 export async function saveAutopay(fd: FormData) {
