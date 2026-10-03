@@ -43,6 +43,8 @@ export async function makeGym() {
       branchIds: branches.map((x) => x.id),
       can: (p: Permission) => perms.has(p),
       planBlocked: false,
+      plan: { key: "professional", name: "Professional", custom: true },
+      has: () => true,
     };
   }
 

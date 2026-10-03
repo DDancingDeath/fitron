@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { canOpen } from "@/lib/nav";
+import { FEATURES, planFor, type Feature } from "@/lib/domain/features";
 import type { ReactNode } from "react";
 import {
   ArrowsClockwiseIcon,
@@ -75,6 +76,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <div className="flex flex-col gap-7">
       {sp.denied && <Notice tone="alert">Your role doesn&apos;t have access to that page.</Notice>}
+      {typeof sp.locked === "string" && sp.locked in FEATURES && (
+        <Notice tone="accent">
+          {FEATURES[sp.locked as Feature].label} is on the {planFor(sp.locked as Feature).name} plan. Ask a Super Admin to upgrade in Settings › Plan &amp; billing.
+        </Notice>
+      )}
       <div className="flex flex-wrap items-end justify-between gap-4 pt-3">
         <div>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-xs tracking-[0.08em] text-muted uppercase">
@@ -115,7 +121,19 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         ))}
       </div>
 
-      {d.branches && <BranchComparison rows={d.branches} fin={d.fin} />}
+      {d.branches && u.has("analytics") && <BranchComparison rows={d.branches} fin={d.fin} />}
+      {d.branches && !u.has("analytics") && (
+        <Notice tone="accent">
+          Branch comparison (consolidated figures, branch by branch) is on the Enterprise plan.{" "}
+          {u.can("settings.manage") ? (
+            <Link href="/settings/billing?upgrade=analytics" className="font-semibold underline">
+              See plans
+            </Link>
+          ) : (
+            "Ask a Super Admin to upgrade."
+          )}
+        </Notice>
+      )}
 
       <div className="rounded-lg border border-line bg-surface px-[22px] py-1.5 shadow-sm">
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,150px),1fr))] gap-x-6">

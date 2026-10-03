@@ -12,7 +12,7 @@ export async function GET(req: Request, ctx: RouteContext<"/reports/[key]/csv">)
   const { key } = await ctx.params;
   const def = REPORTS[key];
   if (!def) return new Response("Not found.", { status: 404 });
-  if (!u.can(def.perm)) return new Response("Not allowed.", { status: 403 });
+  if (!u.can(def.perm) || (def.feature && !u.has(def.feature))) return new Response("Not allowed.", { status: 403 });
   const url = new URL(req.url);
   const today = todayIso();
   const from = url.searchParams.get("from");

@@ -84,7 +84,15 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
         </div>
       )}
 
-      {tab === "perm" && (
+      {tab === "perm" && !u.has("roles") && (
+        <Notice tone="accent">
+          Changing what each role can do is on the Enterprise plan. Your roles keep their standard permissions.{" "}
+          <Link href="/settings/billing?upgrade=roles" className="font-semibold underline">
+            See plans
+          </Link>
+        </Notice>
+      )}
+      {tab === "perm" && u.has("roles") && (
         <section>
           <h3 className="mb-1.5 text-[22px]">Permissions</h3>
           <p className="mb-3.5 text-[13px] text-muted">What each role can do. Change a person&apos;s role from Edit &amp; role.</p>

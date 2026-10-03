@@ -7,6 +7,7 @@ import { fitronUpi, isFitronAdmin } from "@/lib/integrations/upi";
 import { PLANS } from "@/lib/domain/pricing";
 import { branchPrice, GRACE_DAYS, gymPlanCards, type PlanStanding, type Standing } from "@/lib/domain/saas";
 import { PlanCards } from "@/components/plan-cards";
+import { FEATURES, planFor, type Feature } from "@/lib/domain/features";
 import { Badge, Card, Empty, Notice, PageHeader } from "@/components/ui";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, formatInr } from "@/lib/format";
@@ -33,8 +34,10 @@ function PlanBadge({ s, checking }: { s: PlanStanding; checking: boolean }) {
 const STATUS: Record<string, string> = { PAID: "", SUBMITTED: " · being checked", REJECTED: " · not matched" };
 const prices = (f: (c: "MONTHLY" | "YEARLY") => { total: number }) => ({ MONTHLY: f("MONTHLY").total, YEARLY: f("YEARLY").total });
 
-export default async function BillingPage() {
+export default async function BillingPage({ searchParams }: PageProps<"/settings/billing">) {
   const u = await requirePermission("settings.manage");
+  const sp = await searchParams;
+  const upgrade = typeof sp.upgrade === "string" && sp.upgrade in FEATURES ? (sp.upgrade as Feature) : null;
   const [{ branches, freeSlots, terms }, history, plan, members] = await Promise.all([branchStandings(u.orgId), billingHistory(u), gymPlan(u.orgId), activeMemberCount(db, u.orgId)]);
   const upi = fitronUpi();
   const demo = !upi && !fitronKeyId();
@@ -51,6 +54,11 @@ export default async function BillingPage() {
       <PageHeader title="Plan & billing" subtitle="Your FITRON Gym Accounting plan, extra branches and payments to FITRON. Prices are plus 18% GST." />
       <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/billing" />
       <div className="mb-4 flex flex-col gap-2">
+        {upgrade && (
+          <Notice tone="accent">
+            <strong>{FEATURES[upgrade].label}</strong> is on the <strong>{planFor(upgrade).name}</strong> plan ({FEATURES[upgrade].card}). Your gym is on {plan.name}. Pick {planFor(upgrade).name} below; it opens as soon as the payment is confirmed.
+          </Notice>
+        )}
         {demo && <Notice>Demo mode: FITRON&apos;s UPI ID isn&apos;t set on this server, so payments are simulated and no money is charged.</Notice>}
         {upi && <Notice tone="neutral">You pay by UPI to {upi.name} ({upi.id}) and enter the UTR. We check it and email you, usually within a working day; your gym keeps working meanwhile.</Notice>}
         {admin && (

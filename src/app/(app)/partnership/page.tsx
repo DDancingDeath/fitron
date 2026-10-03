@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requirePermission } from "@/lib/auth/current";
+import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { ensureTrainerCode, partnership } from "@/lib/services/trainer-gym";
 import { todayIso } from "@/lib/services/time";
 import { findPlan, PARTNER_SHARE, rupeesLabel } from "@/lib/domain/pricing";
@@ -13,7 +13,8 @@ const ACCESS: Record<string, [string, Tone]> = { ACTIVE: ["Paid", "ok"], TRIAL: 
 
 /** Members of this gym who use the AI Trainer, and the gym's share of what they pay FITRON. */
 export default async function PartnershipPage({ searchParams }: PageProps<"/partnership">) {
-  const u = await requirePermission("accounting.view");
+  await requirePermission("accounting.view");
+  const u = await requireFeature("partnership");
   const sp = await searchParams;
   const today = todayIso();
   const thisMonth = today.slice(0, 7);

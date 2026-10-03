@@ -2,6 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import type { Permission } from "@/lib/auth/permissions";
+import type { Feature } from "@/lib/domain/features";
 import { daysBetween } from "@/lib/domain/dates";
 import { listMembers } from "./members";
 import { listReceivables } from "./billing";
@@ -15,7 +16,7 @@ export type Cell = string | number | null;
 export type Column = { key: string; label: string; money?: boolean };
 export type Report = { columns: Column[]; rows: Record<string, Cell>[]; totals?: Record<string, Cell> };
 
-type Def = { title: string; group: string; perm: Permission; usesPeriod: boolean; run: (u: CurrentUser, p: Period) => Promise<Report> };
+type Def = { title: string; group: string; perm: Permission; feature?: Feature; usesPeriod: boolean; run: (u: CurrentUser, p: Period) => Promise<Report> };
 
 const inPeriod = (p: Period) => ({ gte: fromIso(p.from), lte: fromIso(p.to) });
 const sumCol = (rows: Record<string, Cell>[], k: string) => rows.reduce((s, r) => s + (Number(r[k]) || 0), 0);
@@ -172,6 +173,7 @@ export const REPORTS: Record<string, Def> = {
     },
   },
   leads: {
+    feature: "leads",
     title: "All leads",
     group: "Members",
     perm: "leads.manage",
@@ -193,6 +195,7 @@ export const REPORTS: Record<string, Def> = {
   assets: {
     title: "Fixed asset register",
     group: "Fixed assets",
+    feature: "accounting",
     perm: "assets.manage",
     usesPeriod: false,
     async run(u) {
@@ -212,6 +215,7 @@ export const REPORTS: Record<string, Def> = {
   "dep-fy": {
     title: "Depreciation this financial year",
     group: "Fixed assets",
+    feature: "accounting",
     perm: "assets.manage",
     usesPeriod: false,
     async run(u) {
@@ -235,6 +239,7 @@ export const REPORTS: Record<string, Def> = {
   "dep-month": {
     title: "Monthly depreciation · 12 months",
     group: "Fixed assets",
+    feature: "accounting",
     perm: "assets.manage",
     usesPeriod: false,
     async run(u) {
@@ -251,6 +256,7 @@ export const REPORTS: Record<string, Def> = {
   disposals: {
     title: "Asset disposals",
     group: "Fixed assets",
+    feature: "accounting",
     perm: "assets.manage",
     usesPeriod: true,
     async run(u, p) {
@@ -269,6 +275,7 @@ export const REPORTS: Record<string, Def> = {
   "pur-month": {
     title: "Purchases by month",
     group: "Purchases",
+    feature: "accounting",
     perm: "purchases.manage",
     usesPeriod: true,
     async run(u, p) {
@@ -291,6 +298,7 @@ export const REPORTS: Record<string, Def> = {
   "pur-vendor": {
     title: "Purchases by supplier",
     group: "Purchases",
+    feature: "accounting",
     perm: "purchases.manage",
     usesPeriod: true,
     async run(u, p) {
@@ -314,6 +322,7 @@ export const REPORTS: Record<string, Def> = {
   payables: {
     title: "Supplier dues",
     group: "Purchases",
+    feature: "accounting",
     perm: "purchases.manage",
     usesPeriod: false,
     async run(u) {
@@ -332,7 +341,7 @@ export const REPORTS: Record<string, Def> = {
   },
 };
 
-export const reportList = (u: CurrentUser) => Object.entries(REPORTS).filter(([, d]) => u.can(d.perm)).map(([key, d]) => ({ key, ...d }));
+export const reportList = (u: CurrentUser) => Object.entries(REPORTS).filter(([, d]) => u.can(d.perm) && (!d.feature || u.has(d.feature))).map(([key, d]) => ({ key, ...d }));
 
 export function toCsv(r: Report): string {
   const esc = (v: Cell) => {

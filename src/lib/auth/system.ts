@@ -30,5 +30,7 @@ export async function systemUser(orgId: string, actAs?: string): Promise<Current
     can: (p: Permission) => perms.has(p),
     // Automatic jobs (renewals, webhooks) keep running; the plan only gates people.
     planBlocked: false,
+    plan: { key: org.plan, name: org.plan, custom: true },
+    has: () => true,
   };
 }
