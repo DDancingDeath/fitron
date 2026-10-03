@@ -60,6 +60,13 @@ if [ ! -f .env ]; then
   set_env CRON_SECRET "$(rand 32)"
   set_env AUTH_SECRET "$(rand 32)"
   set_env BIOMETRIC_KEY "$(rand 32)"
+  # Web Push (AI Trainer reminders): a P-256 key pair, as VAPID wants it (base64url, 65-byte public point, 32-byte private scalar).
+  b64url() { base64 -w0 | tr '+/' '-_' | tr -d '='; }
+  openssl ecparam -name prime256v1 -genkey -noout -out vapid.pem
+  set_env VAPID_PUBLIC_KEY "$(openssl ec -in vapid.pem -pubout -outform DER 2>/dev/null | tail -c 65 | b64url)"
+  set_env VAPID_PRIVATE_KEY "$(openssl ec -in vapid.pem -outform DER 2>/dev/null | tail -c +8 | head -c 32 | b64url)"
+  rm -f vapid.pem
+  set_env VAPID_SUBJECT "mailto:hello@fitron.in"
   set_env WHATSAPP_VERIFY_TOKEN "$(rand 16)"
   set_env AI_MODEL "claude-sonnet-5"
   set_env FITRON_LEGAL_NAME "Fitron Technologies"

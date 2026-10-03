@@ -6,6 +6,7 @@ import { trainerPaymentsToCheck } from "@/lib/services/trainer-admin";
 import { Badge, Card, Empty, PageHeader } from "@/components/ui";
 import { fmtStamp, formatInr } from "@/lib/format";
 import { ReviewForm } from "./review-form";
+import { AdminTabs } from "./tabs";
 
 export const metadata = { title: "Payment checks · FITRON" };
 
@@ -18,6 +19,7 @@ export default async function FitronAdminPage() {
   return (
     <>
       <PageHeader title="UPI payments to check" subtitle="Find each UTR in your bank or UPI app for the same amount. Confirm only when the money is in." />
+      <AdminTabs current="/fitron-admin" />
       <div className="flex flex-col gap-4">
         <Card title={`Gyms waiting · ${waiting.length}`}>
           {waiting.length === 0 ? (

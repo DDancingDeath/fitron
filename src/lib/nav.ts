@@ -19,6 +19,7 @@ export type NavIcon =
   | "ai"
   | "whatsapp"
   | "programs"
+  | "partnership"
   | "notifications"
   | "plans"
   | "biometric"
@@ -76,6 +77,7 @@ export const NAV: NavGroup[] = [
       { href: "/ai", label: "Fitron AI", icon: "ai", perm: "ai.use", count: "ai" },
       { href: "/whatsapp", label: "WhatsApp", icon: "whatsapp", perm: "whatsapp.send" },
       { href: "/programs", label: "Workouts & diet", icon: "programs", perm: "programs.manage" },
+      { href: "/partnership", label: "Gym Partnership", icon: "partnership", perm: "accounting.view" },
       { href: "/notifications", label: "Notifications", icon: "notifications", count: "notifications" },
     ],
   },

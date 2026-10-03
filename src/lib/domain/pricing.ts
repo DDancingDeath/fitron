@@ -20,6 +20,8 @@ export type PlanDef = {
 };
 
 export const TRIAL_DAYS = 7;
+/** Gym Partnership: the gym's share of what its linked members pay FITRON for the AI Trainer (of the price before GST). */
+export const PARTNER_SHARE = 0.7;
 
 export const PLANS = [
   { key: "ai-pro", product: "AI_TRAINER", name: "AI Pro", tagline: "Structured workouts and personalised fitness guidance.", price: { MONTHLY: 29_900, YEARLY: 1_99_900 }, trialDays: TRIAL_DAYS },

@@ -8,7 +8,7 @@ One product for India's fitness market, live at **fitron.in**, in three parts th
 
 They work together: a gym on FITRON gives its members the AI Trainer under its own brand, sees their training next to their dues, and earns 70% of members' AI Trainer subscriptions through the Gym Partnership.
 
-The AI Trainer's design is the browser demo in `prototype/ai-trainer/` (serve the folder and open `index.html`); it is being built into the app at `/trainer`.
+The AI Trainer's design is the browser demo in `prototype/ai-trainer/` (serve the folder and open `index.html`). The app serves it, wired to the real backend, at `/trainer` from `public/trainer/`; the demo's unreachable admin console, landing page and preview controls are not in that copy.
 
 ## What's here
 
@@ -56,5 +56,10 @@ This creates the gym, its first branch, the default roles and the Super Admin ac
 - Staff: add, edit, reset password, deactivate (signs them out).
 - My profile (avatar menu, top right): edit your name and mobile, upload a photo, change your password (signs out your other devices), see your recent activity.
 - Every change is written to the audit log.
+- Exercise form videos: the FITRON team pastes one YouTube (or .mp4) link per exercise on `/fitron-admin/trainer/content`; the AI Trainer plays it on the exercise card and in full screen instead of the demo's placeholder.
+- FITRON team console for the AI Trainer (`/fitron-admin/trainer`, FITRON_ADMIN_EMAILS): members by state with search and CSV, every payment with its UTR and decision, and each partner gym's monthly payout.
+- AI Trainer push reminders: with VAPID keys set, members who enable notifications get workout, water, meal and sleep nudges on their phone even with the app closed, plus trial-ending, renewal-due and rejected-payment notices; `deploy/scheduler.sh` calls `/api/jobs/trainer` hourly.
+- AI Trainer set logging: each exercise card logs weight × reps for today; sets are kept per day, and Progress shows each lift from its first session to its best.
+- Gym Partnership: Settings makes the gym's trainer code; members type it into the AI Trainer (or open `/trainer?gym=CODE`) to link. Their record at the gym is matched by email or phone, their training shows on their member profile, and the Gym Partnership page lists linked members and the gym's 70% share of each month's AI Trainer payments.
 
 Money is stored as integer paise. Invoice and membership status are computed, never stored.

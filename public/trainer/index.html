@@ -30,56 +30,9 @@
 
 <div class="appwrap {{ themeClass }}" style="min-height:100vh;background:radial-gradient(120% 80% at 80% -10%,rgba(217,180,90,.10),transparent 60%),var(--bg);display:flex;flex-direction:column;align-items:center;gap:16px;padding:64px 18px 46px">
 
-  <div class="devpill" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:3px;padding:4px;border-radius:999px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.5)">
-    <button class="btn" style="{{ deskPillStyle }}" onClick="{{ setDeviceDesktop }}"><i class="ph-duotone ph-desktop"></i>Desktop</button>
-    <button class="btn" style="{{ mobPillStyle }}" onClick="{{ setDeviceMobile }}"><i class="ph-duotone ph-device-mobile"></i>Phone</button>
-  </div>
-
   <div class="{{ frameCls }}" style="{{ frameStyle }}">
 
-    <!-- ================= LANDING ================= -->
-    <sc-if value="{{ showLanding }}" hint-placeholder-val="{{ false }}">
-    <div class="lp scr {{ lpMode }}">
-      <div class="lp-wrap">
-
-        <div class="lp-copy">
-          <img class="lp-brand" src="assets/brand/fitron-logo-clean.png" alt="Fitron, AI gym and health trainer">
-          <span class="lp-pill">Coming soon · Our new product</span>
-          <h1 class="lp-h1">Your AI<em>Personal</em>Trainer</h1>
-          <p class="lp-sub">Personalized fitness coaching without the personal-trainer price.</p>
-          <ul class="lp-feats">
-            <li><i class="ph-duotone ph-barbell"></i>Custom workout plans</li>
-            <li><i class="ph-duotone ph-bowl-food"></i>Personalized meal plans</li>
-            <li><i class="ph-duotone ph-calendar-check"></i>Daily planning &amp; reminders</li>
-            <li><i class="ph-duotone ph-chart-line-up"></i>Progress tracking</li>
-            <li><i class="ph-duotone ph-chat-circle-dots"></i>24/7 AI coach support</li>
-          </ul>
-          <div class="lp-prices">
-            <div class="lp-price"><b>₹299</b><span>per month</span><small>AI Pro</small></div>
-            <div class="lp-price lp-best"><em>Best value</em><s>₹3,588</s><b>₹1,999</b><span>per year</span><small>Save 44%</small></div>
-          </div>
-          <button class="lp-cta" onClick="{{ goLogin }}">Coming soon</button>
-          <p class="lp-trust"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;No long-term lock-in &nbsp;·&nbsp; Secure payments &nbsp;·&nbsp; Cancel anytime</p>
-        </div>
-
-        <div class="lp-visual">
-          <img src="assets/landing-visual.jpg" alt="The Fitron app on a laptop and a phone, with an athlete training behind them">
-        </div>
-
-      </div>
-
-      <div class="lp-band">
-        <div class="lp-b"><i class="ph-duotone ph-target"></i><span>Personalized<br>for you</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-barbell"></i><span>Expert-backed<br>programs</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-currency-inr"></i><span>Affordable<br>fitness</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-device-mobile"></i><span>Anytime,<br>anywhere</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-chart-line-up"></i><span>Real<br>results</span></div>
-      </div>
-      <div class="lp-tag">A stronger, healthier you — powered by AI</div>
-    </div>
-    </sc-if>
-
-    <!-- ================= ADMIN LOGIN ================= -->
+    <!-- ================= LOGIN ================= -->
     <sc-if value="{{ showLogin }}" hint-placeholder-val="{{ true }}">
     <div class="scr" style="width:100%;height:100%;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:36px 20px 28px;background:radial-gradient(90% 55% at 50% 0%,rgba(212,170,80,.18),transparent 70%),#0B0A08;color:#F4EFE3">
       <div style="width:100%;max-width:400px;display:flex;flex-direction:column;flex:1">
@@ -89,9 +42,7 @@
           <p style="text-align:center;font-size:14px;line-height:1.5;margin:0 0 24px;color:#B9B09C;text-wrap:pretty">{{ loginSub }}</p>
           <div style="display:flex;flex-direction:column;gap:12px">
             <button onClick="{{ googleLogin }}" style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:0 18px;border-radius:12px;border:1px solid #747775;background:#FFFFFF;color:#1F1F1F;font-family:Roboto,Arial,sans-serif;font-weight:500;font-size:15px;cursor:pointer"><svg width="20" height="20" viewBox="0 0 48 48" style="flex:none"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 34.9 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.2 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>Continue with Google</button>
-            <button onClick="{{ truecallerLogin }}" style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:0 18px;border-radius:12px;border:0;background:#0087FF;color:#FFFFFF;font-weight:700;font-size:15px;cursor:pointer"><span style="width:24px;height:24px;border-radius:7px;background:#FFFFFF;display:inline-grid;place-items:center;flex:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0087FF"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"></path></svg></span>Continue with Truecaller</button>
           </div>
-          <p style="font-size:12px;text-align:center;margin:10px 0 0;color:#8F8775">Truecaller sign-in works on Android phones only.</p>
           <button onClick="{{ goEmailSignin }}" style="display:block;margin:12px auto 0;padding:6px 10px;border:0;background:transparent;color:#E0B85C;font-weight:700;font-size:13px;cursor:pointer"><i class="ph-duotone ph-envelope-simple"></i>&nbsp;Sign in with an email link</button>
           <sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:10px 0 0;text-align:center">{{ linkErr }}</p></sc-if>
           <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:20px 0 0;padding:16px 0 0;border-top:1px solid rgba(255,255,255,.08)">
@@ -143,7 +94,7 @@
 
       <sc-if value="{{ fsVidOpen }}" hint-placeholder-val="{{ false }}">
       <div style="position:absolute;inset:0;z-index:90;background:rgba(0,0,0,.93);display:flex;align-items:center;justify-content:center;padding:16px" onClick="{{ closeFs }}">
-        <div style="position:relative;height:min(88%,640px);aspect-ratio:9/16;max-width:88%;border-radius:16px;overflow:hidden;background:#000" onClick="{{ stop }}"><image-slot id="{{ fsVidId }}" shape="rect" placeholder="Drop a reel / form clip"></image-slot></div>
+        <div style="position:relative;height:min(88%,640px);aspect-ratio:9/16;max-width:88%;border-radius:16px;overflow:hidden;background:#000" onClick="{{ stop }}"><sc-if value="{{ fsIsYt }}" hint-placeholder-val="{{ false }}"><iframe src="{{ fsSrc }}" title="Form video" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="true"></iframe></sc-if><sc-if value="{{ fsIsFile }}" hint-placeholder-val="{{ false }}"><video src="{{ fsSrc }}" controls="true" autoplay="true" playsinline="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain"></video></sc-if><sc-if value="{{ fsNone }}" hint-placeholder-val="{{ true }}"><image-slot id="{{ fsVidId }}" shape="rect" placeholder="No form video yet"></image-slot></sc-if></div>
         <button onClick="{{ closeFs }}" style="position:absolute;top:14px;right:14px;width:38px;height:38px;border-radius:10px;border:none;background:rgba(30,28,20,.85);color:var(--gold);cursor:pointer;display:grid;place-items:center;z-index:2"><i class="ph-duotone ph-x" style="font-size:19px"></i></button>
       </div>
       </sc-if>
@@ -349,7 +300,7 @@
         <sc-if value="{{ isRest }}" hint-placeholder-val="{{ false }}"><div class="card" style="align-items:center;text-align:center;gap:6px;padding:34px 20px;margin-top:16px"><i class="ph-duotone ph-bed goldc" style="font-size:36px"></i><div class="disp" style="font-size:20px;font-weight:800">Rest &amp; recovery day</div><p class="mut" style="margin:0;font-size:13px">No training scheduled. Light mobility or a walk keeps you on track.</p></div></sc-if>
         <sc-if value="{{ hasExercises }}" hint-placeholder-val="{{ true }}">
         <div style="margin-top:16px;display:flex;flex-direction:column;gap:12px"><sc-for list="{{ exercises }}" as="e" hint-placeholder-count="5">
-          <div class="card" style="border-color:{{ e.cardBorder }}"><div style="display:flex;align-items:baseline;gap:16px"><span class="disp goldc" style="font-size:18px;font-weight:800">{{ e.num }}</span><div style="flex:1"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap"><span class="disp" style="font-size:20px;font-weight:700">{{ e.name }}</span><span style="font-size:13px;font-weight:600;color:{{ e.restColor }}">{{ e.rest }}</span></div><div style="font-size:15px;margin-top:2px">{{ e.scheme }}</div><div class="mut" style="font-size:12px;margin-top:4px"><i class="ph-duotone ph-target goldc"></i>&nbsp;Hits: <span style="color:var(--text);font-weight:600">{{ e.muscles }}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ e.toggle }}"><i class="ph-duotone ph-arrows-clockwise"></i>&nbsp;Alternative</button><button class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ e.vidToggle }}"><i class="ph-duotone ph-play-circle"></i>&nbsp;Form video</button></div><sc-if value="{{ e.open }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><sc-for list="{{ e.alts }}" as="a" hint-placeholder-count="3"><span class="chip-plain" style="cursor:pointer" onClick="{{ a.pick }}">{{ a.label }}</span></sc-for></div></sc-if><sc-if value="{{ e.vidOpen }}" hint-placeholder-val="{{ false }}"><div data-vidbox style="margin-top:10px;position:relative;aspect-ratio:9/16;max-width:210px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#000"><image-slot id="{{ e.vid }}" shape="rect" placeholder="Drop a reel / form clip"></image-slot><button onClick="{{ e.fs }}" style="position:absolute;inset:0;border:none;background:transparent;cursor:pointer;display:grid;place-items:center"><div style="width:56px;height:56px;border-radius:50%;background:rgba(20,18,13,.72);display:grid;place-items:center"><i class="ph-duotone ph-play goldc" style="font-size:26px"></i></div></button><button onClick="{{ e.fs }}" style="position:absolute;bottom:10px;right:10px;width:34px;height:34px;border-radius:9px;border:none;background:rgba(20,18,13,.72);color:var(--gold);cursor:pointer;display:grid;place-items:center"><i class="ph-duotone ph-arrows-out" style="font-size:17px"></i></button></div></sc-if><sc-if value="{{ e.showTimer }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:{{ e.timerColor }};text-transform:uppercase;letter-spacing:.06em">{{ e.activeLabel }}</span><span class="disp" style="font-size:24px;font-weight:800;color:{{ e.timerColor }}">{{ e.activeTime }}</span><button class="btn btn-ghost" style="padding:7px 14px;font-size:12px" onClick="{{ e.skip }}">Skip</button></div></sc-if><sc-if value="{{ e.doneMark }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;font-size:12px;font-weight:700;color:#5ec2a0"><i class="ph-duotone ph-check-circle"></i>&nbsp;Completed</div></sc-if></div></div></div>
+          <div class="card" style="border-color:{{ e.cardBorder }}"><div style="display:flex;align-items:baseline;gap:16px"><span class="disp goldc" style="font-size:18px;font-weight:800">{{ e.num }}</span><div style="flex:1"><div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap"><span class="disp" style="font-size:20px;font-weight:700">{{ e.name }}</span><span style="font-size:13px;font-weight:600;color:{{ e.restColor }}">{{ e.rest }}</span></div><div style="font-size:15px;margin-top:2px">{{ e.scheme }}</div><div class="mut" style="font-size:12px;margin-top:4px"><i class="ph-duotone ph-target goldc"></i>&nbsp;Hits: <span style="color:var(--text);font-weight:600">{{ e.muscles }}</span></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ e.toggle }}"><i class="ph-duotone ph-arrows-clockwise"></i>&nbsp;Alternative</button><button class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ e.vidToggle }}"><i class="ph-duotone ph-play-circle"></i>&nbsp;Form video</button></div><sc-if value="{{ e.open }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><sc-for list="{{ e.alts }}" as="a" hint-placeholder-count="3"><span class="chip-plain" style="cursor:pointer" onClick="{{ a.pick }}">{{ a.label }}</span></sc-for></div></sc-if><sc-if value="{{ e.vidOpen }}" hint-placeholder-val="{{ false }}"><sc-if value="{{ e.hasVideo }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;position:relative;aspect-ratio:9/16;max-width:210px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#000"><sc-if value="{{ e.isYt }}" hint-placeholder-val="{{ true }}"><iframe src="{{ e.videoSrc }}" title="{{ e.name }} form video" style="position:absolute;inset:0;width:100%;height:100%;border:0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen="true"></iframe></sc-if><sc-if value="{{ e.isFile }}" hint-placeholder-val="{{ false }}"><video src="{{ e.videoSrc }}" controls="true" playsinline="true" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"></video></sc-if><sc-if value="{{ e.isLink }}" hint-placeholder-val="{{ false }}"><a href="{{ e.videoSrc }}" target="_blank" rel="noopener" style="position:absolute;inset:0;display:grid;place-items:center;color:var(--gold);font-weight:700;text-decoration:none;padding:16px;text-align:center">Open the form video<br><span class="mut" style="font-size:12px;font-weight:500">opens in your browser</span></a></sc-if></div><sc-if value="{{ e.videoNote }}" hint-placeholder-val="{{ false }}"><p class="mut" style="font-size:12px;margin:6px 0 0">{{ e.videoNote }}</p></sc-if><button class="btn btn-ghost" style="min-height:36px;padding:6px 12px;font-size:12px;margin-top:8px" onClick="{{ e.fs }}"><i class="ph-duotone ph-arrows-out"></i>&nbsp;Full screen</button></sc-if><sc-if value="{{ e.noVideo }}" hint-placeholder-val="{{ true }}"><div data-vidbox style="margin-top:10px;position:relative;aspect-ratio:9/16;max-width:210px;border-radius:16px;overflow:hidden;border:1px solid var(--line);background:#000"><image-slot id="{{ e.vid }}" shape="rect" placeholder="No form video yet"></image-slot><button onClick="{{ e.fs }}" style="position:absolute;inset:0;border:none;background:transparent;cursor:pointer;display:grid;place-items:center"><div style="width:56px;height:56px;border-radius:50%;background:rgba(20,18,13,.72);display:grid;place-items:center"><i class="ph-duotone ph-play goldc" style="font-size:26px"></i></div></button><button onClick="{{ e.fs }}" style="position:absolute;bottom:10px;right:10px;width:34px;height:34px;border-radius:9px;border:none;background:rgba(20,18,13,.72);color:var(--gold);cursor:pointer;display:grid;place-items:center"><i class="ph-duotone ph-arrows-out" style="font-size:17px"></i></button></div></sc-if></sc-if><sc-if value="{{ e.showTimer }}" hint-placeholder-val="{{ false }}"><div style="display:flex;align-items:center;gap:12px;margin-top:12px;flex-wrap:wrap"><span style="font-size:12px;font-weight:700;color:{{ e.timerColor }};text-transform:uppercase;letter-spacing:.06em">{{ e.activeLabel }}</span><span class="disp" style="font-size:24px;font-weight:800;color:{{ e.timerColor }}">{{ e.activeTime }}</span><button class="btn btn-ghost" style="padding:7px 14px;font-size:12px" onClick="{{ e.skip }}">Skip</button></div></sc-if><sc-if value="{{ e.doneMark }}" hint-placeholder-val="{{ false }}"><div style="margin-top:10px;font-size:12px;font-weight:700;color:#5ec2a0"><i class="ph-duotone ph-check-circle"></i>&nbsp;Completed</div></sc-if><sc-if value="{{ e.canLog }}" hint-placeholder-val="{{ false }}"><div style="margin-top:12px;border-top:1px solid var(--line-2);padding-top:10px"><sc-for list="{{ e.logged }}" as="s" hint-placeholder-count="2"><div style="display:flex;align-items:center;gap:10px;font-size:13px;padding:3px 0"><span class="mut" style="width:44px">Set {{ s.n }}</span><span style="font-weight:600">{{ s.text }}</span><i class="ph-duotone ph-x mut" style="font-size:14px;cursor:pointer;margin-left:auto" onClick="{{ s.remove }}"></i></div></sc-for><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px"><input class="fin" style="width:92px;min-height:40px" type="number" inputmode="decimal" step="0.5" min="0" max="500" placeholder="kg" value="{{ e.kg }}" onInput="{{ e.setKg }}"><span class="mut">×</span><input class="fin" style="width:80px;min-height:40px" type="number" inputmode="numeric" min="1" max="100" placeholder="reps" value="{{ e.reps }}" onInput="{{ e.setReps }}"><button class="btn btn-ghost" style="min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ e.addSet }}"><i class="ph-duotone ph-plus-circle"></i>&nbsp;Log set</button></div><sc-if value="{{ e.setErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#e5735c;margin:6px 0 0">{{ e.setErrText }}</p></sc-if></div></sc-if></div></div></div>
         </sc-for></div>
         </sc-if>
       </div>
@@ -388,6 +339,7 @@
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px">
           <div class="card"><span class="kick">Bodyweight trend</span><div class="disp" style="font-size:20px;font-weight:700;margin:4px 0 8px">{{ bwNow }} <span class="mut" style="font-size:13px;font-family:var(--ui)">{{ bwDelta }}</span></div><canvas id="fitron-bw" width="640" height="260" style="width:100%;height:auto;display:block"></canvas><p class="mut" style="font-size:11px;margin:4px 0 0">{{ bwHint }}</p></div>
           <div class="card"><span class="kick">Workout consistency</span><div style="display:flex;align-items:flex-end;gap:16px;height:120px;margin-top:8px"><sc-for list="{{ consWeeks }}" as="w" hint-placeholder-count="4"><div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;height:100%;justify-content:flex-end"><div style="width:100%;height:{{ w.h }};background:var(--gold);border-radius:3px"></div><span class="mut" style="font-size:11px">{{ w.label }}</span></div></sc-for></div></div>
+          <div class="card"><span class="kick">Strength progression</span><sc-for list="{{ liftRows }}" as="l" hint-placeholder-count="3"><div class="row" style="{{ l.style }}"><span>{{ l.ex }}<span class="mut" style="font-size:12px"> · {{ l.sessions }}</span></span><span class="disp" style="font-weight:700">{{ l.text }}</span></div></sc-for><sc-if value="{{ liftEmpty }}" hint-placeholder-val="{{ false }}"><p class="mut" style="font-size:13px;margin:8px 0 0">Log your sets on Workouts (weight × reps) and each lift's progress shows here.</p></sc-if></div>
           <div class="card"><span class="kick">Sessions by focus · 6 weeks</span><sc-for list="{{ focusRows }}" as="f" hint-placeholder-count="3"><div class="row" style="{{ f.style }}"><span>{{ f.focus }}</span><span class="disp" style="font-weight:700">{{ f.count }}</span></div></sc-for><sc-if value="{{ focusEmpty }}" hint-placeholder-val="{{ false }}"><p class="mut" style="font-size:13px;margin:8px 0 0">Log a session on Workouts and it shows here.</p></sc-if></div>
           <div class="card"><span class="kick">Personal records</span><div style="display:flex;flex-direction:column;gap:12px;margin-top:8px"><sc-for list="{{ records }}" as="r" hint-placeholder-count="3"><div style="display:flex;align-items:center;gap:10px"><i class="ph-duotone ph-{{ r.icon }} goldc" style="font-size:22px"></i><span>{{ r.text }}</span></div></sc-for></div></div>
         </div>
@@ -464,6 +416,7 @@
         <div class="card" style="margin:26px 0;border-color:var(--line);border-left:3px solid var(--gold)"><span class="kick">AI Coach Insight</span><p style="font-size:16px;font-style:italic;margin:8px 0 0;line-height:1.5">{{ reviewInsight }}</p></div>
         <h4 class="disp" style="font-size:18px;margin-bottom:10px">Next week's focus <span class="mut" style="font-size:12px;font-family:var(--ui);font-weight:500">· from your plan</span></h4><div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ reviewFocus }}" as="f" hint-placeholder-count="4"><span class="chip">{{ f }}</span></sc-for></div>
         <div style="margin-top:20px"><span class="chip"><i class="ph-duotone ph-trophy"></i>{{ reviewAchievement }}</span></div>
+        <sc-if value="{{ hasPast }}" hint-placeholder-val="{{ false }}"><h4 class="disp" style="font-size:18px;margin:28px 0 6px">Past weeks</h4><div class="card" style="padding-top:4px;padding-bottom:4px"><sc-for list="{{ pastReviews }}" as="r" hint-placeholder-count="3"><div class="row"><span>{{ r.label }}</span><span class="disp" style="font-weight:700">{{ r.workouts }} · {{ r.consistency }}</span></div></sc-for></div></sc-if>
       </div>
       </sc-if>
 
@@ -509,120 +462,6 @@
           </div>
         </div>
         </sc-if>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · OVERVIEW ===== -->
-      <sc-if value="{{ showAdmin }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:1000px">
-        <span class="kick">Admin · Fitron</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Admin overview</h1><p class="mut" style="margin:0">Who paid, who is due, and what needs you today. Members never see this console.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:20px"><sc-for list="{{ kpis }}" as="a" hint-placeholder-count="6"><div class="card"><div class="disp goldc" style="font-size:28px;font-weight:800;line-height:1">{{ a.v }}</div><div class="mut" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px">{{ a.l }}</div></div></sc-for></div>
-        <sc-if value="{{ adminHasMsg }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:13px;margin:14px 0 0"><i class="ph-duotone ph-check-circle"></i>&nbsp;{{ adminMsg }}</p></sc-if>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Renewals due &amp; lapsed</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goMembers }}">All members</a></div>
-            <sc-for list="{{ renewalsDue }}" as="m" hint-placeholder-count="4"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="min-width:150px;flex:1"><div style="font-weight:700">{{ m.name }}</div><div class="mut" style="font-size:12px">{{ m.plan }} · renews {{ m.renews }}</div></div><span style="{{ m.statusStyle }}">{{ m.status }}</span><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ m.remind }}">Remind</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ m.markPaid }}">Mark paid</button></div></div></sc-for>
-          </div>
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Recent payments</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goPayments }}">All transactions</a></div>
-            <sc-for list="{{ recentPayments }}" as="p" hint-placeholder-count="4"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:150px"><div style="font-weight:700">{{ p.name }}</div><div class="mut" style="font-size:12px">{{ p.date }} · {{ p.method }} · {{ p.plan }}</div></div><div style="text-align:right"><div class="disp" style="font-weight:700">{{ p.amount }}</div><div style="font-size:11px;font-weight:700;color:{{ p.statusColor }}">{{ p.status }}</div></div><sc-if value="{{ p.pending }}" hint-placeholder-val="{{ false }}"><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ p.verify }}"><i class="ph-duotone ph-seal-check"></i>&nbsp;Verify &amp; activate</button></sc-if></div></sc-for>
-          </div>
-          <sc-if value="{{ dbBackendOn }}" hint-placeholder-val="{{ false }}">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">UTR verification queue</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ reloadPending }}">Refresh</a></div>
-            <sc-if value="{{ dbPendingEmpty }}" hint-placeholder-val="{{ true }}"><p class="mut" style="font-size:13px;margin:8px 0 0">Nothing waiting — every UTR has been checked.</p></sc-if>
-            <sc-for list="{{ dbPendingRows }}" as="q" hint-placeholder-count="3"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:150px"><div style="font-weight:700">{{ q.name }}</div><div class="mut" style="font-size:12px">{{ q.plan }} · ₹{{ q.amount_inr }} · UTR {{ q.utr }} · {{ q.when }}</div></div><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ q.reject }}">Reject</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ q.verify }}"><i class="ph-duotone ph-seal-check"></i>&nbsp;Verify &amp; activate</button></div></sc-for>
-          </div>
-          </sc-if>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Trainer bookings waiting</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goBookings }}">All bookings</a></div>
-            <sc-for list="{{ bookingRows }}" as="b" hint-placeholder-count="3"><sc-if value="{{ b.pending }}" hint-placeholder-val="{{ true }}"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-weight:700">{{ b.name }} · {{ b.type }}</div><div class="mut" style="font-size:12px">{{ b.trainer }} · {{ b.when }}</div></div><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ b.decline }}">Decline</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ b.confirm }}">Confirm</button></div></div></sc-if></sc-for>
-          </div>
-          <div class="card"><span class="kick">Most requested workout types · 7 days</span><div class="row"><span>Upper body strength</span><span>8,412 &nbsp;<span class="chip">▲ 12%</span></span></div><div class="row"><span>Full-body / bodyweight</span><span>6,905 &nbsp;<span class="chip">▲ 9%</span></span></div><div class="row"><span>Fat loss / HIIT</span><span>5,120 &nbsp;<span class="chip-plain">▲ 2%</span></span></div><div class="row" style="border-bottom:none"><span>Mobility &amp; recovery</span><span>3,338 &nbsp;<span class="chip-plain">▼ 3%</span></span></div></div>
-        </div>
-        <p class="mut" style="font-size:13px;margin-top:16px"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;Members' AI conversations are never shown here. Every change on this console is written to the audit log.</p>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · MEMBERS ===== -->
-      <sc-if value="{{ showMembers }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:1000px">
-        <span class="kick">Members &amp; payments</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Members</h1><p class="mut" style="margin:0 0 16px">Tap a filter. Mark a payment when someone pays at the desk.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ memFilters }}" as="f" hint-placeholder-count="5"><span style="{{ f.style }}" onClick="{{ f.pick }}">{{ f.label }}</span></sc-for></div>
-        <sc-if value="{{ adminHasMsg }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:13px;margin:14px 0 0"><i class="ph-duotone ph-check-circle"></i>&nbsp;{{ adminMsg }}</p></sc-if>
-        <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
-          <sc-for list="{{ memberRows }}" as="m" hint-placeholder-count="9">
-          <div class="card" style="display:flex;flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px">
-            <div style="width:40px;height:40px;border-radius:50%;background:var(--grad);color:#1a1408;display:grid;place-items:center;font-weight:800;flex:none">{{ m.initial }}</div>
-            <div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:15px">{{ m.name }}</div><div class="mut" style="font-size:12px">{{ m.phone }} · {{ m.plan }} · {{ m.amount }}</div></div>
-            <div style="min-width:140px"><div class="mut" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em">Paid on · renews</div><div style="font-size:13px">{{ m.paidOn }} · {{ m.renews }}</div></div>
-            <div style="min-width:110px"><div class="mut" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em">Active · workouts</div><div style="font-size:13px">{{ m.last }} · {{ m.wk }}</div></div>
-            <span style="{{ m.statusStyle }}">{{ m.status }}</span>
-            <div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ m.remind }}">Remind</button><sc-if value="{{ m.canMark }}" hint-placeholder-val="{{ true }}"><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ m.markPaid }}">Mark paid</button></sc-if></div>
-          </div>
-          </sc-for>
-        </div>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · PAYMENTS ===== -->
-      <sc-if value="{{ showPayments }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Transactions</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Payments</h1><p class="mut" style="margin:0 0 16px">Every UPI, card and net-banking payment from the gateway, plus desk payments you mark by hand.</p>
-        <div class="card"><sc-for list="{{ paymentRows }}" as="p" hint-placeholder-count="7"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:160px"><div style="font-weight:700">{{ p.name }}</div><div class="mut" style="font-size:12px">{{ p.date }} · {{ p.method }} · {{ p.plan }}</div></div><div class="disp" style="font-weight:700;font-size:16px">{{ p.amount }}</div><div style="min-width:72px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:{{ p.statusColor }}">{{ p.status }}</div></div></sc-for></div>
-        <p class="mut" style="font-size:12px;margin-top:12px"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;Card numbers are never stored. Only the gateway reference is kept.</p>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · BOOKINGS ===== -->
-      <sc-if value="{{ showBookings }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Human trainer escalation</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Trainer bookings</h1><p class="mut" style="margin:0 0 16px">Requests the AI coach hands over to your trainers. Confirm or decline; the member is notified in-app.</p>
-        <div style="display:flex;flex-direction:column;gap:10px"><sc-for list="{{ bookingRows }}" as="b" hint-placeholder-count="3"><div class="card" style="display:flex;flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px"><div style="flex:1;min-width:180px"><div style="font-weight:700;font-size:15px">{{ b.name }}</div><div class="mut" style="font-size:12px">{{ b.type }} · {{ b.trainer }}</div><div class="mut" style="font-size:12px">{{ b.when }}</div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:{{ b.statusColor }}">{{ b.status }}</div><sc-if value="{{ b.pending }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ b.decline }}">Decline</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ b.confirm }}">Confirm</button></div></sc-if></div></sc-for></div>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · CONTENT ===== -->
-      <sc-if value="{{ showContent }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Content library</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Content &amp; videos</h1><p class="mut" style="margin:0 0 16px">What the AI coach is allowed to recommend. Upload your trainers' form videos here; members see them on every exercise.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
-          <div class="card"><span class="kick">Exercise library</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ videoCoverage }}</div><div class="mut" style="font-size:12px">exercises across Chest, Back, Shoulders, Arms, Legs, Core and Full Body, each tagged with the muscles it hits</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmExercise }}"><i class="ph-duotone ph-plus"></i>&nbsp;Add exercise</button></div>
-          <div class="card"><span class="kick">Form videos</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ reelCount }} <span class="mut" style="font-size:14px;font-family:var(--ui)">of {{ videoCoverage }}</span></div><div class="mut" style="font-size:12px">reels uploaded by your trainers. Missing ones show a placeholder to members.</div><button class="btn btn-gold" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmReel }}"><i class="ph-duotone ph-upload-simple"></i>&nbsp;Upload reel</button></div>
-          <div class="card"><span class="kick">Location-aware meals</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">By city</div><div class="mut" style="font-size:12px">The coach suggests foods by each member's city from onboarding, inside their budget. Block or add items here when members report something is not available.</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmRules }}"><i class="ph-duotone ph-map-pin"></i>&nbsp;Food rules</button></div>
-          <div class="card"><span class="kick">Meal library</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ mealCount }}</div><div class="mut" style="font-size:12px">veg, non-veg, eggetarian and vegan meals built only from catalog items, with cost and macros</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmMeal }}"><i class="ph-duotone ph-fork-knife"></i>&nbsp;Add meal</button></div>
-        </div>
-        <div class="card" style="margin-top:18px"><span class="kick">Recent changes</span>
-          <sc-if value="{{ cmLogEmpty }}" hint-placeholder-val="{{ true }}"><div class="mut" style="font-size:13px;margin-top:8px">Nothing added yet. Changes you make above show up here.</div></sc-if>
-          <div style="display:flex;flex-direction:column;margin-top:6px"><sc-for list="{{ cmLog }}" as="c" hint-placeholder-count="0"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)"><i class="ph-duotone ph-{{ c.icon }} goldc" style="font-size:18px"></i><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">{{ c.title }}</div><div class="mut" style="font-size:12px">{{ c.sub }}</div></div><button class="btn btn-ghost" style="min-height:36px;padding:6px 12px;font-size:12px" onClick="{{ c.remove }}">Remove</button></div></sc-for></div>
-        </div>
-        <sc-if value="{{ cmOpen }}" hint-placeholder-val="{{ false }}">
-        <div style="position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px" onClick="{{ cmClose }}">
-          <div style="width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)" onClick="{{ cmStop }}">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h3 class="disp" style="font-size:21px;margin:0">{{ cmTitle }}</h3><button class="pf-ic" style="min-width:40px;min-height:40px" onClick="{{ cmClose }}" aria-label="Close"><i class="ph-duotone ph-x"></i></button></div>
-            <p class="mut" style="font-size:13px;margin:6px 0 4px">{{ cmHelp }}</p>
-            <sc-if value="{{ cmIsReel }}" hint-placeholder-val="{{ false }}"><label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">Video file</label><input type="file" accept="video/*" onChange="{{ cmFile }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"></sc-if>
-            <label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelA }}</label><input value="{{ cmA }}" onInput="{{ cmSetA }}" placeholder="{{ cmPhA }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px">
-            <label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelB }}</label><select value="{{ cmB }}" onChange="{{ cmSetB }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"><sc-for list="{{ cmOptsB }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
-            <sc-if value="{{ cmHasC }}" hint-placeholder-val="{{ false }}"><label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelC }}</label><input value="{{ cmC }}" onInput="{{ cmSetC }}" placeholder="{{ cmPhC }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"></sc-if>
-            <sc-if value="{{ cmErr }}" hint-placeholder-val="{{ false }}"><p style="color:#e5735c;font-size:12.5px;margin:10px 0 0">{{ cmErr }}</p></sc-if>
-            <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-ghost" style="flex:1;min-height:46px" onClick="{{ cmClose }}">Cancel</button><button class="btn btn-gold" style="flex:1;min-height:46px" onClick="{{ cmSave }}">{{ cmCta }}</button></div>
-          </div>
-        </div>
-        </sc-if>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · SETTINGS ===== -->
-      <sc-if value="{{ showAdminSettings }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:720px">
-        <span class="kick">Console settings</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Settings &amp; audit</h1>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Pricing</h4>
-        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><span class="lab">Monthly plan</span><input class="fin" value="₹299"></div><div><span class="lab">Yearly plan</span><input class="fin" value="₹1,499"></div></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Social links</h4>
-        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><span class="lab">Instagram</span><input class="fin" placeholder="instagram.com/…"></div><div><span class="lab">WhatsApp</span><input class="fin" placeholder="Gym WhatsApp number"></div><div><span class="lab">YouTube</span><input class="fin" placeholder="Channel link"></div><div><span class="lab">Facebook</span><input class="fin" placeholder="Page link"></div></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">AI coach instructions</h4>
-        <div class="card"><span class="lab">Rules the coach follows for every member</span><div class="fin" style="min-height:96px;line-height:1.5;white-space:pre-wrap">Coach Fitron members in short, practical replies. Suggest only foods commonly available in the member's city and keep the week inside their budget. Never give medical advice; hand pain, injury or symptoms to a human trainer.</div><p class="mut" style="font-size:12px;margin:10px 0 0">Every edit here is versioned and audited.</p></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Audit log</h4>
-        <div class="card"><div class="row"><span>Pricing reviewed, no change</span><span class="mut">Today · Admin</span></div><div class="row"><span>Coach instructions updated</span><span class="mut">2 Sep · Admin</span></div><div class="row" style="border-bottom:none"><span>3 form videos uploaded</span><span class="mut">1 Sep · Rahul</span></div></div>
       </div>
       </sc-if>
 
@@ -685,17 +524,16 @@
       </div>
       </sc-if>
 
-      <!-- ===== SIGNUP (Google / Truecaller / Email link) ===== -->
+      <!-- ===== SIGNUP (Google / Email link) ===== -->
       <sc-if value="{{ showSignup }}" hint-placeholder-val="{{ false }}">
       <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px">
         <div style="width:100%;max-width:360px;text-align:center">
           <img src="assets/brand/fitron-mark-new.png" style="width:56px;height:56px;border-radius:17px;object-fit:cover;border:1px solid var(--line)">
           <h1 class="disp" style="font-size:24px;margin:12px 0 4px">{{ signupTitle }}</h1>
-          <p class="mut" style="font-size:13px;margin:0 0 18px">Google, Truecaller on Android, or an email link. No OTP, no password.</p>
+          <p class="mut" style="font-size:13px;margin:0 0 18px">Google, or an email link. No OTP, no password.</p>
           <sc-if value="{{ authHasNote }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:12.5px;margin:-8px 0 14px;line-height:1.5"><i class="ph-duotone ph-info"></i>&nbsp;{{ authNote }}</p></sc-if>
           <div class="card" style="gap:0">
             <button class="btn btn-ghost btn-block" style="padding:13px" onClick="{{ googleLogin }}"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 34.9 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.2 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>&nbsp;Sign up with Google</button>
-            <button class="btn btn-ghost btn-block" style="padding:13px;margin-top:10px" onClick="{{ truecallerLogin }}"><span style="width:18px;height:18px;border-radius:50%;background:#0087ff;display:inline-grid;place-items:center;color:#fff;font-size:11px;flex:none"><i class="ph-duotone ph-phone"></i></span>&nbsp;Sign up with Truecaller<span class="chip-plain" style="margin-left:8px;padding:2px 8px;font-size:10px">Android</span></button>
             <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--line-2)"></div><span class="mut" style="font-size:11px">or</span><div style="flex:1;height:1px;background:var(--line-2)"></div></div>
             <sc-if value="{{ linkNotSent }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px"><input class="fin" type="email" placeholder="Email address" value="{{ loginMail }}" onInput="{{ setLoginMail }}"><button class="btn btn-gold" style="flex:none;white-space:nowrap" onClick="{{ sendLink }}">Email me a link</button></div><p class="mut" style="font-size:11px;margin:8px 0 0;text-align:left">No password, no OTP. The link creates your account, or signs you in if you have one.</p><sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:8px 0 0;text-align:left">{{ linkErr }}</p></sc-if></sc-if>
             <sc-if value="{{ linkSent }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding:14px;border-color:var(--gold);text-align:left"><div style="font-weight:700;font-size:14px"><i class="ph-duotone ph-envelope-open goldc"></i>&nbsp;Check your inbox</div><div class="mut" style="font-size:12px;margin-top:4px">We sent a sign-up link to {{ loginMail }}. Tap it on this phone to continue.</div><sc-if value="{{ devLinkOn }}" hint-placeholder-val="{{ false }}"><a href="{{ devLink }}" style="display:block;margin-top:8px;font-size:12px;font-weight:700;color:var(--gold);word-break:break-all">Email isn't set up on this server (development): open the sign-in link</a></sc-if><sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:8px 0 0">{{ linkErr }}</p></sc-if><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-gold" style="padding:8px 14px;font-size:12px" onClick="{{ checkLink }}">I tapped the link</button><button class="btn btn-ghost" style="padding:8px 14px;font-size:12px" onClick="{{ resendLink }}">Resend</button></div></div></sc-if>
@@ -759,7 +597,7 @@
             <div class="pf-h"><span class="pf-hi"><i class="ph-duotone ph-crown-simple"></i></span><span class="pf-ht">Membership</span><button class="pf-btn" onClick="{{ goSub }}">Manage</button></div>
             <div class="pf-row"><i class="ph-duotone ph-seal-check pf-ri"></i><span class="pf-l">Plan</span><span class="pf-v">{{ pfPlanLine }}</span></div>
             <div class="pf-row"><i class="ph-duotone ph-calendar-dots pf-ri"></i><span class="pf-l">Renews</span><span class="pf-v">{{ renewDate }}</span></div>
-            <div class="pf-row"><i class="ph-duotone ph-buildings pf-ri"></i><span class="pf-l">Gym</span><span class="pf-v">{{ pfGym }}</span></div>
+            <div class="pf-row" style="cursor:pointer" onClick="{{ pfGymGo }}"><i class="ph-duotone ph-buildings pf-ri"></i><span class="pf-l">Gym</span><span class="pf-v tap">{{ pfGym }}</span></div>
           </div>
           <div class="pf-card">
             <div class="pf-h"><span class="pf-hi"><i class="ph-duotone ph-trophy"></i></span><span class="pf-ht">Achievements</span></div>
@@ -946,7 +784,15 @@
               <sc-for list="{{ equipCards }}" as="c" hint-placeholder-count="6"><div class="{{ c.cls }}" onClick="{{ c.pick }}"><i class="ph-duotone ph-{{ c.icon }}"></i><div><b>{{ c.label }}</b><span>{{ c.desc }}</span></div><sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}"><span class="ob-tick"><i class="ph-duotone ph-check"></i></span></sc-if></div></sc-for>
             </div></div>
             <sc-if value="{{ showGymName }}" hint-placeholder-val="{{ false }}">
-            <div class="ob-sec"><div class="ob-f"><label>Your gym</label><input class="ob-in" aria-label="Gym" placeholder="Optional" value="{{ obGymName }}" onInput="{{ setObGym }}"></div><p class="ob-help" style="margin-top:6px">Where you train, if you have a gym. Optional.</p></div>
+            <div class="ob-sec">
+              <sc-if value="{{ gymLinked }}" hint-placeholder-val="{{ false }}"><div class="card" style="flex-direction:row;align-items:center;gap:12px"><i class="ph-duotone ph-buildings goldc" style="font-size:24px"></i><div style="flex:1"><div style="font-weight:700;font-size:14px">{{ gymName }}</div><div class="mut" style="font-size:12px">{{ gymMemberLine }}</div></div><button class="btn btn-ghost" style="min-height:38px;padding:6px 12px;font-size:13px" onClick="{{ unlinkGym }}">Leave</button></div></sc-if>
+              <sc-if value="{{ gymNotLinked }}" hint-placeholder-val="{{ true }}">
+                <div class="ob-f"><label>Gym code</label><div style="display:flex;gap:8px"><input class="ob-in" style="flex:1;letter-spacing:.12em;text-transform:uppercase" aria-label="Gym code" placeholder="e.g. PHG7K2" value="{{ gymCode }}" onInput="{{ setGymCode }}"><button class="btn btn-gold" style="min-height:44px;padding:0 16px" onClick="{{ linkGym }}" disabled="{{ gymBusy }}">Link</button></div></div>
+                <p class="ob-help" style="margin-top:6px">If your gym is on FITRON, ask the front desk for its code: your gym then sees your training next to your membership.</p>
+                <div class="ob-f" style="margin-top:12px"><label>Your gym</label><input class="ob-in" aria-label="Gym" placeholder="Optional" value="{{ obGymName }}" onInput="{{ setObGym }}"></div><p class="ob-help" style="margin-top:6px">Where you train, if your gym is not on FITRON. Optional.</p>
+              </sc-if>
+              <sc-if value="{{ gymMsgOn }}" hint-placeholder-val="{{ false }}"><p class="ob-help" style="margin-top:8px;color:var(--gold)">{{ gymMsg }}</p></sc-if>
+            </div>
             </sc-if>
           </sc-if>
 
@@ -1144,39 +990,11 @@ class Component extends DCLogic {
     },
     obErr: false, suppDraft: '', avoidDraft: '',
     suppInfo: { whey: { brand:'MuscleBlaze Biozyme', serv:'1 scoop' }, pre: { brand:'GNC AMP Ripped', serv:'1 scoop' }, creatine: { brand:'MuscleBlaze Creatine', serv:'1 (5 g)' } },
-    bookings: [
-      { name:'Priya Singh', trainer:'Rahul · Strength coach', when:'Fri 6 Sep · 7:00 AM', type:'Form check · Squat', status:'Pending' },
-      { name:'Aman Kumar', trainer:'Neha · Nutrition', when:'Sat 7 Sep · 11:00 AM', type:'Diet consultation', status:'Pending' },
-      { name:'Rohit Das', trainer:'Rahul · Strength coach', when:'Mon 9 Sep · 6:30 PM', type:'Program review', status:'Confirmed' },
-    ],
-    members: [
-      { name:'Sumit Verma', phone:'+91 98765 43210', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'12 Oct 2025', renews:'12 Oct 2026', last:'Today', wk:'3/4' },
-      { name:'Priya Singh', phone:'+91 91234 56780', plan:'Monthly', status:'Due', amount:'₹299', paidOn:'5 Aug 2026', renews:'5 Sep 2026', last:'Yesterday', wk:'2/4' },
-      { name:'Aman Kumar', phone:'+91 99887 76655', plan:'Monthly', status:'Paid', amount:'₹299', paidOn:'1 Sep 2026', renews:'1 Oct 2026', last:'Today', wk:'4/4' },
-      { name:'Rohit Das', phone:'+91 93456 12345', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'20 Jun 2026', renews:'20 Jun 2027', last:'2 days ago', wk:'1/4' },
-      { name:'Neha Gupta', phone:'+91 90123 45678', plan:'Monthly', status:'Expired', amount:'₹299', paidOn:'2 Jul 2026', renews:'2 Aug 2026', last:'3 weeks ago', wk:'0/4' },
-      { name:'Vikas Mahto', phone:'+91 97890 11223', plan:'Monthly', status:'Due', amount:'₹299', paidOn:'6 Aug 2026', renews:'6 Sep 2026', last:'Today', wk:'3/4' },
-      { name:'Anjali Kumari', phone:'+91 96543 21098', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'15 Aug 2026', renews:'15 Aug 2027', last:'Yesterday', wk:'2/4' },
-      { name:'Deepak Sao', phone:'+91 94321 09876', plan:'Monthly', status:'Unpaid', amount:'₹299', paidOn:'—', renews:'—', last:'Never', wk:'0/4' },
-      { name:'Kajal Devi', phone:'+91 95678 12340', plan:'Monthly', status:'Paid', amount:'₹299', paidOn:'4 Sep 2026', renews:'4 Oct 2026', last:'Today', wk:'1/4' },
-    ],
-    payments: [
-      { date:'4 Sep 2026', name:'Kajal Devi', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'1 Sep 2026', name:'Aman Kumar', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'30 Aug 2026', name:'Deepak Sao', amount:'₹299', method:'Card', plan:'Monthly', status:'Failed' },
-      { date:'15 Aug 2026', name:'Anjali Kumari', amount:'₹1,499', method:'Net banking', plan:'Yearly', status:'Success' },
-      { date:'6 Aug 2026', name:'Vikas Mahto', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'5 Aug 2026', name:'Priya Singh', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'2 Jul 2026', name:'Neha Gupta', amount:'₹299', method:'Card', plan:'Monthly', status:'Refunded' },
-    ],
+    bookings: [],
+    members: [],
+    payments: [],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
-    notifs: [
-      { icon:'drop', text:"Time to drink water — you're behind today's hydration goal.", time:'Just now' },
-      { icon:'barbell', text:'Your workout starts in 30 minutes. Ready?', time:'6:00 PM' },
-      { icon:'flame', text:"You've completed 4 workouts this week. Keep going!", time:'Today' },
-      { icon:'fork-knife', text:'Lunch time — grilled chicken bowl on your plan.', time:'1:00 PM' },
-      { icon:'moon', text:'Wind-down reminder — aim for 7 hours of sleep tonight.', time:'Yesterday' },
-    ],
+    notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false, todaySets: [], setDraft: {}, pushOn: false, exVideos: {},
     selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
     schedule: [
       { key:'wake', time:'7:00 AM', label:'Wake-up', short:'Wake-up', icon:'sun-horizon' },
@@ -1216,6 +1034,7 @@ class Component extends DCLogic {
   componentDidMount() {
     this._lastMsgs = this.state.messages;
     this.restoreSession();
+    this._api('content').then(r => { if (r.ok && r.data.videos) this.setState({ exVideos: r.data.videos }); }).catch(() => {});
     this._fired = {}; this.tick(); this._t = setInterval(() => this.tick(), 20000);
     this._resize = () => this.setState({ vw: window.innerWidth });
     window.addEventListener('resize', this._resize);
@@ -1232,7 +1051,8 @@ class Component extends DCLogic {
   notify(title, body) { if (this.state.focusMode || this.state.notificationsOn === false) return; try { if (window.Notification && Notification.permission === 'granted') new Notification(title, { body }); } catch (e) {} }
   waterGoal() { return parseFloat(String((this.state.ob || {}).water || '')) || 3; }
 
-  nav = (s) => this.setState(st => {
+  nav = (s) => { if (s === 'review' && this.state.me) this._api('reviews').then(r => { if (r.ok) this.setState({ pastReviews: r.data.reviews || [] }); }).catch(() => {}); this._nav(s); };
+  _nav = (s) => this.setState(st => {
     // the paywall gate: an unpaid, trial-less account sees only the subscription screen
     if (st.planLocked && !['subscription', 'settings', 'profile', 'login'].includes(s)) {
       return { screen: 'subscription', subMode: 'plans', moreOpen: false, planMsg: st.me && st.me.trialUsed ? 'Your free trial has ended. Choose a plan to open this section.' : 'Start your free 7-day trial or choose a plan to open this section.' };
@@ -1242,8 +1062,8 @@ class Component extends DCLogic {
   setDevice = (d) => this.setState({ device: d });
   toggleMore = () => this.setState(st => ({ moreOpen: !st.moreOpen }));
   toggleNotif = () => this.setState(st => ({ notifOpen: !st.notifOpen }));
-  removeNotif = (i) => this.setState(st => ({ notifs: st.notifs.filter((_, j) => j !== i) }));
-  clearNotifs = () => this.setState({ notifs: [] });
+  removeNotif = (id) => this.setState(st => ({ notifGone: [...(st.notifGone || []), id] }));
+  clearNotifs = () => this.setState(st => ({ notifGone: st.notifs.map(n => n.id) }));
   // the water ring and the "drink water" habit are the same fact — hitting the goal ticks the habit
   addWater = (l) => this.setState(st => {
     const w = Math.round(Math.min(this.waterGoal(), st.water + l) * 10) / 10;
@@ -1483,6 +1303,56 @@ class Component extends DCLogic {
       return { ok: r.ok, status: r.status, data, error: (data && data.error) || (r.ok ? '' : 'Something went wrong. Try again.') };
     } catch (e) { return { ok: false, status: 0, data: {}, error: 'No connection. Check your internet and try again.' }; }
   }
+  // Sets, reps and weights: logged under the exercise as shown, for today only.
+  setDraft = (i, k) => (e) => { const v = e.target.value; this.setState(st => ({ setDraft: { ...st.setDraft, [i]: { ...(st.setDraft[i] || {}), [k]: v } } })); };
+  addSet = (i, ex) => () => this.setState(st => {
+    const d = st.setDraft[i] || {}, kg = Math.round(parseFloat(d.kg) * 2) / 2, reps = Math.round(parseFloat(d.reps));
+    if (!(kg >= 0 && kg <= 500) || !(reps >= 1 && reps <= 100)) return { setDraft: { ...st.setDraft, [i]: { ...d, err: 'Enter the weight (0–500 kg) and reps (1–100).' } } };
+    if ((st.todaySets || []).length >= 80) return {};
+    // the next set usually repeats this one, so keep the numbers in the inputs
+    return { todaySets: [...(st.todaySets || []), { ex, kg, reps }], setDraft: { ...st.setDraft, [i]: { kg: d.kg, reps: d.reps, err: '' } }, workoutLogged: true, habits: { ...st.habits, workout: true } };
+  }, () => this._flush());
+  removeSet = (idx) => () => this.setState(st => ({ todaySets: (st.todaySets || []).filter((_, j) => j !== idx) }), () => this._flush());
+  // Gym Partnership: link to a gym on FITRON with its trainer code.
+  setGymCode = (e) => this.setState({ gymCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12), gymMsg: '' });
+  linkGym = async () => {
+    const code = (this.state.gymCode || '').trim();
+    if (!code) { this.setState({ gymMsg: 'Type the code your gym gave you.' }); return; }
+    if (!this.state.me) { this.setState({ gymMsg: 'Sign in first, then link your gym.' }); return; }
+    this.setState({ gymBusy: true, gymMsg: '' });
+    const r = await this._api('gym', 'POST', { code });
+    try { localStorage.removeItem('fitron.gym'); } catch (e) {}
+    if (r.ok && r.data.gym) this.setState(st => ({ gym: r.data.gym, gymBusy: false, gymCode: '', gymMsg: 'Linked to ' + r.data.gym.name + (r.data.gym.member ? ' as ' + r.data.gym.member.name + ' (' + r.data.gym.member.code + ').' : '.'), ob: { ...st.ob, gymName: r.data.gym.name } }));
+    else this.setState({ gymBusy: false, gymMsg: r.error || 'Could not link. Try again.' });
+  };
+  unlinkGym = async () => {
+    if (!window.confirm('Leave this gym? It will no longer see your training, and stops earning from your plan.')) return;
+    const r = await this._api('gym', 'DELETE');
+    if (r.ok) this.setState({ gym: null, gymMsg: 'You left the gym.' }); else this.setState({ gymMsg: r.error });
+  };
+  // A code from /trainer?gym=CODE links as soon as the member is signed in.
+  _autoLinkGym(d) {
+    let code = ''; try { code = localStorage.getItem('fitron.gym') || ''; } catch (e) {}
+    if (!code || (d.gym && d.gym.code === code)) { if (code) try { localStorage.removeItem('fitron.gym'); } catch (e) {} return; }
+    this.setState({ gymCode: code }, () => this.linkGym());
+  }
+  // What needs the member's attention, from the server's own picture of the account and the week.
+  _liveNotifs(st) { return (st.notifs || []).filter(n => !(st.notifGone || []).includes(n.id)); }
+  _notices(d) {
+    const m = d.member || {}, P = d.progress || {}, W = P.week || {}, t = d.today, out = [];
+    const days = (iso) => iso ? Math.ceil((new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso) - Date.now()) / 864e5) : null;
+    const pay = d.payments || [], pending = pay.find(x => x.status === 'SUBMITTED'), rejected = pay[0] && pay[0].status === 'REJECTED' ? pay[0] : null;
+    if (pending) out.push({ id: 'pay-' + pending.id, icon: 'hourglass', text: 'Payment under review — UTR ' + pending.utr + '. Your plan activates once FITRON matches it, usually within a working day.', time: 'Pending' });
+    else if (rejected) out.push({ id: 'rej-' + rejected.id, icon: 'warning', text: "We couldn't confirm your last payment (UTR " + rejected.utr + '). Check the UTR, or pay again.', time: 'Action needed' });
+    const tl = m.access === 'TRIAL' ? days(m.trialEndsAt) : null;
+    if (tl !== null && tl <= 3) out.push({ id: 'trial-' + m.trialEndsAt, icon: 'clock', text: tl <= 0 ? 'Your free trial ends today. Choose a plan to keep your coach.' : 'Your free trial ends in ' + tl + ' day' + (tl === 1 ? '' : 's') + '. Choose a plan to keep your coach.', time: 'Trial' });
+    const pl = m.access === 'ACTIVE' && !m.planCancelled ? days(m.paidUntil) : null;
+    if (pl !== null && pl <= 7) out.push({ id: 'renew-' + m.paidUntil, icon: 'calendar-check', text: 'Your plan ends ' + (pl <= 0 ? 'today' : 'in ' + pl + ' day' + (pl === 1 ? '' : 's')) + '. Pay before then to stay on — nothing is debited automatically.', time: 'Renewal' });
+    if (m.access === 'LOCKED' && m.onboarded) out.push({ id: 'locked', icon: 'lock-key', text: 'Your plan has ended. Pick a plan to open your workouts, meals and coach again.', time: 'Plan' });
+    if (P.streak >= 3) out.push({ id: 'streak-' + P.streak, icon: 'flame', text: P.streak + '-day habit streak. Tick today\'s habits to keep it going.', time: 'Today' });
+    if (W.planned) out.push({ id: 'week-' + W.workouts, icon: 'barbell', text: W.workouts >= W.planned ? 'Every planned session done this week — ' + W.workouts + ' of ' + W.planned + '.' : W.workouts + ' of ' + W.planned + ' planned workouts done this week.' + (t && t.workoutDone ? '' : " Today's session is still open."), time: 'This week' });
+    return out;
+  }
   _fmtDate(iso) { if (!iso) return ''; const d = new Date(String(iso).length === 10 ? iso + 'T00:00:00' : iso); return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }); }
   _authMsg() {
     try {
@@ -1495,10 +1365,12 @@ class Component extends DCLogic {
   async restoreSession() {
     const msg = this._authMsg();
     // a plan picked on fitron.in (/trainer?plan=ai-premium) is remembered through the sign-in link
+    try { const gc = new URLSearchParams(window.location.search).get('gym'); if (gc) { localStorage.setItem('fitron.gym', gc.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)); window.history.replaceState(null, '', window.location.pathname); } } catch (e) {}
+    try { const gc = localStorage.getItem('fitron.gym'); if (gc) this.setState({ gymCode: gc }); } catch (e) {}
     try { const pre = new URLSearchParams(window.location.search).get('plan'); if (pre === 'ai-pro' || pre === 'ai-premium') { localStorage.setItem('fitron.tier', pre); window.history.replaceState(null, '', window.location.pathname); } } catch (e) {}
     try { const t = localStorage.getItem('fitron.tier'); if (t === 'ai-pro' || t === 'ai-premium') this.setState({ tier: t }); } catch (e) {}
     const r = await this._api('me');
-    if (r.ok) { this.applyUser(r.data); return true; }
+    if (r.ok) { this.applyUser(r.data); this._autoLinkGym(r.data); this._subscribePush(true); return true; }
     if (msg) this.setState({ linkErr: msg });
     return false;
   }
@@ -1518,7 +1390,7 @@ class Component extends DCLogic {
       reminders: st.reminders, notificationsOn: st.notificationsOn, focusMode: !!st.focusMode, theme: st.theme, groc: this._g || null,
       avatar: st.avatar || this._av || '', consentPrefs: { notif: !!(st.consent || {}).notif, city: !!(st.consent || {}).city } };
   }
-  _daySnap() { const st = this.state; return { water: st.water, habits: st.habits, workoutDone: !!(st.workoutLogged || (st.habits || {}).workout) }; }
+  _daySnap() { const st = this.state; return { water: st.water, habits: st.habits, workoutDone: !!(st.workoutLogged || (st.habits || {}).workout), sets: st.todaySets || [] }; }
   _schedulePersist() {
     if (!this.state.me || !this._loaded) return;
     const p = JSON.stringify(this._profileSnap()), d = JSON.stringify(this._daySnap());
@@ -1536,7 +1408,7 @@ class Component extends DCLogic {
     if (!extra && !body.profile && !body.day) return;
     this._savedP = p; this._savedD = d;
     const r = await this._api('state', 'PUT', body);
-    if (r.ok && r.data.member) { this._applyMember(r.data.member); this.setState({ prog: r.data.progress, review: r.data.review, coachUse: r.data.coach }); }
+    if (r.ok && r.data.member) { this._applyMember(r.data.member); this.setState({ prog: r.data.progress, review: r.data.review, coachUse: r.data.coach, notifs: this._notices(r.data) }); }
     else if (!r.ok) { this._savedP = ''; this._savedD = ''; if (r.status === 401) this.setState({ me: null, screen: 'login', linkErr: 'You were signed out. Sign in again to keep saving.' }); }
   }
   applyUser(d) {
@@ -1556,8 +1428,8 @@ class Component extends DCLogic {
       const inApp = !['login', 'signup', 'landing', 'onboard', 'pickTheme', 'consent'].includes(st.screen);
       return { ...keep, ob, avatar: p.avatar || st.avatar, groc: p.groc || st.groc, chats: this._ch,
         consent: { ...st.consent, ...(p.consentPrefs || {}) },
-        water: t ? t.water : 0, habits: { workout:false, water:false, steps:false, protein:false, meals:false, sleep:false, ...(t ? t.habits : {}) }, workoutLogged: !!(t && t.workoutDone),
-        prog: d.progress, review: d.review, coachUse: d.coach, role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
+        water: t ? t.water : 0, habits: { workout:false, water:false, steps:false, protein:false, meals:false, sleep:false, ...(t ? t.habits : {}) }, workoutLogged: !!(t && t.workoutDone), todaySets: (t && Array.isArray(t.sets)) ? t.sets : [],
+        prog: d.progress, review: d.review, coachUse: d.coach, notifs: this._notices(d), gym: d.gym || null, role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
         signup: !m.onboarded, screen: !m.onboarded ? 'onboard' : (locked ? 'subscription' : (inApp ? st.screen : 'home')),
         onboardStep: !m.onboarded ? 1 : st.onboardStep,
         subMode: m.access === 'LOCKED' ? 'plans' : 'manage',
@@ -1569,7 +1441,7 @@ class Component extends DCLogic {
   // What this phone keeps for the signed-in member (photo, grocery list, chats). Cleared on
   // sign-out, account deletion, or when someone else signs in here, so it never shows up in another account.
   _forgetDevice() { try { ['fitron.avatar', 'fitron.chats', 'fitron.content', 'fitron.groc', 'fitron.owner'].forEach(k => localStorage.removeItem(k)); } catch (e) {} this._av = undefined; this._ch = undefined; }
-  logout = async () => { await this._flush(); await this._api('auth/logout', 'POST'); this._forgetDevice(); window.location.replace('/trainer'); };
+  logout = async () => { await this._flush(); await this._unsubscribePush(); await this._api('auth/logout', 'POST'); this._forgetDevice(); window.location.replace('/trainer'); };
   checkLink = async () => { const ok = await this.restoreSession(); if (!ok) this.setState({ linkErr: 'Open the link we emailed you (on this phone) to sign in, then come back here.' }); };
   requestData = () => { window.location.href = '/api/trainer/account'; };
   deleteAccount = async () => {
@@ -1620,14 +1492,37 @@ class Component extends DCLogic {
   setSuppField = (k, f) => (e) => { const v = e.target.value; this.setState(st => ({ suppInfo: { ...(st.suppInfo || {}), [k]: { ...((st.suppInfo || {})[k] || {}), [f]: v } } })); };
   toggleReminder = (k) => this.setState(st => ({ reminders: { ...st.reminders, [k]: !st.reminders[k] } }));
   toggleNotifications = () => {
-    if (this.state.notificationsOn) { this.setState({ notificationsOn: false }); return; }
+    if (this.state.notificationsOn) { this.setState({ notificationsOn: false }); this._unsubscribePush(); return; }
     this.setState({ notificationsOn: true });
-    if (this.state.notifPerm !== 'granted') this.requestNotif();
+    if (this.state.notifPerm !== 'granted') this.requestNotif(); else this._subscribePush();
   };
   requestNotif = async () => {
-    try { const p = await (window.Notification ? Notification.requestPermission() : Promise.resolve('granted')); this.setState({ notifPerm: p === 'default' ? 'granted' : p }); }
+    try { const p = await (window.Notification ? Notification.requestPermission() : Promise.resolve('granted')); this.setState({ notifPerm: p === 'default' ? 'granted' : p }); if (p === 'granted') this._subscribePush(); }
     catch (e) { this.setState({ notifPerm: 'granted' }); }
   };
+  // Web Push: reminders reach this phone with the app closed. Needs the server's VAPID key; without it the in-page reminders stay.
+  _pushSupported() { return !!(window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && window.Notification); }
+  async _subscribePush(quiet) {
+    if (!this.state.me || !this._pushSupported() || Notification.permission !== 'granted' || this.state.notificationsOn === false) return;
+    try {
+      const k = await this._api('push'); const key = k.ok && k.data.publicKey; if (!key) return;
+      const reg = await navigator.serviceWorker.register('/trainer/sw.js');
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this._b64ToBytes(key) });
+      const r = await this._api('push', 'POST', { subscription: sub.toJSON() });
+      if (r.ok) this.setState({ pushOn: true }); else if (!quiet) this.setState({ gymMsg: '' });
+    } catch (e) { console.warn('push', e); }
+  }
+  async _unsubscribePush() {
+    if (!this._pushSupported()) return;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/trainer/'); const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) { if (this.state.me) await this._api('push', 'DELETE', { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+    } catch (e) {}
+    this.setState({ pushOn: false });
+  }
+  _b64ToBytes(b64) { const s = (b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s); const out = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out; }
   dismissNotif = () => this.setState({ notifPerm: 'dismissed' });
   switchMonthly = async () => {
     const r = await this._api('state', 'PUT', { cycle: 'MONTHLY' });
@@ -1728,7 +1623,7 @@ class Component extends DCLogic {
       payments,
       adminMsg: p.name + "'s " + p.plan + ' payment (' + p.amount + ') verified against UTR ' + p.utr + ' — receipt sent in-app, audit log updated.',
       activePlan: p.plan === 'Yearly' ? 'yearly' : 'monthly',
-      planMsg: 'Payment verified by Power Haus Gym — your ' + p.plan + ' plan is active.',
+      planMsg: 'Payment verified by FITRON — your ' + p.plan + ' plan is active.',
     };
   });
   logWorkout = () => this.setState(st => ({ workoutLogged: !st.workoutLogged, habits: st.workoutLogged ? st.habits : { ...st.habits, workout: true } }));
@@ -1764,7 +1659,8 @@ class Component extends DCLogic {
   cyclePlanDay = (d) => this.setState(st => { const opts = ['Chest','Back','Legs','Shoulders','Arms','Core','Full Body','Rest']; const next = opts[(opts.indexOf(st.plan[d]) + 1) % opts.length]; return { plan: { ...st.plan, [d]: next } }; });
   toggleAlt = (i) => this.setState(st => ({ altOpen: st.altOpen === i ? null : i }));
   toggleVid = (i) => this.setState(st => ({ vidOpen: st.vidOpen === i ? null : i }));
-  openFs = (i) => this.setState({ fsVid: i });
+  // Full screen for a playable video; a plain link (Instagram and the like) opens in the browser instead.
+  openFs = (i) => { const e = (this._exNow || [])[i], v = e && (this.state.exVideos || {})[e.name]; if (v && v.kind === 'link') { try { window.open(v.src, '_blank', 'noopener'); } catch (x) {} return; } this.setState({ fsVid: i }); };
   closeFs = () => this.setState({ fsVid: null });
   toggleEditSupp = () => this.setState(st => ({ editSupp: !st.editSupp }));
   updSupp = (i, f, e) => { const v = e.target.value; this.setState(st => ({ suppList: st.suppList.map((x, j) => j === i ? { ...x, [f]: v } : x) })); };
@@ -1993,12 +1889,18 @@ class Component extends DCLogic {
       consWeeks: ((P && P.weeks) || []).map(w => ({ label: w.label + '·' + w.done + '/' + w.planned, h: Math.max(3, Math.min(100, Math.round(w.done / (w.planned || 1) * 100))) + '%' })),
       focusRows: ((P && P.byFocus) || []).slice(0, 4).map((f, i, a) => ({ focus: f.focus, count: f.count + ' session' + (f.count === 1 ? '' : 's'), style: i === a.length - 1 ? 'border-bottom:none' : '' })),
       focusEmpty: !((P && P.byFocus) || []).length,
+      liftRows: ((P && P.strength) || []).slice(0, 5).map((l, i, a) => ({ ex: l.ex, sessions: l.sessions + ' session' + (l.sessions === 1 ? '' : 's'), text: l.first.kg === l.best.kg && l.first.reps === l.best.reps ? l.best.kg + ' kg × ' + l.best.reps : l.first.kg + ' → ' + l.best.kg + ' kg', style: i === a.length - 1 ? 'border-bottom:none' : '' })),
+      liftEmpty: !((P && P.strength) || []).length,
       records: [
+        ...((P && P.strength && P.strength[0]) ? [{ icon: 'barbell', text: 'Best lift: ' + P.strength[0].ex + ' ' + P.strength[0].best.kg + ' kg × ' + P.strength[0].best.reps }] : []),
         { icon: 'medal', text: (P ? P.totalWorkouts : 0) + ' workout' + (P && P.totalWorkouts === 1 ? '' : 's') + ' completed' },
         { icon: 'flame', text: 'Best habit streak: ' + (P ? P.bestStreak : 0) + ' day' + (P && P.bestStreak === 1 ? '' : 's') },
         { icon: 'trophy', text: P && P.byFocus && P.byFocus[0] ? 'Most trained: ' + P.byFocus[0].focus : 'Your first logged session is on its way' },
       ],
     });
+    const past = (st.pastReviews || []).filter(r => !R || r.weekStart !== R.weekStart).slice(0, 8);
+    v.pastReviews = past.map(r => ({ label: 'Week of ' + this._fmtDate(r.weekStart), workouts: r.workouts + '/' + r.planned + ' workouts', consistency: r.consistency + '%' }));
+    v.hasPast = past.length > 0;
     if (R) {
       const f = (d) => d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), ws = new Date(R.weekStart + 'T00:00:00'), we = new Date(ws); we.setDate(we.getDate() + 6);
       Object.assign(v, {
@@ -2183,9 +2085,14 @@ class Component extends DCLogic {
     this._lib = lib;
     this._restSecs = (lib[focus] || []).map(e => parseInt((e.rest.match(/\d+/) || [60])[0], 10));
     this._setCounts = (lib[focus] || []).map(e => parseInt((e.scheme.match(/(\d+)\s*set/) || [0, 3])[1], 10) || 3);
+    const isToday = st.selDay === ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()];
+    const todaySets = st.todaySets || [];
     const exercises = (lib[focus] || []).map((e, i) => {
       const chosen = exSwaps[i];
       const name = chosen || e.name;
+      const draft = st.setDraft[i] || {};
+      const video = (st.exVideos || {})[name] || null;
+      const logged = todaySets.map((s, idx) => ({ ...s, idx })).filter(s => s.ex === name).map((s, n) => ({ n: n + 1, text: s.kg + ' kg × ' + s.reps, remove: this.removeSet(s.idx) }));
       const altNames = [e.name, ...e.alts].filter(x => x !== name);
       const active = st.running && st.step === i;
       const done = st.running && i < st.step;
@@ -2198,8 +2105,11 @@ class Component extends DCLogic {
         skip: this.skipPhase,
         num: String(i + 1).padStart(2,'0'), open: st.altOpen === i, toggle: () => this.toggleAlt(i),
         vid: 'ex-vid-' + i, vidOpen: st.vidOpen === i, vidToggle: () => this.toggleVid(i), fs: () => this.openFs(i),
+        hasVideo: !!video, noVideo: !video, isYt: !!video && video.kind === 'youtube', isFile: !!video && video.kind === 'video', isLink: !!video && video.kind === 'link', videoSrc: video ? video.src : '', videoNote: (video && video.note) || '',
+        canLog: isToday && !!st.me, logged, kg: draft.kg || '', reps: draft.reps || '', setKg: this.setDraft(i, 'kg'), setReps: this.setDraft(i, 'reps'), addSet: this.addSet(i, name), setErr: !!draft.err, setErrText: draft.err || '',
         alts: altNames.map(a => ({ label: a, pick: () => this.swapExercise(i, a) })) };
     });
+    this._exNow = exercises;
     const dayStyle = (sel) => ({ flex:'none', minWidth:'64px', textAlign:'center', padding:'10px 6px', borderRadius:'12px', cursor:'pointer', background: sel ? 'var(--grad)' : 'var(--card)', color: sel ? '#1a1408' : 'var(--text)', border: '1px solid ' + (sel ? 'transparent' : 'var(--line-2)') });
     const weekPlan = planDays.map(d => ({ day: d, short: shortMap[st.plan[d]], style: dayStyle(d === st.selDay), select: () => this.setState({ selDay: d, altOpen: null, exSwaps: {} }) }));
     const optStyle = (sel) => ({ display:'inline-flex', alignItems:'center', padding:'7px 13px', borderRadius:'999px', fontSize:'13px', fontWeight:600, cursor:'pointer', background: sel ? 'var(--grad)' : 'var(--card-2)', color: sel ? '#1a1408' : 'var(--mut)', border:'1px solid var(--line-2)' });
@@ -2271,27 +2181,6 @@ class Component extends DCLogic {
     const paymentRows = pays.map((p, i) => ({ ...p, statusColor: p.status === 'Pending' ? '#e8894a' : payColor(p.status), pending: p.status === 'Pending', verify: () => this.verifyUpiPayment(i) }));
     const recentPayments = paymentRows.slice(0, 4);
     const bookingRows = (st.bookings || []).map((b, i) => ({ ...b, pending: b.status === 'Pending', confirm: () => this.setBooking(i, 'Confirmed'), decline: () => this.setBooking(i, 'Declined'), statusColor: b.status === 'Confirmed' ? '#5ec2a0' : b.status === 'Declined' ? '#e06c6c' : '#e8894a' }));
-    // ----- when the backend is on, every admin screen reads real data, not the demo rows -----
-    const dbOn = false, dbM = st.dbMembers || [], dbS = st.dbStats, dbR = st.dbRecent || [];
-    let kpisOut = kpis, memberRowsOut = memberRows, renewalsDueOut = renewalsDue, recentPaymentsOut = recentPayments, memFiltersOut = memFilters;
-    if (dbOn && dbM.length) {
-      const f = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-      const rowOf = (m) => {
-        const status = m.plan_status === 'active' ? 'Paid' : (m.plan_status === 'trial' && m.trial_ends && new Date(m.trial_ends) > new Date() ? 'Trial' : 'Unpaid');
-        const nm = m.name || m.email || 'Member';
-        return { name: nm, phone: m.email || '', plan: m.plan_name || (status === 'Trial' ? 'Trial' : '—'), status, amount: m.plan_name === 'Yearly' ? '₹1,499' : m.plan_name === 'Monthly' ? '₹299' : '—', paidOn: f(m.created_at), renews: status === 'Trial' ? f(m.trial_ends) : '—', last: status, wk: '—', idx: 0, initial: nm[0].toUpperCase(), statusStyle: statusStyle(status), canMark: false, markPaid: () => {}, remind: () => this.remindMember(0, nm) };
-      };
-      const dbRows = dbM.map(rowOf);
-      memberRowsOut = dbRows.filter(m => st.memFilter === 'All' || m.status === st.memFilter);
-      renewalsDueOut = dbRows.filter(m => m.status !== 'Paid');
-      memFiltersOut = ['All', 'Paid', 'Trial', 'Unpaid'].map(fl => ({ label: fl, style: optStyle(st.memFilter === fl), pick: () => this.setMemFilter(fl) }));
-      if (dbS) kpisOut = [
-        { v: String(dbS.members), l: 'Members' }, { v: String(dbS.active), l: 'Paid & active' }, { v: String(dbS.trial), l: 'On trial' },
-        { v: String(dbS.unpaid), l: 'Unpaid / expired' }, { v: String(dbS.pending), l: 'UTRs to verify' },
-        { v: '₹' + Number(dbS.collected_month || 0).toLocaleString('en-IN'), l: 'Collected this month' },
-      ];
-      recentPaymentsOut = dbR.map(p => ({ name: p.name, date: new Date(p.submitted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), method: 'UPI · UTR ' + p.utr, plan: p.plan, amount: '₹' + p.amount_inr, status: p.status === 'verified' ? 'Success' : p.status === 'rejected' ? 'Failed' : 'Pending', statusColor: p.status === 'verified' ? '#5ec2a0' : p.status === 'rejected' ? '#e06c6c' : '#e8894a', pending: false, verify: () => {} }));
-    }
     const videoCoverage = Object.values(lib).reduce((a, l) => a + l.length, 0);
     const chipsOf = (k, list, multi) => list.map(v => ({ label: v, style: optStyle(multi ? (ob[k] || []).includes(v) : ob[k] === v), pick: () => multi ? this.toggleOb(k, v) : this.pickOb(k, v) }));
     const suppInfo = st.suppInfo || {};
@@ -2339,8 +2228,9 @@ class Component extends DCLogic {
             { label: 'Log out', icon: 'sign-out', note: 'See you again soon', tone: 'tone-out', go: this.logout },
           ],
       fsVidOpen: st.fsVid != null, fsVidId: st.fsVid || '', closeFs: this.closeFs,
-      notifOpen: !!st.notifOpen, toggleNotif: this.toggleNotif, clearNotifs: this.clearNotifs, notifEmpty: st.notifs.length === 0,
-      notifList: st.notifs.map((n, i) => ({ ...n, remove: () => this.removeNotif(i) })),
+      ...(() => { const e = st.fsVid != null ? (this._exNow || [])[st.fsVid] : null; const v = e && (st.exVideos || {})[e.name]; return { fsIsYt: !!v && v.kind === 'youtube', fsIsFile: !!v && v.kind === 'video', fsSrc: v && v.kind !== 'link' ? v.src : '', fsNone: !v || v.kind === 'link' }; })(),
+      notifOpen: !!st.notifOpen, toggleNotif: this.toggleNotif, clearNotifs: this.clearNotifs, notifEmpty: this._liveNotifs(st).length === 0,
+      notifList: this._liveNotifs(st).map(n => ({ ...n, remove: () => this.removeNotif(n.id) })),
       showHome: s==='home', homeDesk: s==='home' && D, homeMobile: s==='home' && !D,
       showPlanner: s==='planner', showWorkout: s==='workout', showFood: s==='food', showProgress: s==='progress',
       showHabits: s==='habits', showCoach: s==='coach', showReview: s==='review', showSub: s==='subscription',
@@ -2366,11 +2256,12 @@ class Component extends DCLogic {
         return 'Starter plan';
       })(),
       pfPlanLine: this._planLine(),
-      pfGym: (ob.gymName || '').trim() || '—',
+      pfGym: st.gym ? st.gym.name + (st.gym.member ? ' · ' + st.gym.member.code : '') + ' · linked' : (ob.gymName || '').trim() || 'Link your gym',
+      pfGymGo: () => this.setState({ screen: 'onboard', onboardStep: 5, signup: true, moreOpen: false, obFrom: 'profile' }),
       pfEditLabel: st.pfEdit ? 'Done' : 'Edit',
       pfToggleEdit: this.pfToggleEdit, pfEditBody: this.pfEditBody,
       pfAch: (() => {
-        const w = 124, k = 36;
+        const P = st.prog || {}, w = P.totalWorkouts || 0, k = P.bestStreak || 0;
         const b = (icon, label, on) => ({ icon, label, cls: on ? 'pf-ab' : 'pf-ab off' });
         return [
           b('sneaker-move', 'First workout', w >= 1),
@@ -2443,7 +2334,7 @@ class Component extends DCLogic {
       notifAsk: st.notifPerm === 'default',
       notifIcon: st.notifPerm === 'granted' ? 'bell-ringing' : 'bell-slash',
       notifStatus: st.notifPerm === 'granted' ? 'Enabled on this device.' : st.notifPerm === 'denied' ? 'Blocked — enable in browser settings.' : 'Not enabled yet.',
-      notifStatus: st.notificationsOn === false ? 'Off - reminders stay inside Fitron.' : st.notifPerm === 'granted' ? 'Enabled on this device.' : st.notifPerm === 'denied' ? 'Blocked - enable in browser settings.' : 'Not enabled yet.',
+      notifStatus: st.notificationsOn === false ? 'Off - reminders stay inside Fitron.' : st.notifPerm === 'granted' ? (st.pushOn ? 'Enabled on this device, even when the app is closed.' : 'Enabled while the app is open.') : st.notifPerm === 'denied' ? 'Blocked - enable in browser settings.' : 'Not enabled yet.',
       notifEnabled: !!st.notificationsOn, notifLabel: st.notificationsOn ? 'On' : 'Off',
       notifTrackStyle: { width:'42px', height:'24px', borderRadius:'999px', flex:'none', padding:'3px', display:'flex', transition:'background .15s', background: st.notificationsOn ? 'var(--grad)' : 'var(--card-2)', border:'1px solid var(--line-2)', justifyContent: st.notificationsOn ? 'flex-end' : 'flex-start' },
       notifKnobStyle: { width:'18px', height:'18px', borderRadius:'50%', background: st.notificationsOn ? '#1a1408' : 'var(--mut)' },
@@ -2556,7 +2447,7 @@ class Component extends DCLogic {
       profileName: isAdmin ? 'Fitron Admin' : (ob.name || 'Member'), profileSub: isAdmin ? 'Admin console' : 'View profile',
       showMembers: s==='members', showPayments: s==='payments', showBookings: s==='bookings', showContent: s==='content', showAdminSettings: s==='adminsettings',
       goMembers: () => this.nav('members'), goPayments: () => this.nav('payments'), goBookings: () => this.nav('bookings'),
-      kpis: kpisOut, renewalsDue: renewalsDueOut, recentPayments: recentPaymentsOut, memberRows: memberRowsOut, memFilters: memFiltersOut, adminMsg: st.adminMsg || '', adminHasMsg: !!st.adminMsg,
+      kpis, renewalsDue, recentPayments, memberRows, memFilters, adminMsg: st.adminMsg || '', adminHasMsg: !!st.adminMsg,
       paymentRows, bookingRows, videoCoverage,
       city, firstName, waterGoalLabel: waterGoal.toFixed(1),
       obBudget: ob.budget,
@@ -2678,7 +2569,8 @@ class Component extends DCLogic {
             card('equipment','Bodyweight only','No equipment at all','person-simple-run', true),
             card('equipment','Nothing yet','I am about to start','sparkle', true),
           ],
-      obGymName: o.gymName || '', setObGym: this.setOb('gymName'), showGymName: (o.equipment || []).includes('Full gym'),
+      obGymName: o.gymName || '', setObGym: this.setOb('gymName'), showGymName: true,
+      gymLinked: !!st.gym, gymNotLinked: !st.gym, gymName: st.gym ? st.gym.name : '', gymMemberLine: st.gym ? (st.gym.member ? 'Linked as ' + st.gym.member.name + ' · ' + st.gym.member.code : 'Linked · your gym sees your training') : '', gymCode: st.gymCode || '', setGymCode: this.setGymCode, linkGym: this.linkGym, unlinkGym: this.unlinkGym, gymBusy: !!st.gymBusy, gymMsg: st.gymMsg || '', gymMsgOn: !!st.gymMsg,
 
           dietCards: [
             card('diet','Veg','No meat, no egg','leaf'),

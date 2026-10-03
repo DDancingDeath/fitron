@@ -232,4 +232,17 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
     const off = profileLines({ ...where, consentPrefs: { city: false } }, { city: "Ranchi", state: "Jharkhand" });
     expect(off.join("\n")).not.toMatch(/Ranchi|Jharkhand/);
   });
+
+  it("keeps the day's logged sets, cleaned, and shows each lift's progress", async () => {
+    const m = await findOrCreateTrainer(email(), "EMAIL");
+    await saveTrainerState(m.id, { day: { workoutDone: true, sets: [{ ex: "Bench Press", kg: 40, reps: 10 }, { ex: " Bench Press ", kg: "42.3", reps: 8.4 }, { ex: "", kg: 10, reps: 5 }, { ex: "Squat", kg: 999, reps: 5 }, { ex: "Squat", kg: 60, reps: 0 }, "junk"] } }, "2026-09-20");
+    await saveTrainerState(m.id, { day: { workoutDone: true, sets: [{ ex: "Bench Press", kg: 45, reps: 8 }] } }, "2026-09-27");
+    const d = await loadTrainer(m.id, "2026-09-27");
+    expect(d.today?.sets).toEqual([{ ex: "Bench Press", kg: 45, reps: 8 }]);
+    expect(d.progress.strength).toEqual([{ ex: "Bench Press", first: { kg: 42.5, reps: 8, date: "2026-09-20" }, best: { kg: 45, reps: 8, date: "2026-09-27" }, sessions: 2 }]);
+    // Saving the day without sets leaves them as they are.
+    await saveTrainerState(m.id, { day: { water: 1 } }, "2026-09-27");
+    expect((await loadTrainer(m.id, "2026-09-27")).today?.sets).toHaveLength(1);
+    expect((await exportTrainer(m.id)).days.map((d) => d.sets?.length)).toEqual([2, 1]);
+  });
 });

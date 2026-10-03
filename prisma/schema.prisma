@@ -45,6 +45,9 @@ model Organization {
   /// Free trial end for gyms that signed up on fitron.in; null for gyms set up by hand
   trialEndsAt       DateTime?          @db.Timestamptz
   offers            Offer[]
+  /// Short code members type into the AI Trainer to link to this gym (Gym Partnership); made on demand
+  trainerCode       String?            @unique
+  trainerMembers    TrainerMember[]
 }
 
 model Branch {
@@ -216,6 +219,7 @@ model Member {
   mandates           AutopayMandate[]
   invoices           Invoice[]
   payments           Payment[]
+  trainerMember      TrainerMember?
   createdById        String
   createdAt          DateTime          @default(now()) @db.Timestamptz
   updatedAt          DateTime          @updatedAt @db.Timestamptz
@@ -1137,14 +1141,22 @@ model TrainerMember {
   lastSeenAt      DateTime? @db.Timestamptz
   /// After the account is deleted: sha256 of its old email, so the same email can't get a second free trial
   deletedEmailHash String?
+  /// Gym Partnership: the gym this member linked to with its trainer code, and their record there when one matched
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  gymMemberId  String?       @unique
+  gymMember    Member?       @relation(fields: [gymMemberId], references: [id], onDelete: SetNull)
+  gymLinkedAt  DateTime?     @db.Timestamptz
 
   sessions TrainerSession[]
+  pushes   TrainerPush[]
   days     TrainerDay[]
   chats    TrainerChat[]
   payments TrainerPayment[]
   reviews  TrainerReview[]
 
   @@index([deletedEmailHash])
+  @@index([orgId])
 }
 
 /// Sign-in links sent by email. `id` is the SHA-256 of the token in the link.
@@ -1186,6 +1198,8 @@ model TrainerDay {
   /// The day's training focus from the plan (Chest, Legs, Rest…)
   focus       String?
   weightKg    Float?
+  /// Sets logged that day, in order: [{ ex, kg, reps }]
+  sets        Json          @default("[]")
   updatedAt   DateTime      @updatedAt @db.Timestamptz
 
   @@unique([memberId, date])
@@ -1264,6 +1278,32 @@ model TrainerPayment {
 }
 
 /// AI Coach messages a member sent on a day (India time), for the plan's daily limit.
+/// A device subscribed to push reminders (Web Push)
+model TrainerPush {
+  id         String        @id @default(cuid())
+  memberId   String
+  member     TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  endpoint   String        @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  /// Reminder key → the Indian date it was last sent, so each goes once a day
+  sent       Json          @default("{}")
+  failures   Int           @default(0)
+  createdAt  DateTime      @default(now()) @db.Timestamptz
+  lastUsedAt DateTime      @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+}
+/// Exercise form videos for the AI Trainer, one link per exercise in the app's library
+model TrainerContent {
+  /// The exercise's name as the app shows it
+  ex        String   @id
+  videoUrl  String
+  note      String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}
 model TrainerCoachUsage {
   memberId String
   date     DateTime @db.Date
