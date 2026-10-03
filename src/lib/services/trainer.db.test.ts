@@ -2,6 +2,7 @@ import { randomInt, randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { hasDb } from "@/test/db";
 import { db } from "@/lib/db";
+import { appUrl } from "./accounts";
 import { addDays } from "@/lib/domain/dates";
 import { COACH_DAILY_LIMIT } from "@/lib/domain/trainer";
 import {
@@ -22,6 +23,7 @@ import {
 } from "./trainer";
 import { reviewTrainerPayment, trainerPaymentsToCheck } from "./trainer-admin";
 import { coachSystem, profileLines } from "./trainer-coach";
+import { currentPlan } from "./trainer-session";
 import { fromIso, toIso, todayIso } from "./time";
 
 const email = () => `t-${randomUUID().slice(0, 8)}@test.local`;
@@ -31,9 +33,9 @@ const member = (id: string) => db.trainerMember.findUniqueOrThrow({ where: { id 
 describe.skipIf(!hasDb)("AI Trainer (database)", () => {
   it("an email link creates the account once and works only once", async () => {
     const e = email();
-    const r = await requestTrainerLink(e.toUpperCase(), "http://localhost:3200");
-    // No SMTP in tests: the link comes back to show on screen.
-    expect(r.devLink).toMatch(/^http:\/\/localhost:3200\/api\/trainer\/auth\/verify\?token=/);
+    const r = await requestTrainerLink(e.toUpperCase());
+    // No SMTP in tests: the link comes back to show on screen. It points at APP_URL, not the request's host.
+    expect(r.devLink!.startsWith(`${appUrl()}/api/trainer/auth/verify?token=`)).toBe(true);
     const token = new URL(r.devLink!).searchParams.get("token")!;
     const m = await redeemTrainerLink(token);
     expect(m?.email).toBe(e);
@@ -130,7 +132,39 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
     expect(toIso(after.paidUntil!) > addDays(trialEnd, 360)).toBe(true);
     expect((await loadTrainer(m.id)).member.access).toBe("ACTIVE");
     await expect(reviewTrainerPayment(admin, pay.id, "CONFIRM")).rejects.toThrow(/isn't waiting/);
+    await expect(reviewTrainerPayment(admin, pay.id, "REJECT", "late click")).rejects.toThrow(/isn't waiting/);
     expect((await trainerPaymentsToCheck()).recent.find((r) => r.id === pay.id)?.status).toBe("PAID");
+  });
+
+  it("moving down to AI Pro waits until the AI Premium time already paid for runs out", async () => {
+    const m = await findOrCreateTrainer(email(), "EMAIL");
+    const admin = { email: "team@fitron.in" };
+    const premium = await startTrainerPayment(m.id, { plan: "ai-premium", cycle: "MONTHLY", kind: "purchase" });
+    await submitTrainerUtr(m.id, premium.id, utr());
+    await reviewTrainerPayment(admin, premium.id, "CONFIRM");
+    const pro = await startTrainerPayment(m.id, { plan: "ai-pro", cycle: "MONTHLY", kind: "renew" });
+    await submitTrainerUtr(m.id, pro.id, utr());
+    const done = await reviewTrainerPayment(admin, pro.id, "CONFIRM");
+    // Still Premium for the month already paid; Pro starts the day after.
+    expect((await member(m.id)).plan).toBe("ai-premium");
+    expect(await currentPlan(await member(m.id))).toMatchObject({ plan: "ai-premium" });
+    // When the Pro month has started, the plan follows it.
+    await db.trainerPayment.update({ where: { id: pro.id }, data: { periodStart: fromIso(todayIso()) } });
+    expect(await currentPlan(await member(m.id))).toMatchObject({ plan: "ai-pro" });
+    expect((await member(m.id)).plan).toBe("ai-pro");
+    expect(done?.periodStart && toIso(done.periodStart) > todayIso()).toBe(true);
+  });
+
+  it("moving up to AI Premium starts at once", async () => {
+    const m = await findOrCreateTrainer(email(), "EMAIL");
+    const admin = { email: "team@fitron.in" };
+    const pro = await startTrainerPayment(m.id, { plan: "ai-pro", cycle: "MONTHLY", kind: "purchase" });
+    await submitTrainerUtr(m.id, pro.id, utr());
+    await reviewTrainerPayment(admin, pro.id, "CONFIRM");
+    const up = await startTrainerPayment(m.id, { plan: "ai-premium", cycle: "MONTHLY", kind: "upgrade" });
+    await submitTrainerUtr(m.id, up.id, utr());
+    await reviewTrainerPayment(admin, up.id, "CONFIRM");
+    expect(await currentPlan(await member(m.id))).toMatchObject({ plan: "ai-premium" });
   });
 
   it("exports the member's data, and deleting the account keeps only the payments", async () => {
@@ -154,11 +188,40 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
     expect((await findOrCreateTrainer(m.email, "EMAIL")).id).not.toBe(m.id);
   });
 
+  it("the free trial is once per email, even after deleting the account", async () => {
+    const e = email();
+    const first = await findOrCreateTrainer(e, "EMAIL");
+    await startTrainerTrial(first.id, "ai-premium");
+    await deleteTrainerAccount(first.id);
+    const again = await findOrCreateTrainer(e, "GOOGLE");
+    expect(again.id).not.toBe(first.id);
+    await expect(startTrainerTrial(again.id, "ai-premium")).rejects.toThrow(/already had a free trial/);
+    // A deleted account that never used a trial doesn't block anyone.
+    const f = email();
+    const unused = await findOrCreateTrainer(f, "EMAIL");
+    await deleteTrainerAccount(unused.id);
+    await expect(startTrainerTrial((await findOrCreateTrainer(f, "EMAIL")).id)).resolves.toBeTruthy();
+  });
+
+  it("the app can't change the member's plan: only the trial or a confirmed payment can", async () => {
+    const m = await findOrCreateTrainer(email(), "EMAIL");
+    await startTrainerTrial(m.id, "ai-pro");
+    await saveTrainerState(m.id, { plan: "ai-premium", cycle: "YEARLY" } as Parameters<typeof saveTrainerState>[1]);
+    const after = await member(m.id);
+    expect(after.plan).toBe("ai-pro");
+    expect(after.cycle).toBe("YEARLY");
+  });
+
   it("the coach prompt uses the saved onboarding answers over what the app sent", () => {
     const lines = profileLines({ ob: { name: "Asha", goal: "Lose fat", injuries: ["Knee"], timeOfDay: "Morning", supps: ["Whey"], suppCustom: ["Creatine"] } }, { name: "Old", kcal: 1800 });
     expect(lines).toEqual(["- Name: Asha", "- Main goal: Lose fat", "- Injuries: Knee", "- Trains at: Morning", "- Supplements: Whey, Creatine", "- Calorie target (kcal/day): 1800"]);
     const sys = coachSystem({ name: "Asha", plan: "ai-premium" }, lines);
     expect(sys).toContain("AI Premium plan");
     expect(sys).toContain("- Main goal: Lose fat");
+    // City and state only when the member left "Use my city for food suggestions" on.
+    const where = { ob: { city: "Ranchi", state: "Jharkhand", goal: "Lose fat" } };
+    expect(profileLines(where, {})).toContain("- City: Ranchi");
+    const off = profileLines({ ...where, consentPrefs: { city: false } }, { city: "Ranchi", state: "Jharkhand" });
+    expect(off.join("\n")).not.toMatch(/Ranchi|Jharkhand/);
   });
 });

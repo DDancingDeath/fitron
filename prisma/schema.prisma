@@ -1135,12 +1135,16 @@ model TrainerMember {
   createdAt       DateTime  @default(now()) @db.Timestamptz
   updatedAt       DateTime  @updatedAt @db.Timestamptz
   lastSeenAt      DateTime? @db.Timestamptz
+  /// After the account is deleted: sha256 of its old email, so the same email can't get a second free trial
+  deletedEmailHash String?
 
   sessions TrainerSession[]
   days     TrainerDay[]
   chats    TrainerChat[]
   payments TrainerPayment[]
   reviews  TrainerReview[]
+
+  @@index([deletedEmailHash])
 }
 
 /// Sign-in links sent by email. `id` is the SHA-256 of the token in the link.

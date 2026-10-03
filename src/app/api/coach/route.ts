@@ -4,6 +4,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { refundCoachMessage, takeCoachMessage } from "@/lib/services/trainer";
 import { coachAnswer } from "@/lib/services/trainer-coach";
 import { currentTrainer } from "@/lib/services/trainer-session";
+import { readCapped } from "../trainer/_lib/http";
 
 // The AI Trainer app's coach: POST { messages: [{ role, text }], profile } → { text }.
 // 503 without ANTHROPIC_API_KEY and 429 over the plan's daily limit; the app then uses its built-in replies.
@@ -18,8 +19,16 @@ export async function POST(req: Request) {
   const m = await currentTrainer();
   if (!m) return Response.json({ error: "Sign in again." }, { status: 401 });
   if (!aiReady()) return Response.json({ error: "The coach isn't switched on yet. The server needs an ANTHROPIC_API_KEY." }, { status: 503 });
-  if (!rateLimit(`coach:${m.id}`, 10, 60_000)) return Response.json({ error: "That's a lot of messages in a minute. Wait a moment." }, { status: 429 });
-  const parsed = schema.safeParse(await req.json().catch(() => null));
+  // Per member, and per connection so many trial accounts on one phone can't share out the cost.
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
+  if (!rateLimit(`coach:${m.id}`, 10, 60_000) || !rateLimit(`coach-ip:${ip}`, 30, 60_000)) return Response.json({ error: "That's a lot of messages in a minute. Wait a moment." }, { status: 429 });
+  const text = await readCapped(req, 600_000);
+  if (text === null) return Response.json({ error: "That message is too long." }, { status: 413 });
+  let raw: unknown = null;
+  try {
+    raw = JSON.parse(text);
+  } catch {}
+  const parsed = schema.safeParse(raw);
   if (!parsed.success) return Response.json({ error: "Bad request." }, { status: 400 });
 
   const quota = await takeCoachMessage(m);

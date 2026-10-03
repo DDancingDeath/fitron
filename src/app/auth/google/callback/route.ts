@@ -1,8 +1,10 @@
+import { randomBytes } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { db } from "@/lib/db";
+import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
-import { GOOGLE_BACK, GOOGLE_FLOW_COOKIE, GOOGLE_SIGNUP_COOKIE, exchangeCode, sign, unsign, type GoogleFlow, type GoogleProfile } from "@/lib/integrations/google";
+import { GOOGLE_BACK, GOOGLE_FLOWS, GOOGLE_FLOW_COOKIE, GOOGLE_SIGNUP_COOKIE, exchangeCode, sign, unsign, type GoogleFlow, type GoogleProfile } from "@/lib/integrations/google";
 import { appUrl } from "@/lib/services/accounts";
 import { signInTrainerWithGoogle } from "@/lib/services/trainer-google";
 
@@ -21,7 +23,11 @@ export async function GET(req: NextRequest) {
     res.cookies.set(GOOGLE_FLOW_COOKIE, "", { path: "/auth/google", maxAge: 0 });
     return res;
   };
-  if (!f) return done(to("/login?google=expired"));
+  if (!f) {
+    const flow = (q.get("state") ?? "").split(".")[0];
+    const back = (GOOGLE_FLOWS as readonly string[]).includes(flow) ? GOOGLE_BACK[flow as GoogleFlow] : "/login";
+    return done(to(`${back}?google=expired`));
+  }
   const back = GOOGLE_BACK[f.flow];
   // Cancelled on Google's screen, or a state that isn't ours.
   if (q.get("error") || !q.get("code") || q.get("state") !== f.state) return done(to(`${back}?google=cancelled`));
@@ -53,9 +59,17 @@ export async function GET(req: NextRequest) {
   return done(await staffIn(user.id, user.emailVerifiedAt, safeNext(f.next)));
 }
 
-/** Google has verified the email, so an unconfirmed account counts as confirmed now. */
+/**
+ * Google has verified the email, so an unconfirmed account counts as confirmed now. Its password
+ * was never proven to belong to this person (anyone can sign up with someone else's address and
+ * wait), so it is replaced and any other sessions end; they can set their own with "Forgot your password?".
+ */
 async function staffIn(userId: string, verifiedAt: Date | null, next: string) {
+  if (!verifiedAt) {
+    await db.session.deleteMany({ where: { userId } });
+    await db.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date(), passwordHash: await hashPassword(randomBytes(24).toString("base64url")) } });
+  }
   await createSession(userId);
-  await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date(), ...(verifiedAt ? {} : { emailVerifiedAt: new Date() }) } });
+  await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
   return to(next);
 }

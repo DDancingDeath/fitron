@@ -7,9 +7,9 @@ import { body, json } from "../../_lib/http";
 export async function POST(req: Request) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (!rateLimit(`trainer-link:${ip}`, 10, 10 * 60_000)) return json({ error: "Too many tries. Wait a few minutes and try again." }, 429);
-  const { email } = await body<{ email?: string }>(req);
   try {
-    return json(await requestTrainerLink(String(email ?? ""), new URL(req.url).origin));
+    const { email } = await body<{ email?: string }>(req, 4_000);
+    return json(await requestTrainerLink(String(email ?? "")));
   } catch (e) {
     if (e instanceof UserError) return json({ error: e.message }, 400);
     console.error("[trainer link]", e);
