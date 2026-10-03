@@ -2,6 +2,7 @@
 # Runs inside the scheduler container. Checks every 5 minutes (times in UTC):
 #   01:00 UTC = 06:30 India time: daily jobs (reminders, autopay, risk scores, device sync…)
 #   20:30 UTC = 02:00 India time: backup of the database and member files, keeping KEEP_DAYS days
+#   every hour: AI Trainer push reminders (each one goes once a day, in its own window)
 set -u
 mkdir -p /backups
 state=/backups/.state
@@ -17,6 +18,14 @@ while true; do
       mark jobs "$day"; echo "$(date -u) daily jobs done"
     else
       echo "$(date -u) daily jobs failed; retrying in 5 minutes"
+    fi
+  fi
+  hour=$(date -u +%F-%H)
+  if [ "$(last trainer)" != "$hour" ]; then
+    if wget -q -O /dev/null --header "Authorization: Bearer $CRON_SECRET" http://app:3000/api/jobs/trainer; then
+      mark trainer "$hour"
+    else
+      echo "$(date -u) trainer reminders failed; retrying in 5 minutes"
     fi
   fi
   if [ "$hm" -ge 2030 ] && [ "$(last backup)" != "$day" ]; then

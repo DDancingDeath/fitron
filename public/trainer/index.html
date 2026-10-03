@@ -1180,7 +1180,7 @@ class Component extends DCLogic {
       { date:'2 Jul 2026', name:'Neha Gupta', amount:'₹299', method:'Card', plan:'Monthly', status:'Refunded' },
     ],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
-    notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false, todaySets: [], setDraft: {},
+    notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false, todaySets: [], setDraft: {}, pushOn: false,
     selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
     schedule: [
       { key:'wake', time:'7:00 AM', label:'Wake-up', short:'Wake-up', icon:'sun-horizon' },
@@ -1555,7 +1555,7 @@ class Component extends DCLogic {
     try { const pre = new URLSearchParams(window.location.search).get('plan'); if (pre === 'ai-pro' || pre === 'ai-premium') { localStorage.setItem('fitron.tier', pre); window.history.replaceState(null, '', window.location.pathname); } } catch (e) {}
     try { const t = localStorage.getItem('fitron.tier'); if (t === 'ai-pro' || t === 'ai-premium') this.setState({ tier: t }); } catch (e) {}
     const r = await this._api('me');
-    if (r.ok) { this.applyUser(r.data); this._autoLinkGym(r.data); return true; }
+    if (r.ok) { this.applyUser(r.data); this._autoLinkGym(r.data); this._subscribePush(true); return true; }
     if (msg) this.setState({ linkErr: msg });
     return false;
   }
@@ -1626,7 +1626,7 @@ class Component extends DCLogic {
   // What this phone keeps for the signed-in member (photo, grocery list, chats). Cleared on
   // sign-out, account deletion, or when someone else signs in here, so it never shows up in another account.
   _forgetDevice() { try { ['fitron.avatar', 'fitron.chats', 'fitron.content', 'fitron.groc', 'fitron.owner'].forEach(k => localStorage.removeItem(k)); } catch (e) {} this._av = undefined; this._ch = undefined; }
-  logout = async () => { await this._flush(); await this._api('auth/logout', 'POST'); this._forgetDevice(); window.location.replace('/trainer'); };
+  logout = async () => { await this._flush(); await this._unsubscribePush(); await this._api('auth/logout', 'POST'); this._forgetDevice(); window.location.replace('/trainer'); };
   checkLink = async () => { const ok = await this.restoreSession(); if (!ok) this.setState({ linkErr: 'Open the link we emailed you (on this phone) to sign in, then come back here.' }); };
   requestData = () => { window.location.href = '/api/trainer/account'; };
   deleteAccount = async () => {
@@ -1677,14 +1677,37 @@ class Component extends DCLogic {
   setSuppField = (k, f) => (e) => { const v = e.target.value; this.setState(st => ({ suppInfo: { ...(st.suppInfo || {}), [k]: { ...((st.suppInfo || {})[k] || {}), [f]: v } } })); };
   toggleReminder = (k) => this.setState(st => ({ reminders: { ...st.reminders, [k]: !st.reminders[k] } }));
   toggleNotifications = () => {
-    if (this.state.notificationsOn) { this.setState({ notificationsOn: false }); return; }
+    if (this.state.notificationsOn) { this.setState({ notificationsOn: false }); this._unsubscribePush(); return; }
     this.setState({ notificationsOn: true });
-    if (this.state.notifPerm !== 'granted') this.requestNotif();
+    if (this.state.notifPerm !== 'granted') this.requestNotif(); else this._subscribePush();
   };
   requestNotif = async () => {
-    try { const p = await (window.Notification ? Notification.requestPermission() : Promise.resolve('granted')); this.setState({ notifPerm: p === 'default' ? 'granted' : p }); }
+    try { const p = await (window.Notification ? Notification.requestPermission() : Promise.resolve('granted')); this.setState({ notifPerm: p === 'default' ? 'granted' : p }); if (p === 'granted') this._subscribePush(); }
     catch (e) { this.setState({ notifPerm: 'granted' }); }
   };
+  // Web Push: reminders reach this phone with the app closed. Needs the server's VAPID key; without it the in-page reminders stay.
+  _pushSupported() { return !!(window.isSecureContext && 'serviceWorker' in navigator && 'PushManager' in window && window.Notification); }
+  async _subscribePush(quiet) {
+    if (!this.state.me || !this._pushSupported() || Notification.permission !== 'granted' || this.state.notificationsOn === false) return;
+    try {
+      const k = await this._api('push'); const key = k.ok && k.data.publicKey; if (!key) return;
+      const reg = await navigator.serviceWorker.register('/trainer/sw.js');
+      await navigator.serviceWorker.ready;
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: this._b64ToBytes(key) });
+      const r = await this._api('push', 'POST', { subscription: sub.toJSON() });
+      if (r.ok) this.setState({ pushOn: true }); else if (!quiet) this.setState({ gymMsg: '' });
+    } catch (e) { console.warn('push', e); }
+  }
+  async _unsubscribePush() {
+    if (!this._pushSupported()) return;
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/trainer/'); const sub = reg && await reg.pushManager.getSubscription();
+      if (sub) { if (this.state.me) await this._api('push', 'DELETE', { endpoint: sub.endpoint }); await sub.unsubscribe(); }
+    } catch (e) {}
+    this.setState({ pushOn: false });
+  }
+  _b64ToBytes(b64) { const s = (b64 + '='.repeat((4 - b64.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(s); const out = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i); return out; }
   dismissNotif = () => this.setState({ notifPerm: 'dismissed' });
   switchMonthly = async () => {
     const r = await this._api('state', 'PUT', { cycle: 'MONTHLY' });
@@ -2512,7 +2535,7 @@ class Component extends DCLogic {
       notifAsk: st.notifPerm === 'default',
       notifIcon: st.notifPerm === 'granted' ? 'bell-ringing' : 'bell-slash',
       notifStatus: st.notifPerm === 'granted' ? 'Enabled on this device.' : st.notifPerm === 'denied' ? 'Blocked — enable in browser settings.' : 'Not enabled yet.',
-      notifStatus: st.notificationsOn === false ? 'Off - reminders stay inside Fitron.' : st.notifPerm === 'granted' ? 'Enabled on this device.' : st.notifPerm === 'denied' ? 'Blocked - enable in browser settings.' : 'Not enabled yet.',
+      notifStatus: st.notificationsOn === false ? 'Off - reminders stay inside Fitron.' : st.notifPerm === 'granted' ? (st.pushOn ? 'Enabled on this device, even when the app is closed.' : 'Enabled while the app is open.') : st.notifPerm === 'denied' ? 'Blocked - enable in browser settings.' : 'Not enabled yet.',
       notifEnabled: !!st.notificationsOn, notifLabel: st.notificationsOn ? 'On' : 'Off',
       notifTrackStyle: { width:'42px', height:'24px', borderRadius:'999px', flex:'none', padding:'3px', display:'flex', transition:'background .15s', background: st.notificationsOn ? 'var(--grad)' : 'var(--card-2)', border:'1px solid var(--line-2)', justifyContent: st.notificationsOn ? 'flex-end' : 'flex-start' },
       notifKnobStyle: { width:'18px', height:'18px', borderRadius:'50%', background: st.notificationsOn ? '#1a1408' : 'var(--mut)' },

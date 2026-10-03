@@ -56,6 +56,7 @@ This creates the gym, its first branch, the default roles and the Super Admin ac
 - Staff: add, edit, reset password, deactivate (signs them out).
 - My profile (avatar menu, top right): edit your name and mobile, upload a photo, change your password (signs out your other devices), see your recent activity.
 - Every change is written to the audit log.
+- AI Trainer push reminders: with VAPID keys set, members who enable notifications get workout, water, meal and sleep nudges on their phone even with the app closed, plus trial-ending, renewal-due and rejected-payment notices; `deploy/scheduler.sh` calls `/api/jobs/trainer` hourly.
 - AI Trainer set logging: each exercise card logs weight × reps for today; sets are kept per day, and Progress shows each lift from its first session to its best.
 - Gym Partnership: Settings makes the gym's trainer code; members type it into the AI Trainer (or open `/trainer?gym=CODE`) to link. Their record at the gym is matched by email or phone, their training shows on their member profile, and the Gym Partnership page lists linked members and the gym's 70% share of each month's AI Trainer payments.
 

@@ -1149,6 +1149,7 @@ model TrainerMember {
   gymLinkedAt  DateTime?     @db.Timestamptz
 
   sessions TrainerSession[]
+  pushes   TrainerPush[]
   days     TrainerDay[]
   chats    TrainerChat[]
   payments TrainerPayment[]
@@ -1277,6 +1278,23 @@ model TrainerPayment {
 }
 
 /// AI Coach messages a member sent on a day (India time), for the plan's daily limit.
+/// A device subscribed to push reminders (Web Push)
+model TrainerPush {
+  id         String        @id @default(cuid())
+  memberId   String
+  member     TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  endpoint   String        @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  /// Reminder key → the Indian date it was last sent, so each goes once a day
+  sent       Json          @default("{}")
+  failures   Int           @default(0)
+  createdAt  DateTime      @default(now()) @db.Timestamptz
+  lastUsedAt DateTime      @default(now()) @db.Timestamptz
+
+  @@index([memberId])
+}
 model TrainerCoachUsage {
   memberId String
   date     DateTime @db.Date

@@ -393,6 +393,7 @@ export async function deleteTrainerAccount(memberId: string) {
   const { email } = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId }, select: { email: true } });
   await db.$transaction([
     db.trainerSession.deleteMany({ where: { memberId } }),
+    db.trainerPush.deleteMany({ where: { memberId } }),
     db.trainerDay.deleteMany({ where: { memberId } }),
     db.trainerChat.deleteMany({ where: { memberId } }),
     db.trainerReview.deleteMany({ where: { memberId } }),
