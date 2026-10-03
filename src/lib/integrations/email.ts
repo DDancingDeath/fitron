@@ -6,7 +6,7 @@ import nodemailer from "nodemailer";
 
 export const emailReady = () => !!process.env.SMTP_HOST?.trim();
 
-let transport: nodemailer.Transporter | undefined;
+let transport: ReturnType<typeof nodemailer.createTransport> | undefined;
 function smtp() {
   transport ??= nodemailer.createTransport({
     host: process.env.SMTP_HOST!.trim(),
