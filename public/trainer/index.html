@@ -30,56 +30,9 @@
 
 <div class="appwrap {{ themeClass }}" style="min-height:100vh;background:radial-gradient(120% 80% at 80% -10%,rgba(217,180,90,.10),transparent 60%),var(--bg);display:flex;flex-direction:column;align-items:center;gap:16px;padding:64px 18px 46px">
 
-  <div class="devpill" style="position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:60;display:flex;align-items:center;gap:3px;padding:4px;border-radius:999px;background:var(--card);border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.5)">
-    <button class="btn" style="{{ deskPillStyle }}" onClick="{{ setDeviceDesktop }}"><i class="ph-duotone ph-desktop"></i>Desktop</button>
-    <button class="btn" style="{{ mobPillStyle }}" onClick="{{ setDeviceMobile }}"><i class="ph-duotone ph-device-mobile"></i>Phone</button>
-  </div>
-
   <div class="{{ frameCls }}" style="{{ frameStyle }}">
 
-    <!-- ================= LANDING ================= -->
-    <sc-if value="{{ showLanding }}" hint-placeholder-val="{{ false }}">
-    <div class="lp scr {{ lpMode }}">
-      <div class="lp-wrap">
-
-        <div class="lp-copy">
-          <img class="lp-brand" src="assets/brand/fitron-logo-clean.png" alt="Fitron, AI gym and health trainer">
-          <span class="lp-pill">Coming soon · Our new product</span>
-          <h1 class="lp-h1">Your AI<em>Personal</em>Trainer</h1>
-          <p class="lp-sub">Personalized fitness coaching without the personal-trainer price.</p>
-          <ul class="lp-feats">
-            <li><i class="ph-duotone ph-barbell"></i>Custom workout plans</li>
-            <li><i class="ph-duotone ph-bowl-food"></i>Personalized meal plans</li>
-            <li><i class="ph-duotone ph-calendar-check"></i>Daily planning &amp; reminders</li>
-            <li><i class="ph-duotone ph-chart-line-up"></i>Progress tracking</li>
-            <li><i class="ph-duotone ph-chat-circle-dots"></i>24/7 AI coach support</li>
-          </ul>
-          <div class="lp-prices">
-            <div class="lp-price"><b>₹299</b><span>per month</span><small>AI Pro</small></div>
-            <div class="lp-price lp-best"><em>Best value</em><s>₹3,588</s><b>₹1,999</b><span>per year</span><small>Save 44%</small></div>
-          </div>
-          <button class="lp-cta" onClick="{{ goLogin }}">Coming soon</button>
-          <p class="lp-trust"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;No long-term lock-in &nbsp;·&nbsp; Secure payments &nbsp;·&nbsp; Cancel anytime</p>
-        </div>
-
-        <div class="lp-visual">
-          <img src="assets/landing-visual.jpg" alt="The Fitron app on a laptop and a phone, with an athlete training behind them">
-        </div>
-
-      </div>
-
-      <div class="lp-band">
-        <div class="lp-b"><i class="ph-duotone ph-target"></i><span>Personalized<br>for you</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-barbell"></i><span>Expert-backed<br>programs</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-currency-inr"></i><span>Affordable<br>fitness</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-device-mobile"></i><span>Anytime,<br>anywhere</span></div>
-        <div class="lp-b"><i class="ph-duotone ph-chart-line-up"></i><span>Real<br>results</span></div>
-      </div>
-      <div class="lp-tag">A stronger, healthier you — powered by AI</div>
-    </div>
-    </sc-if>
-
-    <!-- ================= ADMIN LOGIN ================= -->
+    <!-- ================= LOGIN ================= -->
     <sc-if value="{{ showLogin }}" hint-placeholder-val="{{ true }}">
     <div class="scr" style="width:100%;height:100%;overflow-y:auto;display:flex;flex-direction:column;align-items:center;padding:36px 20px 28px;background:radial-gradient(90% 55% at 50% 0%,rgba(212,170,80,.18),transparent 70%),#0B0A08;color:#F4EFE3">
       <div style="width:100%;max-width:400px;display:flex;flex-direction:column;flex:1">
@@ -89,9 +42,7 @@
           <p style="text-align:center;font-size:14px;line-height:1.5;margin:0 0 24px;color:#B9B09C;text-wrap:pretty">{{ loginSub }}</p>
           <div style="display:flex;flex-direction:column;gap:12px">
             <button onClick="{{ googleLogin }}" style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:0 18px;border-radius:12px;border:1px solid #747775;background:#FFFFFF;color:#1F1F1F;font-family:Roboto,Arial,sans-serif;font-weight:500;font-size:15px;cursor:pointer"><svg width="20" height="20" viewBox="0 0 48 48" style="flex:none"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 34.9 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.2 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>Continue with Google</button>
-            <button onClick="{{ truecallerLogin }}" style="display:flex;align-items:center;justify-content:center;gap:12px;width:100%;min-height:52px;padding:0 18px;border-radius:12px;border:0;background:#0087FF;color:#FFFFFF;font-weight:700;font-size:15px;cursor:pointer"><span style="width:24px;height:24px;border-radius:7px;background:#FFFFFF;display:inline-grid;place-items:center;flex:none"><svg width="14" height="14" viewBox="0 0 24 24" fill="#0087FF"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1A17 17 0 0 1 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1L6.6 10.8z"></path></svg></span>Continue with Truecaller</button>
           </div>
-          <p style="font-size:12px;text-align:center;margin:10px 0 0;color:#8F8775">Truecaller sign-in works on Android phones only.</p>
           <button onClick="{{ goEmailSignin }}" style="display:block;margin:12px auto 0;padding:6px 10px;border:0;background:transparent;color:#E0B85C;font-weight:700;font-size:13px;cursor:pointer"><i class="ph-duotone ph-envelope-simple"></i>&nbsp;Sign in with an email link</button>
           <sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:10px 0 0;text-align:center">{{ linkErr }}</p></sc-if>
           <div style="display:flex;justify-content:center;gap:18px;flex-wrap:wrap;margin:20px 0 0;padding:16px 0 0;border-top:1px solid rgba(255,255,255,.08)">
@@ -514,120 +465,6 @@
       </div>
       </sc-if>
 
-      <!-- ===== ADMIN · OVERVIEW ===== -->
-      <sc-if value="{{ showAdmin }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:1000px">
-        <span class="kick">Admin · Fitron</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Admin overview</h1><p class="mut" style="margin:0">Who paid, who is due, and what needs you today. Members never see this console.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-top:20px"><sc-for list="{{ kpis }}" as="a" hint-placeholder-count="6"><div class="card"><div class="disp goldc" style="font-size:28px;font-weight:800;line-height:1">{{ a.v }}</div><div class="mut" style="font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-top:6px">{{ a.l }}</div></div></sc-for></div>
-        <sc-if value="{{ adminHasMsg }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:13px;margin:14px 0 0"><i class="ph-duotone ph-check-circle"></i>&nbsp;{{ adminMsg }}</p></sc-if>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:20px">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Renewals due &amp; lapsed</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goMembers }}">All members</a></div>
-            <sc-for list="{{ renewalsDue }}" as="m" hint-placeholder-count="4"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="min-width:150px;flex:1"><div style="font-weight:700">{{ m.name }}</div><div class="mut" style="font-size:12px">{{ m.plan }} · renews {{ m.renews }}</div></div><span style="{{ m.statusStyle }}">{{ m.status }}</span><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ m.remind }}">Remind</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ m.markPaid }}">Mark paid</button></div></div></sc-for>
-          </div>
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Recent payments</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goPayments }}">All transactions</a></div>
-            <sc-for list="{{ recentPayments }}" as="p" hint-placeholder-count="4"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:150px"><div style="font-weight:700">{{ p.name }}</div><div class="mut" style="font-size:12px">{{ p.date }} · {{ p.method }} · {{ p.plan }}</div></div><div style="text-align:right"><div class="disp" style="font-weight:700">{{ p.amount }}</div><div style="font-size:11px;font-weight:700;color:{{ p.statusColor }}">{{ p.status }}</div></div><sc-if value="{{ p.pending }}" hint-placeholder-val="{{ false }}"><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ p.verify }}"><i class="ph-duotone ph-seal-check"></i>&nbsp;Verify &amp; activate</button></sc-if></div></sc-for>
-          </div>
-          <sc-if value="{{ dbBackendOn }}" hint-placeholder-val="{{ false }}">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">UTR verification queue</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ reloadPending }}">Refresh</a></div>
-            <sc-if value="{{ dbPendingEmpty }}" hint-placeholder-val="{{ true }}"><p class="mut" style="font-size:13px;margin:8px 0 0">Nothing waiting — every UTR has been checked.</p></sc-if>
-            <sc-for list="{{ dbPendingRows }}" as="q" hint-placeholder-count="3"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:150px"><div style="font-weight:700">{{ q.name }}</div><div class="mut" style="font-size:12px">{{ q.plan }} · ₹{{ q.amount_inr }} · UTR {{ q.utr }} · {{ q.when }}</div></div><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ q.reject }}">Reject</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ q.verify }}"><i class="ph-duotone ph-seal-check"></i>&nbsp;Verify &amp; activate</button></div></sc-for>
-          </div>
-          </sc-if>
-        </div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-top:16px">
-          <div class="card"><div style="display:flex;align-items:center;justify-content:space-between"><span class="kick">Trainer bookings waiting</span><a style="font-size:12px;font-weight:600;cursor:pointer" onClick="{{ goBookings }}">All bookings</a></div>
-            <sc-for list="{{ bookingRows }}" as="b" hint-placeholder-count="3"><sc-if value="{{ b.pending }}" hint-placeholder-val="{{ true }}"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:0"><div style="font-weight:700">{{ b.name }} · {{ b.type }}</div><div class="mut" style="font-size:12px">{{ b.trainer }} · {{ b.when }}</div></div><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ b.decline }}">Decline</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ b.confirm }}">Confirm</button></div></div></sc-if></sc-for>
-          </div>
-          <div class="card"><span class="kick">Most requested workout types · 7 days</span><div class="row"><span>Upper body strength</span><span>8,412 &nbsp;<span class="chip">▲ 12%</span></span></div><div class="row"><span>Full-body / bodyweight</span><span>6,905 &nbsp;<span class="chip">▲ 9%</span></span></div><div class="row"><span>Fat loss / HIIT</span><span>5,120 &nbsp;<span class="chip-plain">▲ 2%</span></span></div><div class="row" style="border-bottom:none"><span>Mobility &amp; recovery</span><span>3,338 &nbsp;<span class="chip-plain">▼ 3%</span></span></div></div>
-        </div>
-        <p class="mut" style="font-size:13px;margin-top:16px"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;Members' AI conversations are never shown here. Every change on this console is written to the audit log.</p>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · MEMBERS ===== -->
-      <sc-if value="{{ showMembers }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:1000px">
-        <span class="kick">Members &amp; payments</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Members</h1><p class="mut" style="margin:0 0 16px">Tap a filter. Mark a payment when someone pays at the desk.</p>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><sc-for list="{{ memFilters }}" as="f" hint-placeholder-count="5"><span style="{{ f.style }}" onClick="{{ f.pick }}">{{ f.label }}</span></sc-for></div>
-        <sc-if value="{{ adminHasMsg }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:13px;margin:14px 0 0"><i class="ph-duotone ph-check-circle"></i>&nbsp;{{ adminMsg }}</p></sc-if>
-        <div style="display:flex;flex-direction:column;gap:10px;margin-top:16px">
-          <sc-for list="{{ memberRows }}" as="m" hint-placeholder-count="9">
-          <div class="card" style="display:flex;flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px">
-            <div style="width:40px;height:40px;border-radius:50%;background:var(--grad);color:#1a1408;display:grid;place-items:center;font-weight:800;flex:none">{{ m.initial }}</div>
-            <div style="flex:1;min-width:150px"><div style="font-weight:700;font-size:15px">{{ m.name }}</div><div class="mut" style="font-size:12px">{{ m.phone }} · {{ m.plan }} · {{ m.amount }}</div></div>
-            <div style="min-width:140px"><div class="mut" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em">Paid on · renews</div><div style="font-size:13px">{{ m.paidOn }} · {{ m.renews }}</div></div>
-            <div style="min-width:110px"><div class="mut" style="font-size:10px;text-transform:uppercase;letter-spacing:.06em">Active · workouts</div><div style="font-size:13px">{{ m.last }} · {{ m.wk }}</div></div>
-            <span style="{{ m.statusStyle }}">{{ m.status }}</span>
-            <div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ m.remind }}">Remind</button><sc-if value="{{ m.canMark }}" hint-placeholder-val="{{ true }}"><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ m.markPaid }}">Mark paid</button></sc-if></div>
-          </div>
-          </sc-for>
-        </div>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · PAYMENTS ===== -->
-      <sc-if value="{{ showPayments }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Transactions</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Payments</h1><p class="mut" style="margin:0 0 16px">Every UPI, card and net-banking payment from the gateway, plus desk payments you mark by hand.</p>
-        <div class="card"><sc-for list="{{ paymentRows }}" as="p" hint-placeholder-count="7"><div class="row" style="gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:160px"><div style="font-weight:700">{{ p.name }}</div><div class="mut" style="font-size:12px">{{ p.date }} · {{ p.method }} · {{ p.plan }}</div></div><div class="disp" style="font-weight:700;font-size:16px">{{ p.amount }}</div><div style="min-width:72px;text-align:right;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:{{ p.statusColor }}">{{ p.status }}</div></div></sc-for></div>
-        <p class="mut" style="font-size:12px;margin-top:12px"><i class="ph-duotone ph-lock-key goldc"></i>&nbsp;Card numbers are never stored. Only the gateway reference is kept.</p>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · BOOKINGS ===== -->
-      <sc-if value="{{ showBookings }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Human trainer escalation</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Trainer bookings</h1><p class="mut" style="margin:0 0 16px">Requests the AI coach hands over to your trainers. Confirm or decline; the member is notified in-app.</p>
-        <div style="display:flex;flex-direction:column;gap:10px"><sc-for list="{{ bookingRows }}" as="b" hint-placeholder-count="3"><div class="card" style="display:flex;flex-direction:row;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 16px"><div style="flex:1;min-width:180px"><div style="font-weight:700;font-size:15px">{{ b.name }}</div><div class="mut" style="font-size:12px">{{ b.type }} · {{ b.trainer }}</div><div class="mut" style="font-size:12px">{{ b.when }}</div></div><div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:{{ b.statusColor }}">{{ b.status }}</div><sc-if value="{{ b.pending }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:6px"><button class="btn btn-ghost" style="padding:7px 12px;font-size:12px" onClick="{{ b.decline }}">Decline</button><button class="btn btn-gold" style="padding:7px 12px;font-size:12px" onClick="{{ b.confirm }}">Confirm</button></div></sc-if></div></sc-for></div>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · CONTENT ===== -->
-      <sc-if value="{{ showContent }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:900px">
-        <span class="kick">Content library</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Content &amp; videos</h1><p class="mut" style="margin:0 0 16px">What the AI coach is allowed to recommend. Upload your trainers' form videos here; members see them on every exercise.</p>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px">
-          <div class="card"><span class="kick">Exercise library</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ videoCoverage }}</div><div class="mut" style="font-size:12px">exercises across Chest, Back, Shoulders, Arms, Legs, Core and Full Body, each tagged with the muscles it hits</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmExercise }}"><i class="ph-duotone ph-plus"></i>&nbsp;Add exercise</button></div>
-          <div class="card"><span class="kick">Form videos</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ reelCount }} <span class="mut" style="font-size:14px;font-family:var(--ui)">of {{ videoCoverage }}</span></div><div class="mut" style="font-size:12px">reels uploaded by your trainers. Missing ones show a placeholder to members.</div><button class="btn btn-gold" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmReel }}"><i class="ph-duotone ph-upload-simple"></i>&nbsp;Upload reel</button></div>
-          <div class="card"><span class="kick">Location-aware meals</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">By city</div><div class="mut" style="font-size:12px">The coach suggests foods by each member's city from onboarding, inside their budget. Block or add items here when members report something is not available.</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmRules }}"><i class="ph-duotone ph-map-pin"></i>&nbsp;Food rules</button></div>
-          <div class="card"><span class="kick">Meal library</span><div class="disp goldc" style="font-size:28px;font-weight:800;margin:8px 0 2px">{{ mealCount }}</div><div class="mut" style="font-size:12px">veg, non-veg, eggetarian and vegan meals built only from catalog items, with cost and macros</div><button class="btn btn-ghost" style="margin-top:12px;min-height:40px;padding:8px 14px;font-size:13px" onClick="{{ cmMeal }}"><i class="ph-duotone ph-fork-knife"></i>&nbsp;Add meal</button></div>
-        </div>
-        <div class="card" style="margin-top:18px"><span class="kick">Recent changes</span>
-          <sc-if value="{{ cmLogEmpty }}" hint-placeholder-val="{{ true }}"><div class="mut" style="font-size:13px;margin-top:8px">Nothing added yet. Changes you make above show up here.</div></sc-if>
-          <div style="display:flex;flex-direction:column;margin-top:6px"><sc-for list="{{ cmLog }}" as="c" hint-placeholder-count="0"><div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-2)"><i class="ph-duotone ph-{{ c.icon }} goldc" style="font-size:18px"></i><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:13.5px">{{ c.title }}</div><div class="mut" style="font-size:12px">{{ c.sub }}</div></div><button class="btn btn-ghost" style="min-height:36px;padding:6px 12px;font-size:12px" onClick="{{ c.remove }}">Remove</button></div></sc-for></div>
-        </div>
-        <sc-if value="{{ cmOpen }}" hint-placeholder-val="{{ false }}">
-        <div style="position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:18px" onClick="{{ cmClose }}">
-          <div style="width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5)" onClick="{{ cmStop }}">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><h3 class="disp" style="font-size:21px;margin:0">{{ cmTitle }}</h3><button class="pf-ic" style="min-width:40px;min-height:40px" onClick="{{ cmClose }}" aria-label="Close"><i class="ph-duotone ph-x"></i></button></div>
-            <p class="mut" style="font-size:13px;margin:6px 0 4px">{{ cmHelp }}</p>
-            <sc-if value="{{ cmIsReel }}" hint-placeholder-val="{{ false }}"><label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">Video file</label><input type="file" accept="video/*" onChange="{{ cmFile }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"></sc-if>
-            <label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelA }}</label><input value="{{ cmA }}" onInput="{{ cmSetA }}" placeholder="{{ cmPhA }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px">
-            <label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelB }}</label><select value="{{ cmB }}" onChange="{{ cmSetB }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"><sc-for list="{{ cmOptsB }}" as="o" hint-placeholder-count="3"><option value="{{ o }}">{{ o }}</option></sc-for></select>
-            <sc-if value="{{ cmHasC }}" hint-placeholder-val="{{ false }}"><label style="display:block;font-size:12px;font-weight:700;color:var(--mut);margin:12px 0 6px">{{ cmLabelC }}</label><input value="{{ cmC }}" onInput="{{ cmSetC }}" placeholder="{{ cmPhC }}" style="width:100%;box-sizing:border-box;min-height:44px;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card-2);color:var(--text);font:inherit;font-size:14px"></sc-if>
-            <sc-if value="{{ cmErr }}" hint-placeholder-val="{{ false }}"><p style="color:#e5735c;font-size:12.5px;margin:10px 0 0">{{ cmErr }}</p></sc-if>
-            <div style="display:flex;gap:10px;margin-top:18px"><button class="btn btn-ghost" style="flex:1;min-height:46px" onClick="{{ cmClose }}">Cancel</button><button class="btn btn-gold" style="flex:1;min-height:46px" onClick="{{ cmSave }}">{{ cmCta }}</button></div>
-          </div>
-        </div>
-        </sc-if>
-      </div>
-      </sc-if>
-
-      <!-- ===== ADMIN · SETTINGS ===== -->
-      <sc-if value="{{ showAdminSettings }}" hint-placeholder-val="{{ false }}">
-      <div style="padding:26px 24px 34px;max-width:720px">
-        <span class="kick">Console settings</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Settings &amp; audit</h1>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Pricing</h4>
-        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><span class="lab">Monthly plan</span><input class="fin" value="₹299"></div><div><span class="lab">Yearly plan</span><input class="fin" value="₹1,499"></div></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Social links</h4>
-        <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"><div><span class="lab">Instagram</span><input class="fin" placeholder="instagram.com/…"></div><div><span class="lab">WhatsApp</span><input class="fin" placeholder="Gym WhatsApp number"></div><div><span class="lab">YouTube</span><input class="fin" placeholder="Channel link"></div><div><span class="lab">Facebook</span><input class="fin" placeholder="Page link"></div></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">AI coach instructions</h4>
-        <div class="card"><span class="lab">Rules the coach follows for every member</span><div class="fin" style="min-height:96px;line-height:1.5;white-space:pre-wrap">Coach Fitron members in short, practical replies. Suggest only foods commonly available in the member's city and keep the week inside their budget. Never give medical advice; hand pain, injury or symptoms to a human trainer.</div><p class="mut" style="font-size:12px;margin:10px 0 0">Every edit here is versioned and audited.</p></div>
-        <h4 class="disp" style="font-size:18px;margin:22px 0 10px">Audit log</h4>
-        <div class="card"><div class="row"><span>Pricing reviewed, no change</span><span class="mut">Today · Admin</span></div><div class="row"><span>Coach instructions updated</span><span class="mut">2 Sep · Admin</span></div><div class="row" style="border-bottom:none"><span>3 form videos uploaded</span><span class="mut">1 Sep · Rahul</span></div></div>
-      </div>
-      </sc-if>
-
       <!-- ===== SETTINGS ===== -->
       <sc-if value="{{ showSettings }}" hint-placeholder-val="{{ false }}">
       <div style="padding:26px 24px 34px;max-width:640px"><span class="kick">Preferences</span><h1 class="disp" style="font-size:30px;margin:8px 0 4px">Settings</h1><p class="mut">Personalize how Fitron looks and reminds you.</p>
@@ -687,17 +524,16 @@
       </div>
       </sc-if>
 
-      <!-- ===== SIGNUP (Google / Truecaller / Email link) ===== -->
+      <!-- ===== SIGNUP (Google / Email link) ===== -->
       <sc-if value="{{ showSignup }}" hint-placeholder-val="{{ false }}">
       <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:36px 20px">
         <div style="width:100%;max-width:360px;text-align:center">
           <img src="assets/brand/fitron-mark-new.png" style="width:56px;height:56px;border-radius:17px;object-fit:cover;border:1px solid var(--line)">
           <h1 class="disp" style="font-size:24px;margin:12px 0 4px">{{ signupTitle }}</h1>
-          <p class="mut" style="font-size:13px;margin:0 0 18px">Google, Truecaller on Android, or an email link. No OTP, no password.</p>
+          <p class="mut" style="font-size:13px;margin:0 0 18px">Google, or an email link. No OTP, no password.</p>
           <sc-if value="{{ authHasNote }}" hint-placeholder-val="{{ false }}"><p class="goldc" style="font-size:12.5px;margin:-8px 0 14px;line-height:1.5"><i class="ph-duotone ph-info"></i>&nbsp;{{ authNote }}</p></sc-if>
           <div class="card" style="gap:0">
             <button class="btn btn-ghost btn-block" style="padding:13px" onClick="{{ googleLogin }}"><svg width="17" height="17" viewBox="0 0 48 48" style="flex:none"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.3-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 10-2 13.6-5.2l-6.3-5.3C29.2 34.9 26.7 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4 5.5l6.3 5.3C41.2 36.3 44 30.7 44 24c0-1.3-.1-2.3-.4-3.5z"/></svg>&nbsp;Sign up with Google</button>
-            <button class="btn btn-ghost btn-block" style="padding:13px;margin-top:10px" onClick="{{ truecallerLogin }}"><span style="width:18px;height:18px;border-radius:50%;background:#0087ff;display:inline-grid;place-items:center;color:#fff;font-size:11px;flex:none"><i class="ph-duotone ph-phone"></i></span>&nbsp;Sign up with Truecaller<span class="chip-plain" style="margin-left:8px;padding:2px 8px;font-size:10px">Android</span></button>
             <div style="display:flex;align-items:center;gap:10px;margin:14px 0"><div style="flex:1;height:1px;background:var(--line-2)"></div><span class="mut" style="font-size:11px">or</span><div style="flex:1;height:1px;background:var(--line-2)"></div></div>
             <sc-if value="{{ linkNotSent }}" hint-placeholder-val="{{ true }}"><div style="display:flex;gap:8px"><input class="fin" type="email" placeholder="Email address" value="{{ loginMail }}" onInput="{{ setLoginMail }}"><button class="btn btn-gold" style="flex:none;white-space:nowrap" onClick="{{ sendLink }}">Email me a link</button></div><p class="mut" style="font-size:11px;margin:8px 0 0;text-align:left">No password, no OTP. The link creates your account, or signs you in if you have one.</p><sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:8px 0 0;text-align:left">{{ linkErr }}</p></sc-if></sc-if>
             <sc-if value="{{ linkSent }}" hint-placeholder-val="{{ false }}"><div class="card" style="padding:14px;border-color:var(--gold);text-align:left"><div style="font-weight:700;font-size:14px"><i class="ph-duotone ph-envelope-open goldc"></i>&nbsp;Check your inbox</div><div class="mut" style="font-size:12px;margin-top:4px">We sent a sign-up link to {{ loginMail }}. Tap it on this phone to continue.</div><sc-if value="{{ devLinkOn }}" hint-placeholder-val="{{ false }}"><a href="{{ devLink }}" style="display:block;margin-top:8px;font-size:12px;font-weight:700;color:var(--gold);word-break:break-all">Email isn't set up on this server (development): open the sign-in link</a></sc-if><sc-if value="{{ linkHasErr }}" hint-placeholder-val="{{ false }}"><p style="font-size:12px;color:#F2867E;margin:8px 0 0">{{ linkErr }}</p></sc-if><div style="display:flex;gap:8px;margin-top:10px"><button class="btn btn-gold" style="padding:8px 14px;font-size:12px" onClick="{{ checkLink }}">I tapped the link</button><button class="btn btn-ghost" style="padding:8px 14px;font-size:12px" onClick="{{ resendLink }}">Resend</button></div></div></sc-if>
@@ -1154,31 +990,9 @@ class Component extends DCLogic {
     },
     obErr: false, suppDraft: '', avoidDraft: '',
     suppInfo: { whey: { brand:'MuscleBlaze Biozyme', serv:'1 scoop' }, pre: { brand:'GNC AMP Ripped', serv:'1 scoop' }, creatine: { brand:'MuscleBlaze Creatine', serv:'1 (5 g)' } },
-    bookings: [
-      { name:'Priya Singh', trainer:'Rahul · Strength coach', when:'Fri 6 Sep · 7:00 AM', type:'Form check · Squat', status:'Pending' },
-      { name:'Aman Kumar', trainer:'Neha · Nutrition', when:'Sat 7 Sep · 11:00 AM', type:'Diet consultation', status:'Pending' },
-      { name:'Rohit Das', trainer:'Rahul · Strength coach', when:'Mon 9 Sep · 6:30 PM', type:'Program review', status:'Confirmed' },
-    ],
-    members: [
-      { name:'Sumit Verma', phone:'+91 98765 43210', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'12 Oct 2025', renews:'12 Oct 2026', last:'Today', wk:'3/4' },
-      { name:'Priya Singh', phone:'+91 91234 56780', plan:'Monthly', status:'Due', amount:'₹299', paidOn:'5 Aug 2026', renews:'5 Sep 2026', last:'Yesterday', wk:'2/4' },
-      { name:'Aman Kumar', phone:'+91 99887 76655', plan:'Monthly', status:'Paid', amount:'₹299', paidOn:'1 Sep 2026', renews:'1 Oct 2026', last:'Today', wk:'4/4' },
-      { name:'Rohit Das', phone:'+91 93456 12345', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'20 Jun 2026', renews:'20 Jun 2027', last:'2 days ago', wk:'1/4' },
-      { name:'Neha Gupta', phone:'+91 90123 45678', plan:'Monthly', status:'Expired', amount:'₹299', paidOn:'2 Jul 2026', renews:'2 Aug 2026', last:'3 weeks ago', wk:'0/4' },
-      { name:'Vikas Mahto', phone:'+91 97890 11223', plan:'Monthly', status:'Due', amount:'₹299', paidOn:'6 Aug 2026', renews:'6 Sep 2026', last:'Today', wk:'3/4' },
-      { name:'Anjali Kumari', phone:'+91 96543 21098', plan:'Yearly', status:'Paid', amount:'₹1,499', paidOn:'15 Aug 2026', renews:'15 Aug 2027', last:'Yesterday', wk:'2/4' },
-      { name:'Deepak Sao', phone:'+91 94321 09876', plan:'Monthly', status:'Unpaid', amount:'₹299', paidOn:'—', renews:'—', last:'Never', wk:'0/4' },
-      { name:'Kajal Devi', phone:'+91 95678 12340', plan:'Monthly', status:'Paid', amount:'₹299', paidOn:'4 Sep 2026', renews:'4 Oct 2026', last:'Today', wk:'1/4' },
-    ],
-    payments: [
-      { date:'4 Sep 2026', name:'Kajal Devi', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'1 Sep 2026', name:'Aman Kumar', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'30 Aug 2026', name:'Deepak Sao', amount:'₹299', method:'Card', plan:'Monthly', status:'Failed' },
-      { date:'15 Aug 2026', name:'Anjali Kumari', amount:'₹1,499', method:'Net banking', plan:'Yearly', status:'Success' },
-      { date:'6 Aug 2026', name:'Vikas Mahto', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'5 Aug 2026', name:'Priya Singh', amount:'₹299', method:'UPI', plan:'Monthly', status:'Success' },
-      { date:'2 Jul 2026', name:'Neha Gupta', amount:'₹299', method:'Card', plan:'Monthly', status:'Refunded' },
-    ],
+    bookings: [],
+    members: [],
+    payments: [],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
     notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false, todaySets: [], setDraft: {}, pushOn: false, exVideos: {},
     selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
@@ -1809,7 +1623,7 @@ class Component extends DCLogic {
       payments,
       adminMsg: p.name + "'s " + p.plan + ' payment (' + p.amount + ') verified against UTR ' + p.utr + ' — receipt sent in-app, audit log updated.',
       activePlan: p.plan === 'Yearly' ? 'yearly' : 'monthly',
-      planMsg: 'Payment verified by Power Haus Gym — your ' + p.plan + ' plan is active.',
+      planMsg: 'Payment verified by FITRON — your ' + p.plan + ' plan is active.',
     };
   });
   logWorkout = () => this.setState(st => ({ workoutLogged: !st.workoutLogged, habits: st.workoutLogged ? st.habits : { ...st.habits, workout: true } }));
@@ -2367,27 +2181,6 @@ class Component extends DCLogic {
     const paymentRows = pays.map((p, i) => ({ ...p, statusColor: p.status === 'Pending' ? '#e8894a' : payColor(p.status), pending: p.status === 'Pending', verify: () => this.verifyUpiPayment(i) }));
     const recentPayments = paymentRows.slice(0, 4);
     const bookingRows = (st.bookings || []).map((b, i) => ({ ...b, pending: b.status === 'Pending', confirm: () => this.setBooking(i, 'Confirmed'), decline: () => this.setBooking(i, 'Declined'), statusColor: b.status === 'Confirmed' ? '#5ec2a0' : b.status === 'Declined' ? '#e06c6c' : '#e8894a' }));
-    // ----- when the backend is on, every admin screen reads real data, not the demo rows -----
-    const dbOn = false, dbM = st.dbMembers || [], dbS = st.dbStats, dbR = st.dbRecent || [];
-    let kpisOut = kpis, memberRowsOut = memberRows, renewalsDueOut = renewalsDue, recentPaymentsOut = recentPayments, memFiltersOut = memFilters;
-    if (dbOn && dbM.length) {
-      const f = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-      const rowOf = (m) => {
-        const status = m.plan_status === 'active' ? 'Paid' : (m.plan_status === 'trial' && m.trial_ends && new Date(m.trial_ends) > new Date() ? 'Trial' : 'Unpaid');
-        const nm = m.name || m.email || 'Member';
-        return { name: nm, phone: m.email || '', plan: m.plan_name || (status === 'Trial' ? 'Trial' : '—'), status, amount: m.plan_name === 'Yearly' ? '₹1,499' : m.plan_name === 'Monthly' ? '₹299' : '—', paidOn: f(m.created_at), renews: status === 'Trial' ? f(m.trial_ends) : '—', last: status, wk: '—', idx: 0, initial: nm[0].toUpperCase(), statusStyle: statusStyle(status), canMark: false, markPaid: () => {}, remind: () => this.remindMember(0, nm) };
-      };
-      const dbRows = dbM.map(rowOf);
-      memberRowsOut = dbRows.filter(m => st.memFilter === 'All' || m.status === st.memFilter);
-      renewalsDueOut = dbRows.filter(m => m.status !== 'Paid');
-      memFiltersOut = ['All', 'Paid', 'Trial', 'Unpaid'].map(fl => ({ label: fl, style: optStyle(st.memFilter === fl), pick: () => this.setMemFilter(fl) }));
-      if (dbS) kpisOut = [
-        { v: String(dbS.members), l: 'Members' }, { v: String(dbS.active), l: 'Paid & active' }, { v: String(dbS.trial), l: 'On trial' },
-        { v: String(dbS.unpaid), l: 'Unpaid / expired' }, { v: String(dbS.pending), l: 'UTRs to verify' },
-        { v: '₹' + Number(dbS.collected_month || 0).toLocaleString('en-IN'), l: 'Collected this month' },
-      ];
-      recentPaymentsOut = dbR.map(p => ({ name: p.name, date: new Date(p.submitted_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }), method: 'UPI · UTR ' + p.utr, plan: p.plan, amount: '₹' + p.amount_inr, status: p.status === 'verified' ? 'Success' : p.status === 'rejected' ? 'Failed' : 'Pending', statusColor: p.status === 'verified' ? '#5ec2a0' : p.status === 'rejected' ? '#e06c6c' : '#e8894a', pending: false, verify: () => {} }));
-    }
     const videoCoverage = Object.values(lib).reduce((a, l) => a + l.length, 0);
     const chipsOf = (k, list, multi) => list.map(v => ({ label: v, style: optStyle(multi ? (ob[k] || []).includes(v) : ob[k] === v), pick: () => multi ? this.toggleOb(k, v) : this.pickOb(k, v) }));
     const suppInfo = st.suppInfo || {};
@@ -2654,7 +2447,7 @@ class Component extends DCLogic {
       profileName: isAdmin ? 'Fitron Admin' : (ob.name || 'Member'), profileSub: isAdmin ? 'Admin console' : 'View profile',
       showMembers: s==='members', showPayments: s==='payments', showBookings: s==='bookings', showContent: s==='content', showAdminSettings: s==='adminsettings',
       goMembers: () => this.nav('members'), goPayments: () => this.nav('payments'), goBookings: () => this.nav('bookings'),
-      kpis: kpisOut, renewalsDue: renewalsDueOut, recentPayments: recentPaymentsOut, memberRows: memberRowsOut, memFilters: memFiltersOut, adminMsg: st.adminMsg || '', adminHasMsg: !!st.adminMsg,
+      kpis, renewalsDue, recentPayments, memberRows, memFilters, adminMsg: st.adminMsg || '', adminHasMsg: !!st.adminMsg,
       paymentRows, bookingRows, videoCoverage,
       city, firstName, waterGoalLabel: waterGoal.toFixed(1),
       obBudget: ob.budget,

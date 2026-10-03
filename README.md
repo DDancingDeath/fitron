@@ -8,7 +8,7 @@ One product for India's fitness market, live at **fitron.in**, in three parts th
 
 They work together: a gym on FITRON gives its members the AI Trainer under its own brand, sees their training next to their dues, and earns 70% of members' AI Trainer subscriptions through the Gym Partnership.
 
-The AI Trainer's design is the browser demo in `prototype/ai-trainer/` (serve the folder and open `index.html`); it is being built into the app at `/trainer`.
+The AI Trainer's design is the browser demo in `prototype/ai-trainer/` (serve the folder and open `index.html`). The app serves it, wired to the real backend, at `/trainer` from `public/trainer/`; the demo's unreachable admin console, landing page and preview controls are not in that copy.
 
 ## What's here
 
