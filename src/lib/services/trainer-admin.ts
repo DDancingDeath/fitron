@@ -53,7 +53,9 @@ export async function reviewTrainerPayment(reviewer: { email: string }, id: stri
   const amount = `Rs ${(p.total / 100).toFixed(2)}`;
   if (decision === "REJECT") {
     if (!reason.trim()) throw new UserError("Say why, so the member knows what to fix.");
-    await db.trainerPayment.update({ where: { id }, data: { status: "REJECTED", reviewedBy: reviewer.email, reviewedAt: new Date(), rejectReason: reason.trim().slice(0, 200) } });
+    // Only while it's still waiting: never over a payment someone else just confirmed.
+    const rejected = await db.trainerPayment.updateMany({ where: { id, status: { in: ["SUBMITTED", "REJECTED"] } }, data: { status: "REJECTED", reviewedBy: reviewer.email, reviewedAt: new Date(), rejectReason: reason.trim().slice(0, 200) } });
+    if (!rejected.count) throw new UserError("This payment was just confirmed by someone else.");
     await sendEmail({
       to: p.member.email,
       subject: "We couldn't confirm your FITRON payment",
@@ -69,7 +71,11 @@ export async function reviewTrainerPayment(reviewer: { email: string }, id: stri
     const m = fresh.member;
     const trialLast = m.trialEndsAt ? addDays(todayIso(m.trialEndsAt), -1) : null;
     const period = trainerPeriod(fresh.cycle as Cycle, today, m.paidUntil ? toIso(m.paidUntil) : null, trialLast);
-    await tx.trainerMember.update({ where: { id: m.id }, data: { plan: fresh.plan, cycle: fresh.cycle, paidUntil: fromIso(period.end), planCancelled: false } });
+    // A move to AI Pro waits until the AI Premium time already paid for runs out (currentTrainer then
+    // switches it); a move up to AI Premium starts at once.
+    const paidPremiumLeft = m.plan === "ai-premium" && !!m.paidUntil && toIso(m.paidUntil) >= today;
+    const plan = fresh.plan === "ai-pro" && paidPremiumLeft ? m.plan : fresh.plan;
+    await tx.trainerMember.update({ where: { id: m.id }, data: { plan, cycle: fresh.cycle, paidUntil: fromIso(period.end), planCancelled: false } });
     return tx.trainerPayment.update({
       where: { id },
       data: { status: "PAID", paidAt: new Date(), periodStart: fromIso(period.start), periodEnd: fromIso(period.end), reviewedBy: reviewer.email, reviewedAt: new Date(), rejectReason: null },

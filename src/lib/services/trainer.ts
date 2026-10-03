@@ -7,6 +7,7 @@ import { COACH_DAILY_LIMIT, isTrainerPlan, plannedSessions, progress, reviewInsi
 import type { Cycle } from "@/lib/domain/pricing";
 import { emailReady, sendEmail } from "@/lib/integrations/email";
 import { cleanUtr, fitronAdmins, fitronUpi, upiLink } from "@/lib/integrations/upi";
+import { appUrl } from "./accounts";
 import { isUniqueViolation, UserError } from "./errors";
 import { sha256 } from "./trainer-session";
 import { fromIso, toIso, todayIso } from "./time";
@@ -15,7 +16,6 @@ import { fromIso, toIso, todayIso } from "./time";
 // accounts, what the member told the app, their daily log, coach chats, and UPI payments to FITRON.
 
 const LINK_MINUTES = 30;
-const appUrl = () => process.env.APP_URL?.trim() || "https://fitron.in";
 
 export const normEmail = (e: string) => e.trim().toLowerCase();
 
@@ -41,20 +41,23 @@ export async function findOrCreateTrainer(email: string, via: "EMAIL" | "GOOGLE"
  * Emails a one-time sign-in link. The link both creates the account and signs in an existing one.
  * Without SMTP (development only) the link is returned so it can be shown on screen instead.
  */
-export async function requestTrainerLink(email: string, origin?: string) {
+/** Emails a one-time sign-in link. It always points at APP_URL (fitron.in), never at whatever address the request came in on. */
+export async function requestTrainerLink(email: string) {
   const e = normEmail(email);
   if (!validEmail(e)) throw new UserError("Enter a valid email address.");
   const recent = await db.trainerLoginToken.count({ where: { email: e, createdAt: { gt: new Date(Date.now() - 3_600_000) } } });
   if (recent >= 5) throw new UserError("Too many links asked for this email. Use the latest one in your inbox, or try again in an hour.");
   const token = randomBytes(32).toString("base64url");
   await db.trainerLoginToken.create({ data: { id: sha256(token), email: e, expiresAt: new Date(Date.now() + LINK_MINUTES * 60_000) } });
-  const link = `${(origin || appUrl()).replace(/\/$/, "")}/api/trainer/auth/verify?token=${token}`;
+  const link = `${appUrl()}/api/trainer/auth/verify?token=${token}`;
   const r = await sendEmail({
     to: e,
     subject: "Your FITRON sign-in link",
     text: `Tap this link to sign in to your FITRON AI Trainer:\n\n${link}\n\nIt works once and expires in ${LINK_MINUTES} minutes. If you didn't ask for it, ignore this email.\n\nFITRON\nhello@fitron.in`,
   });
   const devLink = !emailReady() && process.env.NODE_ENV !== "production" ? link : undefined;
+  // Never tell them to check their inbox when nothing was sent.
+  if (!r.sent && !devLink) throw new UserError("We couldn't send the email just now. Use Continue with Google, or try again in a few minutes.");
   return { sent: r.sent, devLink };
 }
 
@@ -108,10 +111,11 @@ function focusOn(profile: Record<string, unknown>, date: string) {
 
 export type DayInput = { water?: number; habits?: unknown; workoutDone?: boolean };
 
-/** Saves what the member changed: the app's state, and/or today's log. */
-export async function saveTrainerState(memberId: string, input: { profile?: unknown; day?: DayInput; name?: string; onboarded?: boolean; consented?: boolean; plan?: string; cycle?: string }, today = todayIso()) {
+/** Saves what the member changed: the app's state, and/or today's log. The plan itself never changes here: only starting the trial or a confirmed payment sets it. */
+export async function saveTrainerState(memberId: string, input: { profile?: unknown; day?: DayInput; name?: string; onboarded?: boolean; consented?: boolean; cycle?: string }, today = todayIso()) {
   const m = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId } });
-  const data: Prisma.TrainerMemberUpdateInput = {};
+  if (m.deletedEmailHash) return;
+  const data: Prisma.TrainerMemberUpdateManyMutationInput = {};
   let profile = (m.profile ?? {}) as Record<string, unknown>;
   if (input.profile !== undefined) {
     profile = cleanProfile(input.profile);
@@ -122,9 +126,9 @@ export async function saveTrainerState(memberId: string, input: { profile?: unkn
   if (input.name !== undefined) data.name = String(input.name).trim().slice(0, 100);
   if (input.onboarded && !m.onboardedAt) data.onboardedAt = new Date();
   if (input.consented && !m.consentedAt) data.consentedAt = new Date();
-  if (input.plan !== undefined && isTrainerPlan(input.plan)) data.plan = input.plan;
   if (input.cycle === "MONTHLY" || input.cycle === "YEARLY") data.cycle = input.cycle;
-  if (Object.keys(data).length) await db.trainerMember.update({ where: { id: memberId }, data });
+  // Not onto an account deleted while this save was on its way.
+  if (Object.keys(data).length && !(await db.trainerMember.updateMany({ where: { id: memberId, deletedEmailHash: null }, data })).count) return;
 
   const weight = parseFloat(String((profile.ob as { weight?: unknown } | undefined)?.weight ?? ""));
   const weightKg = weight >= 25 && weight <= 300 ? weight : null;
@@ -230,6 +234,10 @@ export const deleteTrainerChat = (memberId: string, clientId: string) => db.trai
 export async function startTrainerTrial(memberId: string, plan?: string) {
   const m = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId } });
   if (m.trialEndsAt) throw new UserError("Your free trial has already been used. Pick a plan to keep going.");
+  // Once per email, even across a deleted account.
+  if (await db.trainerMember.findFirst({ where: { deletedEmailHash: sha256(m.email), trialEndsAt: { not: null } }, select: { id: true } })) {
+    throw new UserError("This email has already had a free trial. Pick a plan to keep going.");
+  }
   if (m.paidUntil && toIso(m.paidUntil) >= todayIso()) throw new UserError("Your plan is already active.");
   const updated = await db.trainerMember.updateMany({
     where: { id: memberId, trialEndsAt: null },
@@ -314,7 +322,11 @@ export async function takeCoachMessage(m: TrainerMember, today = todayIso()): Pr
     create: { memberId: m.id, date: fromIso(today), count: 1 },
     update: { count: { increment: 1 } },
   });
-  if (row.count > limit) return { ok: false, reason: "LIMIT", used: limit, limit };
+  if (row.count > limit) {
+    // Turned away, so it doesn't count: an upgrade later today gets its full extra allowance.
+    await db.trainerCoachUsage.updateMany({ where: { memberId: m.id, date: fromIso(today), count: { gt: limit } }, data: { count: limit } });
+    return { ok: false, reason: "LIMIT", used: limit, limit };
+  }
   return { ok: true, used: row.count, limit };
 }
 
@@ -327,15 +339,26 @@ export async function refundCoachMessage(memberId: string, today = todayIso()) {
 
 /** A copy of everything kept for the member (Settings › Request my data). */
 export async function exportTrainer(memberId: string) {
-  const m = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId }, include: { days: { orderBy: { date: "asc" } }, chats: true, payments: true, reviews: true } });
+  const m = await db.trainerMember.findUniqueOrThrow({
+    where: { id: memberId },
+    include: { days: { orderBy: { date: "asc" } }, chats: true, payments: true, reviews: true, sessions: { orderBy: { createdAt: "asc" } } },
+  });
+  const [usage, links] = await Promise.all([
+    db.trainerCoachUsage.findMany({ where: { memberId }, orderBy: { date: "asc" } }),
+    db.trainerLoginToken.findMany({ where: { email: m.email }, orderBy: { createdAt: "asc" } }),
+  ]);
   return {
     exportedAt: new Date().toISOString(),
-    account: memberView(m),
+    account: { ...memberView(m), signupVia: m.signupVia, createdAt: m.createdAt.toISOString(), emailVerifiedAt: m.emailVerifiedAt?.toISOString() ?? null, lastSeenAt: m.lastSeenAt?.toISOString() ?? null },
     profile: m.profile,
     days: m.days.map(dayLog),
     chats: m.chats.map((c) => ({ title: c.title, updatedAt: c.updatedAt, messages: c.messages })),
-    weeklyReviews: m.reviews.map((r) => ({ weekStart: toIso(r.weekStart), workouts: r.workouts, planned: r.planned, consistency: r.consistency, nutrition: r.nutrition, avgWater: r.avgWater, insight: r.insight })),
+    weeklyReviews: m.reviews.map((r) => ({ weekStart: toIso(r.weekStart), workouts: r.workouts, planned: r.planned, consistency: r.consistency, nutrition: r.nutrition, avgWater: r.avgWater, insight: r.insight, focus: r.focus })),
     payments: m.payments.map(paymentView),
+    // Devices signed in (the token itself is never included), sign-in emails, and AI Coach messages per day.
+    signedInDevices: m.sessions.map((x) => ({ signedInAt: x.createdAt.toISOString(), lastSeenAt: x.lastSeenAt.toISOString(), expiresAt: x.expiresAt.toISOString(), ip: x.ip, device: x.userAgent })),
+    signInEmails: links.map((t) => ({ sentAt: t.createdAt.toISOString(), usedAt: t.usedAt?.toISOString() ?? null })),
+    coachMessagesPerDay: usage.map((u) => ({ date: toIso(u.date), messages: u.count })),
   };
 }
 
@@ -344,12 +367,14 @@ export async function exportTrainer(memberId: string) {
  * must keep them for tax), tied to an account with no email or profile left.
  */
 export async function deleteTrainerAccount(memberId: string) {
+  const { email } = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId }, select: { email: true } });
   await db.$transaction([
     db.trainerSession.deleteMany({ where: { memberId } }),
     db.trainerDay.deleteMany({ where: { memberId } }),
     db.trainerChat.deleteMany({ where: { memberId } }),
     db.trainerReview.deleteMany({ where: { memberId } }),
     db.trainerCoachUsage.deleteMany({ where: { memberId } }),
-    db.trainerMember.update({ where: { id: memberId }, data: { email: `deleted-${memberId}@deleted.fitron.in`, name: "", profile: {}, emailVerifiedAt: null } }),
+    db.trainerLoginToken.deleteMany({ where: { email } }),
+    db.trainerMember.update({ where: { id: memberId }, data: { email: `deleted-${memberId}@deleted.fitron.in`, name: "", profile: {}, emailVerifiedAt: null, deletedEmailHash: sha256(email) } }),
   ]);
 }

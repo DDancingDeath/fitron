@@ -14,7 +14,10 @@ export function GET(req: NextRequest) {
   const cycle = q.get("cycle") ?? "";
   if (!googleReady()) return NextResponse.redirect(new URL(`${GOOGLE_BACK[flow]}?google=off`, appUrl()));
 
-  const { verifier, challenge, state } = newPkce();
+  const pkce = newPkce();
+  const { verifier, challenge } = pkce;
+  // The flow rides in the state too, so if the cookie has expired the callback still knows where to send them back.
+  const state = `${flow}.${pkce.state}`;
   const res = NextResponse.redirect(authUrl({ redirectUri: `${appUrl()}/auth/google/callback`, state, challenge }));
   res.cookies.set(GOOGLE_FLOW_COOKIE, sign({ state, verifier, flow, next, plan, cycle }, 10 * 60_000), {
     httpOnly: true,

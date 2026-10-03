@@ -1541,6 +1541,7 @@ class Component extends DCLogic {
   }
   applyUser(d) {
     const m = d.member, p = d.profile || {}, t = d.today;
+    try { const owner = localStorage.getItem('fitron.owner'); if (owner && owner !== m.email) this._forgetDevice(); localStorage.setItem('fitron.owner', m.email); } catch (e) {}
     try { if (p.theme) localStorage.setItem('aif-look', p.theme); } catch (e) {}
     if (p.avatar) this._av = p.avatar;
     if (p.groc) this._g = p.groc;
@@ -1565,19 +1566,24 @@ class Component extends DCLogic {
     }, () => { this._applyMember(m); this._savedP = JSON.stringify(this._profileSnap()); this._savedD = JSON.stringify(this._daySnap()); this._loaded = true; });
   }
   async persistProfile() { return this._flush(); }
-  logout = async () => { await this._flush(); await this._api('auth/logout', 'POST'); window.location.replace('/trainer'); };
+  // What this phone keeps for the signed-in member (photo, grocery list, chats). Cleared on
+  // sign-out, account deletion, or when someone else signs in here, so it never shows up in another account.
+  _forgetDevice() { try { ['fitron.avatar', 'fitron.chats', 'fitron.content', 'fitron.groc', 'fitron.owner'].forEach(k => localStorage.removeItem(k)); } catch (e) {} this._av = undefined; this._ch = undefined; }
+  logout = async () => { await this._flush(); await this._api('auth/logout', 'POST'); this._forgetDevice(); window.location.replace('/trainer'); };
   checkLink = async () => { const ok = await this.restoreSession(); if (!ok) this.setState({ linkErr: 'Open the link we emailed you (on this phone) to sign in, then come back here.' }); };
   requestData = () => { window.location.href = '/api/trainer/account'; };
   deleteAccount = async () => {
     if (!window.confirm('Delete your FITRON account? Your profile, plan, logs and coach chats are erased and you are signed out. Payment records are kept for tax, without your details. This cannot be undone.')) return;
     const r = await this._api('account', 'DELETE');
     if (!r.ok) return window.alert(r.error);
+    this._forgetDevice();
     window.location.replace('/trainer');
   };
   orderFood = (service, meal) => {
     const name = service === 'zomato' ? 'Zomato' : 'Blinkit';
     const query = encodeURIComponent(meal || 'healthy meal');
-    const city = String((this.state.ob || {}).city || '').trim();
+    // only when "Use my city for food suggestions" is on
+    const city = (this.state.consent || {}).city ? String((this.state.ob || {}).city || '').trim() : '';
     const location = encodeURIComponent(city || 'your saved location');
     const url = service === 'zomato'
       ? `https://www.zomato.com/search?q=${query}&location=${location}`
@@ -1649,7 +1655,9 @@ class Component extends DCLogic {
   }
   payCfg(kind) {
     const k = kind || this.state.payModal;
-    const { tier, cycle } = this._payPlan(k);
+    // once the server has made the payment, show exactly what its QR asks for
+    const pi = !kind && this.state.payInfo;
+    const { tier, cycle } = pi ? { tier: pi.plan, cycle: pi.cycle } : this._payPlan(k);
     const pr = this._price(tier, cycle), name = this._tierName(tier);
     const c = { plan: name + ' · ' + (cycle === 'YEARLY' ? 'Yearly' : 'Monthly'), amount: pr.total, am: pr.am, sub: (cycle === 'YEARLY' ? 'one year' : 'one month') + ' · incl. 18% GST', per: (cycle === 'YEARLY' ? '/ year' : '/ month') + ' · incl. GST' };
     if (k === 'month') return { ...c, title: 'Add another month' };
@@ -1657,7 +1665,8 @@ class Component extends DCLogic {
     if (k === 'purchase') return { ...c, title: 'Unlock your plan' };
     return { ...c, title: 'Upgrade to Yearly' };
   }
-  upiUri() { return (this.state.payInfo && this.state.payInfo.link) || '#'; }
+  // until the payment is ready, tapping the button stays on this page (a bare '#' would reload it: <base href>)
+  upiUri() { return (this.state.payInfo && this.state.payInfo.link) || location.pathname + location.search + '#'; }
   drawQR(tries) {
     tries = tries || 0;
     const canvas = document.getElementById('fitron-qr');
@@ -1836,14 +1845,16 @@ class Component extends DCLogic {
   coachProfile() {
     const st = this.state, o = st.ob || {}, si = st.suppInfo || {};
     const supp = Object.keys(si).map(k => { const v = si[k] || {}; return v.brand ? v.brand + ' ' + (v.per || '?') + 'g x ' + (v.servings || '?') + ' a day' : ''; }).filter(Boolean).join('; ');
+    // no name: it isn't sent to the AI provider (see the consent screen); city only if they allowed it
+    const near = !(st.consent && st.consent.city === false);
     return {
-      name: o.name, age: o.age, sex: o.sex, height: o.height, weight: o.weight,
+      age: o.age, sex: o.sex, height: o.height, weight: o.weight,
       goal: o.goal, extras: o.extras, trainNow: o.trainNow, dayLike: o.dayLike,
       injuries: o.injuries, injuryNote: o.injuryNote,
       days: o.days, session: o.session, trainAt: o.exactTime || o.timeOfDay, wake: o.wake, sleep: o.sleep,
       equipment: o.equipment, gymName: o.gymName,
       diet: o.diet, cuisines: o.cuisines, avoid: o.avoid, mealsDay: o.mealsDay, cooks: o.cooks,
-      state: o.state, city: o.city, budget: o.budget,
+      state: near ? o.state : '', city: near ? o.city : '', budget: o.budget,
       supps: [...(o.supps || []), ...(o.suppCustom || [])], suppDetail: supp,
       split: Object.keys(st.plan || {}).map(d => d + ' ' + st.plan[d]).join(', '),
       todayFocus: this.focusToday(),

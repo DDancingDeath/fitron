@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomBytes } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { db } from "@/lib/db";
+import { fromIso, todayIso } from "./time";
 
 // AI Trainer members sign in separately from gym staff: their own cookie, their own session table.
 
@@ -37,7 +38,19 @@ export async function currentTrainer() {
     await db.trainerSession.update({ where: { id }, data: { lastSeenAt: new Date(now) } }).catch(() => {});
     await db.trainerMember.update({ where: { id: s.memberId }, data: { lastSeenAt: new Date(now) } }).catch(() => {});
   }
-  return s.member;
+  return currentPlan(s.member);
+}
+
+/**
+ * A move down to AI Pro is confirmed to start after the AI Premium time already paid for (see
+ * reviewTrainerPayment). Once that day comes, the member's saved plan follows the latest payment.
+ */
+export async function currentPlan<M extends { id: string; plan: string }>(m: M): Promise<M> {
+  if (m.plan !== "ai-premium") return m;
+  const latest = await db.trainerPayment.findFirst({ where: { memberId: m.id, status: "PAID" }, orderBy: { paidAt: "desc" }, select: { plan: true, periodStart: true } });
+  if (latest?.plan !== "ai-pro" || !latest.periodStart || latest.periodStart > fromIso(todayIso())) return m;
+  await db.trainerMember.update({ where: { id: m.id }, data: { plan: "ai-pro" } });
+  return { ...m, plan: "ai-pro" };
 }
 
 export async function endTrainerSession() {

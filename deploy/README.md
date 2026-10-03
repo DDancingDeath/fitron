@@ -103,10 +103,11 @@ The script:
 
 - installs Docker and opens the server's firewall
 - asks for your web address
+- asks for your UPI ID (printed under your QR) and the email you'll confirm payments with
 - generates the database password and secret keys
 - builds and starts everything
 
-The first build takes 5 to 10 minutes. At the end it asks for your gym name and owner login. Use your own email here: it becomes the FITRON team login that confirms payments in step 9.
+The first build takes 5 to 10 minutes. At the end it asks for your gym name and owner login. Use the same email you gave for confirming payments: that login opens the payments page in step 9.
 
 Open `https://your-address` to see the website, and `https://your-address/login` to sign in. 🎉
 
@@ -122,7 +123,7 @@ nano deploy/.env
 |---|---|---|
 | WhatsApp (official) | `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_APP_SECRET` | In Meta: webhook `https://your-address/api/webhooks/whatsapp`, verify token = `WHATSAPP_VERIFY_TOKEN` from the file |
 | UPI Autopay (your gym's Razorpay) | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET` | Razorpay webhook `https://your-address/api/webhooks/razorpay` |
-| **Payments to FITRON** (your UPI QR) | `FITRON_UPI_ID` (the UPI ID printed under your QR, e.g. `fitron@okaxis`), `FITRON_UPI_NAME` (name shown in the payer's app), `FITRON_ADMIN_EMAILS` (your login email; several are comma separated) | Nothing else. See step 9 |
+| **Payments to FITRON** (your UPI QR) | `FITRON_UPI_ID` (the UPI ID printed under your QR, e.g. `fitron@okaxis`), `FITRON_UPI_NAME` (name shown in the payer's app), `FITRON_ADMIN_EMAILS` (your login email; several are comma separated). The installer fills in the UPI ID and email you typed | Nothing else. See step 9 |
 | Your details on FITRON's invoices to gyms | `FITRON_LEGAL_NAME`, `FITRON_GSTIN`, `FITRON_ADDRESS` | Leave `FITRON_GSTIN` empty if you're not GST-registered yet |
 | **Sign in with Google** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | See "Google sign-in" below. Until both are set, the Google button stays hidden and email + password still work |
 | Fitron AI and the AI Trainer's coach | `ANTHROPIC_API_KEY` | from console.anthropic.com |

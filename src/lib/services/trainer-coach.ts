@@ -8,8 +8,9 @@ import { todayIso } from "./time";
 
 export type CoachTurn = { role: "user" | "assistant"; text: string };
 
+// No name or email: the consent screen promises members they aren't sent to the AI provider.
 const FIELDS: [string, string][] = [
-  ["name", "Name"], ["age", "Age"], ["sex", "Sex"], ["height", "Height (cm)"], ["weight", "Weight (kg)"],
+  ["age", "Age"], ["sex", "Sex"], ["height", "Height (cm)"], ["weight", "Weight (kg)"],
   ["goal", "Main goal"], ["extras", "Also wants"], ["trainNow", "Trains now"], ["dayLike", "Their day"],
   ["injuries", "Injuries"], ["injuryNote", "Injury note"], ["days", "Training days"], ["session", "Session length"],
   ["trainAt", "Trains at"], ["wake", "Wakes"], ["sleep", "Sleeps"], ["equipment", "Equipment"], ["gymName", "Gym"],
@@ -27,6 +28,11 @@ export function profileLines(saved: Record<string, unknown>, sent: Record<string
   const merged: Record<string, unknown> = { ...sent, ...Object.fromEntries(Object.entries(ob).filter(([, v]) => v !== "" && v != null && !(Array.isArray(v) && !v.length))) };
   if (ob.exactTime || ob.timeOfDay) merged.trainAt = ob.exactTime || ob.timeOfDay;
   if (Array.isArray(ob.supps) || Array.isArray(ob.suppCustom)) merged.supps = [...((ob.supps as unknown[]) ?? []), ...((ob.suppCustom as unknown[]) ?? [])];
+  // "Use my city for food suggestions" is optional: when it's off, the coach isn't told where they live.
+  if ((saved.consentPrefs as { city?: unknown } | undefined)?.city === false) {
+    delete merged.city;
+    delete merged.state;
+  }
   return FIELDS.map(([k, label]) => [label, val(merged[k])] as const)
     .filter(([, v]) => v)
     .map(([label, v]) => `- ${label}: ${v}`);
