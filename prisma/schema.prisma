@@ -1197,6 +1197,8 @@ model TrainerDay {
   /// The day's training focus from the plan (Chest, Legs, Rest…)
   focus       String?
   weightKg    Float?
+  /// Sets logged that day, in order: [{ ex, kg, reps }]
+  sets        Json          @default("[]")
   updatedAt   DateTime      @updatedAt @db.Timestamptz
 
   @@unique([memberId, date])

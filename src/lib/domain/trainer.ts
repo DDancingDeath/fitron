@@ -37,7 +37,33 @@ export function weekStart(d: IsoDate): IsoDate {
   return addDays(d, -((dow + 6) % 7));
 }
 
-export type DayLog = { date: IsoDate; water: number; habits: Record<string, boolean>; workoutDone: boolean; focus: string | null; weightKg: number | null };
+/** One logged set: the exercise as shown, the load and the reps. */
+export type SetLog = { ex: string; kg: number; reps: number };
+export type DayLog = { date: IsoDate; water: number; habits: Record<string, boolean>; workoutDone: boolean; focus: string | null; weightKg: number | null; sets?: SetLog[] };
+
+/** A set is "heavier" by load first, then by reps at that load. */
+const heavier = (a: { kg: number; reps: number }, b: { kg: number; reps: number }) => a.kg > b.kg || (a.kg === b.kg && a.reps > b.reps);
+
+export type Lift = { ex: string; first: { kg: number; reps: number; date: IsoDate }; best: { kg: number; reps: number; date: IsoDate }; sessions: number };
+
+/** Each exercise's heaviest set on the first day it was logged and on its best day ever, most-trained first. */
+export function strength(days: DayLog[]): Lift[] {
+  const byEx = new Map<string, Lift>();
+  for (const d of [...days].sort((a, b) => (a.date < b.date ? -1 : 1))) {
+    const top = new Map<string, SetLog>();
+    for (const s of d.sets ?? []) if (!top.has(s.ex) || heavier(s, top.get(s.ex)!)) top.set(s.ex, s);
+    for (const [ex, s] of top) {
+      const l = byEx.get(ex);
+      const at = { kg: s.kg, reps: s.reps, date: d.date };
+      if (!l) byEx.set(ex, { ex, first: at, best: at, sessions: 1 });
+      else {
+        l.sessions++;
+        if (heavier(s, l.best)) l.best = at;
+      }
+    }
+  }
+  return [...byEx.values()].sort((a, b) => b.sessions - a.sessions || b.best.kg - a.best.kg);
+}
 
 const HABITS = ["workout", "water", "steps", "protein", "meals", "sleep"] as const;
 const active = (d: DayLog) => d.workoutDone || HABITS.some((h) => d.habits[h]);
@@ -93,6 +119,8 @@ export type Progress = {
   byFocus: { focus: string; count: number }[];
   /** Monday to Sunday of this week: workout done, share of meal/protein habits ticked (0–100), steps habit ticked */
   thisWeek: { date: IsoDate; workout: boolean; nutrition: number; steps: boolean }[];
+  /** Lifts, from logged sets: most-trained first */
+  strength: Lift[];
 };
 
 export function progress(days: DayLog[], today: IsoDate, planned: number): Progress {
@@ -124,6 +152,7 @@ export function progress(days: DayLog[], today: IsoDate, planned: number): Progr
     weeks,
     weights: weights.slice(-7),
     byFocus: [...counts].map(([focus, count]) => ({ focus, count })).sort((a, b) => b.count - a.count),
+    strength: strength(sorted),
     thisWeek: [0, 1, 2, 3, 4, 5, 6].map((i) => {
       const date = addDays(thisWeek, i);
       const d = sorted.find((x) => x.date === date);

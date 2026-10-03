@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { plannedSessions, progress, reviewInsight, streak, trainerAccess, trainerPeriod, trainerPrice, weekNumbers, weekStart, type DayLog } from "./trainer";
+import { plannedSessions, progress, reviewInsight, streak, trainerAccess, trainerPeriod, trainerPrice, weekNumbers, weekStart, type DayLog, strength } from "./trainer";
 
 const day = (date: string, x: Partial<DayLog> = {}): DayLog => ({ date, water: 0, habits: {}, workoutDone: false, focus: null, weightKg: null, ...x });
 
@@ -64,5 +64,18 @@ describe("log numbers", () => {
     expect(p.byFocus[0]).toEqual({ focus: "Legs", count: 2 });
     expect(p.thisWeek[1]).toEqual({ date: "2026-09-29", workout: true, nutrition: 50, steps: true });
     expect(plannedSessions({ Mon: "Chest", Tue: "Rest", Wed: "Legs" })).toBe(2);
+  });
+
+  it("tracks each lift from its first day to its best, by the heaviest set of the day", () => {
+    const d = [
+      day("2026-09-20", { workoutDone: true, sets: [{ ex: "Bench Press", kg: 40, reps: 10 }, { ex: "Bench Press", kg: 45, reps: 6 }, { ex: "Squat", kg: 60, reps: 8 }] }),
+      day("2026-09-10", { workoutDone: true, sets: [{ ex: "Bench Press", kg: 40, reps: 8 }] }),
+      day("2026-09-29", { workoutDone: true, sets: [{ ex: "Bench Press", kg: 45, reps: 8 }] }),
+    ];
+    const s = strength(d);
+    expect(s.map((l) => l.ex)).toEqual(["Bench Press", "Squat"]);
+    expect(s[0]).toEqual({ ex: "Bench Press", first: { kg: 40, reps: 8, date: "2026-09-10" }, best: { kg: 45, reps: 8, date: "2026-09-29" }, sessions: 3 });
+    expect(progress(d, today, 3).strength[1]?.sessions).toBe(1);
+    expect(strength([day("2026-09-10", {})])).toEqual([]);
   });
 });

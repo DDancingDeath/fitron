@@ -3,7 +3,7 @@ import { randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import type { Prisma, TrainerMember } from "@/generated/prisma/client";
 import { addDays } from "@/lib/domain/dates";
-import { COACH_DAILY_LIMIT, isTrainerPlan, plannedSessions, progress, reviewInsight, trainerAccess, trainerPrice, TRAINER_TRIAL_DAYS, validEmail, type DayLog, type TrainerPlan } from "@/lib/domain/trainer";
+import { COACH_DAILY_LIMIT, isTrainerPlan, plannedSessions, progress, reviewInsight, trainerAccess, trainerPrice, TRAINER_TRIAL_DAYS, validEmail, type DayLog, type SetLog, type TrainerPlan } from "@/lib/domain/trainer";
 import type { Cycle } from "@/lib/domain/pricing";
 import { emailReady, sendEmail } from "@/lib/integrations/email";
 import { cleanUtr, fitronAdmins, fitronUpi, upiLink } from "@/lib/integrations/upi";
@@ -94,14 +94,33 @@ function cleanHabits(h: unknown) {
   return out;
 }
 
-export const dayLog = (d: { date: Date; water: number; habits: Prisma.JsonValue; workoutDone: boolean; focus: string | null; weightKg: number | null }): DayLog => ({
+export const dayLog = (d: { date: Date; water: number; habits: Prisma.JsonValue; workoutDone: boolean; focus: string | null; weightKg: number | null; sets?: Prisma.JsonValue }): DayLog => ({
   date: toIso(d.date),
   water: d.water,
   habits: (d.habits ?? {}) as Record<string, boolean>,
   workoutDone: d.workoutDone,
   focus: d.focus,
   weightKg: d.weightKg,
+  sets: Array.isArray(d.sets) ? (d.sets as SetLog[]) : [],
 });
+
+const MAX_SETS_A_DAY = 80;
+/** Logged sets as sent by the app: a named exercise, 0–500 kg to the half kilo, 1–100 reps. Anything else is dropped. */
+function cleanSets(raw: unknown): SetLog[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SetLog[] = [];
+  for (const s of raw) {
+    if (!s || typeof s !== "object") continue;
+    const { ex, kg, reps } = s as Record<string, unknown>;
+    const name = String(ex ?? "").trim().slice(0, 60);
+    const k = Math.round(Number(kg) * 2) / 2;
+    const r = Math.round(Number(reps));
+    if (!name || !(k >= 0 && k <= 500) || !(r >= 1 && r <= 100)) continue;
+    out.push({ ex: name, kg: k, reps: r });
+    if (out.length >= MAX_SETS_A_DAY) break;
+  }
+  return out;
+}
 
 /** The plan's training focus on a date, from the member's weekly split. */
 function focusOn(profile: Record<string, unknown>, date: string) {
@@ -110,7 +129,7 @@ function focusOn(profile: Record<string, unknown>, date: string) {
   return split?.[key] ?? null;
 }
 
-export type DayInput = { water?: number; habits?: unknown; workoutDone?: boolean };
+export type DayInput = { water?: number; habits?: unknown; workoutDone?: boolean; sets?: unknown };
 
 /** Saves what the member changed: the app's state, and/or today's log. The plan itself never changes here: only starting the trial or a confirmed payment sets it. */
 export async function saveTrainerState(memberId: string, input: { profile?: unknown; day?: DayInput; name?: string; onboarded?: boolean; consented?: boolean; cycle?: string }, today = todayIso()) {
@@ -140,6 +159,7 @@ export async function saveTrainerState(memberId: string, input: { profile?: unkn
       ...(water !== undefined ? { water } : {}),
       ...(d.habits !== undefined ? { habits: cleanHabits(d.habits) } : {}),
       ...(d.workoutDone !== undefined ? { workoutDone: !!d.workoutDone } : {}),
+      ...(d.sets !== undefined ? { sets: cleanSets(d.sets) as unknown as Prisma.InputJsonValue } : {}),
       focus: focusOn(profile, today),
       ...(weightKg ? { weightKg } : {}),
     };
