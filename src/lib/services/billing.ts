@@ -26,6 +26,11 @@ export async function prefixes(orgId: string) {
   return { invoice: n.invoicePrefix ?? "INV-", payment: n.paymentPrefix ?? "PAY-" };
 }
 
+/** The number the next invoice will get, without taking it (nextNumber burns one). */
+export async function nextInvoiceNumber(orgId: string) {
+  return (await db.sequence.findUnique({ where: { orgId_name: { orgId, name: "invoice" } } }))?.next ?? 1001;
+}
+
 async function findMember(u: CurrentUser, memberId: string) {
   const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId } });
   if (!m) throw new UserError("Member not found.");

@@ -4,11 +4,14 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as z from "zod";
 import { requirePermission } from "@/lib/auth/current";
-import { putSetting, saveBranch } from "@/lib/services/settings";
+import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } from "@/lib/services/settings";
+import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
 import { branchInput, gymInput, numberingInput, taxInput } from "@/lib/validation/settings";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
 import { ensureTrainerCode } from "@/lib/services/trainer-gym";
+import { simpleAction } from "@/lib/form-action";
+import type { FormState } from "@/lib/validation/common";
 
 const back = (params: Record<string, string>) => redirect(`/settings?${new URLSearchParams(params)}`);
 const firstError = (e: z.ZodError) => e.issues.map((i) => `${String(i.path[0] ?? "")}: ${i.message}`)[0] ?? "Check the form.";
@@ -29,8 +32,19 @@ async function save<T extends z.ZodType>(schema: T, fd: FormData, section: strin
 export async function saveGym(fd: FormData) {
   const u = await requirePermission("settings.manage");
   await save(gymInput, fd, "gym", async (v) => {
-    await putSetting(u, "gym", v);
+    await saveGymProfile(u, v);
   });
+}
+
+/** Uploads a new gym logo (a PNG from the crop dialog), or goes back to the default with intent=remove. */
+export async function changeLogo(_: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("settings.manage");
+  const state =
+    fd.get("intent") === "remove"
+      ? await simpleAction(() => removeGymLogo(u), "Logo reset to default.")
+      : await simpleAction(() => setGymLogo(u, fd.get("logo") as File), "Logo updated.");
+  if (state?.ok) revalidatePath("/", "layout");
+  return state;
 }
 
 /** The gym's AI Trainer code for the Gym Partnership, made once. */
@@ -44,7 +58,7 @@ export async function makeTrainerCode() {
 export async function saveTax(fd: FormData) {
   const u = await requirePermission("settings.manage");
   await save(taxInput, fd, "tax", async (v) => {
-    await putSetting(u, "tax", v);
+    await saveTaxSettings(u, v);
   });
 }
 

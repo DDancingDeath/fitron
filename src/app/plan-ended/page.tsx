@@ -3,6 +3,8 @@ import { LockSimpleIcon, SignOutIcon } from "@phosphor-icons/react/dist/ssr";
 import { requireUser } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { gymPlan } from "@/lib/services/saas";
+import { getGymProfile } from "@/lib/services/settings";
+import { gymLogoUrl } from "@/components/gym-logo";
 import { fitronKeyId } from "@/lib/integrations/razorpay";
 import { fitronUpi } from "@/lib/integrations/upi";
 import { gymPlanCards } from "@/lib/domain/saas";
@@ -22,10 +24,11 @@ export const metadata = { title: "Choose a plan · Fitron" };
 export default async function PlanEndedPage() {
   const u = await requireUser({ allowBlocked: true });
   if (!u.planBlocked) redirect("/dashboard");
-  const [plan, paidBefore, owner] = await Promise.all([
+  const [plan, paidBefore, owner, profile] = await Promise.all([
     gymPlan(u.orgId),
     db.branchSubscription.count({ where: { orgId: u.orgId, kind: "PLAN", status: "PAID" } }),
     db.user.findFirst({ where: { orgId: u.orgId, active: true, role: { name: "Super Admin" } }, orderBy: { createdAt: "asc" }, select: { name: true, email: true } }),
+    getGymProfile(u.orgId),
   ]);
   const ended = plan.standing.kind === "LAPSED" ? addDays(plan.standing.since, -1) : null;
   const canPay = u.can("settings.manage");
@@ -36,7 +39,7 @@ export default async function PlanEndedPage() {
     <div className="min-h-screen bg-bg">
       <header className="flex items-center justify-between gap-4 border-b border-line-soft px-4 py-3 lg:px-10">
         <div className="w-[160px]">
-          <SideLogo />
+          <SideLogo src={gymLogoUrl(profile.logoKey)} name={profile.name} />
         </div>
         <form action={logout}>
           <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md px-3 text-sm font-semibold text-accent hover:bg-accent/10">
@@ -50,7 +53,7 @@ export default async function PlanEndedPage() {
           <span className="grid size-12 place-items-center rounded-full bg-alert-soft">
             <LockSimpleIcon size={24} weight="duotone" className="text-alert-700" />
           </span>
-          <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{u.orgName}</div>
+          <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{profile.name}</div>
           <h1 className="text-[28px] lg:text-[40px]">{paidBefore ? "Your FITRON plan has ended" : "Your 7-day free trial has ended"}</h1>
           <p className="max-w-2xl text-[15px] text-fg/85">
             {ended ? `It ended on ${fmtDate(ended)}. ` : ""}Your members, invoices, payments and reports are safe and nothing has been deleted.{" "}

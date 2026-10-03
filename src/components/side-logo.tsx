@@ -2,8 +2,17 @@
 
 import Image from "next/image";
 
-/** The sidebar logo from the prototype: the gold ring with a light wordmark on dark; mark and text on light. */
-export function SideLogo() {
+/**
+ * The sidebar logo from the prototype: the gym's own logo when one is uploaded in Settings, else
+ * the gold ring with a light wordmark on dark, and mark and text on light.
+ */
+export function SideLogo({ src, name }: { src?: string | null; name?: string } = {}) {
+  if (src) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- private, session-checked image
+      <img src={src} alt={name ?? "Gym logo"} className="block h-auto max-h-[70px] w-full object-contain object-left" />
+    );
+  }
   return (
     <>
       <Image src="/fitron-logo.png" alt="FITRON" width={599} height={218} className="block h-auto w-full light:hidden" />

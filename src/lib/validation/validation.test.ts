@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { indianPhone, rupees } from "./common";
 import { memberInput } from "./member";
 import { planInput } from "./plan";
+import { gymInput, taxInput } from "./settings";
 
 describe("indianPhone", () => {
   it.each([
@@ -48,5 +49,55 @@ describe("planInput", () => {
     const p = planInput.parse({ name: "Quarterly", kind: "Membership", months: "3", price: "4,000", regFee: "", discount: "", gstApplicable: "on", features: "Locker\n\nDiet chart" });
     expect(p).toMatchObject({ months: 3, price: 400000, regFee: 0, discount: 0, gstApplicable: true, features: ["Locker", "Diet chart"] });
     expect(planInput.parse({ name: "X Plan", kind: "Membership", months: "1", price: "1" }).gstApplicable).toBe(false);
+  });
+});
+
+describe("gymInput", () => {
+  const all = { name: "Power Haus Gym", tagline: "Built Stronger", address: "C-7, Sector 4, City Centre, Bokaro", state: "Jharkhand", phone: "7319742490", email: "hello@powerhausgym.in", website: "powerhausgym.in", instagram: "@powerhausbokaro" };
+
+  it("accepts the eight profile fields and turns blanks into undefined", () => {
+    expect(gymInput.parse(all)).toEqual(all);
+    const g = gymInput.parse({ name: "Ironworks", tagline: "", address: "", state: "", phone: "", email: "", website: "", instagram: "" });
+    expect(g).toEqual({ name: "Ironworks" });
+  });
+
+  it("normalises the website and Instagram handle", () => {
+    expect(gymInput.parse({ ...all, website: "https://www.powerhausgym.in/" }).website).toBe("www.powerhausgym.in");
+    expect(gymInput.parse({ ...all, instagram: "instagram.com/powerhausbokaro" }).instagram).toBe("@powerhausbokaro");
+    expect(gymInput.parse({ ...all, instagram: "https://instagram.com/powerhausbokaro/" }).instagram).toBe("@powerhausbokaro");
+    expect(gymInput.parse({ ...all, instagram: "powerhausbokaro" }).instagram).toBe("@powerhausbokaro");
+    expect(gymInput.parse({ ...all, phone: "+91 73197 42490" }).phone).toBe("7319742490");
+  });
+
+  it("rejects a bad email, phone, website or handle", () => {
+    expect(gymInput.safeParse({ ...all, email: "nope" }).success).toBe(false);
+    expect(gymInput.safeParse({ ...all, phone: "123" }).success).toBe(false);
+    expect(gymInput.safeParse({ ...all, website: "powerhaus" }).success).toBe(false);
+    expect(gymInput.safeParse({ ...all, instagram: "power haus" }).success).toBe(false);
+    expect(gymInput.safeParse({ ...all, name: "P" }).success).toBe(false);
+  });
+});
+
+describe("taxInput", () => {
+  const base = { enabled: "on", rate: "18", type: "CGST+SGST", gstin: "20abcde1234f1z5", sac: "999723", invoicePrefix: "inv-" };
+
+  it("upper-cases the GSTIN and the invoice prefix", () => {
+    expect(taxInput.parse(base)).toEqual({ enabled: true, rate: 18, type: "CGST+SGST", gstin: "20ABCDE1234F1Z5", sac: "999723", invoicePrefix: "INV-" });
+  });
+
+  it("needs a valid GSTIN to charge GST, but not when GST is off", () => {
+    expect(taxInput.safeParse({ ...base, gstin: "20ABCDE1234F1Z" }).success).toBe(false);
+    const r = taxInput.safeParse({ ...base, gstin: "" });
+    expect(r.success).toBe(false);
+    expect(r.success ? [] : r.error.issues.map((i) => [i.path[0], i.message])).toEqual([["gstin", "Add your GSTIN to charge GST."]]);
+    const off = taxInput.parse({ ...base, enabled: undefined, gstin: "" });
+    expect(off.enabled).toBe(false);
+    expect(off.gstin).toBeUndefined();
+  });
+
+  it("checks the SAC code and the prefix characters", () => {
+    expect(taxInput.safeParse({ ...base, sac: "12" }).success).toBe(false);
+    expect(taxInput.safeParse({ ...base, invoicePrefix: "IN V" }).success).toBe(false);
+    expect(taxInput.parse({ ...base, sac: "" }).sac).toBeUndefined();
   });
 });

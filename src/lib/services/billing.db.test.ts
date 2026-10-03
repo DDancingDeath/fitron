@@ -104,3 +104,37 @@ describe.skipIf(!hasDb)("billing (database)", () => {
     expect(Number(b.invoice.number.split("-")[1])).toBe(Number(a.invoice.number.split("-")[1]) + 1);
   });
 });
+
+describe.skipIf(!hasDb)("invoice PDF (database)", () => {
+  it("renders the gym profile with and without a logo", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const path = await import("node:path");
+    const { vi } = await import("vitest");
+    vi.stubEnv("STORAGE_DIR", mkdtempSync(path.join(tmpdir(), "fitron-pdf-")));
+    vi.stubEnv("S3_BUCKET", "");
+    const { invoicePdf } = await import("./invoice-pdf");
+    const { saveGymProfile, saveTax } = await import("./settings");
+    const { setGymLogo } = await import("./gym-logo");
+
+    const gym = await makeGym();
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const planId = (await createPlan(admin, { name: "Monthly", kind: "Membership", months: 1, price: 150000, regFee: 0, discount: 0, gstApplicable: true, features: [] })).id;
+    const m = await createMember(admin, { name: "PDF Member", gender: "Female", phone: "9811199002", source: "Walk-in", tags: [] });
+    await saveGymProfile(admin, { name: "Power Haus Gym", tagline: "Built Stronger", address: "C-7, Sector 4, City Centre, Bokaro", phone: "7319742490", email: "hello@powerhausgym.in", instagram: "@powerhausbokaro" });
+    await saveTax(admin, { enabled: true, rate: 18, type: "CGST+SGST", gstin: "20ABCDE1234F1Z5", sac: "999723", invoicePrefix: "INV-" });
+    const { invoice } = await sellMembership(admin, m.id, { planId, startDate: todayIso(), discount: 0, includeRegFee: false, payAmount: 0 });
+
+    const plain = await invoicePdf(admin, invoice.id);
+    expect(plain).not.toBeNull();
+    expect(Buffer.from(plain!.bytes.subarray(0, 4)).toString()).toBe("%PDF");
+    expect(plain!.filename).toBe("INV-1001.pdf");
+
+    // A real 1×1 PNG, so pdf-lib can embed it.
+    const onePx = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64");
+    await setGymLogo(admin, new File([onePx], "logo.png", { type: "image/png" }));
+    const withLogo = await invoicePdf(admin, invoice.id);
+    expect(Buffer.from(withLogo!.bytes.subarray(0, 4)).toString()).toBe("%PDF");
+    expect(withLogo!.bytes.length).toBeGreaterThan(plain!.bytes.length);
+  });
+});

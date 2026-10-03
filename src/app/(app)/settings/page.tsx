@@ -1,10 +1,14 @@
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
-import { getSetting } from "@/lib/services/settings";
+import { getGymProfile, getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { nextInvoiceNumber } from "@/lib/services/billing";
+import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui";
+import { gymLogoUrl } from "@/components/gym-logo";
+import { LogoForm } from "./logo-form";
+import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveTax, saveWhatsApp } from "./actions";
+import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveWhatsApp } from "./actions";
 import { getWaSettings } from "@/lib/services/whatsapp";
 import { getAutopayMode } from "@/lib/services/autopay";
 import { providerStatus } from "@/lib/integrations/whatsapp";
@@ -33,9 +37,10 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           } as Record<string, string>
         )[section ?? ""];
   const tab = ["gym", "billing", "wa", "int", "branches"].includes(asked ?? "") ? asked! : "gym";
-  const [gym, tax, numbering, branches, wa, autopayMode] = await Promise.all([
-    getSetting<{ name?: string }>(u.orgId, "gym"),
+  const [gym, tax, nextInvoice, numbering, branches, wa, autopayMode] = await Promise.all([
+    getGymProfile(u.orgId),
     getTax(u.orgId),
+    nextInvoiceNumber(u.orgId),
     getSetting<{
       memberPrefix?: string;
       invoicePrefix?: string;
@@ -65,15 +70,42 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       {typeof sp.error === "string" && <Notice tone="alert">{sp.error}</Notice>}
       {tab === "gym" && (
         <div className="grid max-w-[960px] gap-10 lg:grid-cols-2">
-          <Panel title="Gym profile">
-            <form action={saveGym} className="flex flex-col gap-3">
-              <Field label="Gym name (shown on invoices)">
-                <Input name="name" defaultValue={gym?.name ?? u.orgName} required />
-              </Field>
+          <Panel title="Gym profile" className="lg:col-span-2">
+            <form action={saveGym} className="flex flex-col gap-[18px]">
+              <div className="grid max-w-[900px] gap-x-6 gap-y-[18px] sm:grid-cols-2 lg:grid-cols-3">
+                <Field label="Gym name">
+                  <Input name="name" defaultValue={gym.name} required maxLength={120} />
+                </Field>
+                <Field label="Tagline">
+                  <Input name="tagline" defaultValue={gym.tagline ?? ""} placeholder="Built Stronger" maxLength={80} />
+                </Field>
+                <Field label="Address">
+                  <Textarea name="address" defaultValue={gym.address ?? ""} rows={2} className="min-h-0! py-2" maxLength={300} />
+                </Field>
+                <Field label="State">
+                  <Input name="state" defaultValue={gym.state ?? ""} placeholder="Jharkhand" maxLength={60} />
+                </Field>
+                <Field label="Phone">
+                  <Input name="phone" type="tel" inputMode="numeric" defaultValue={gym.phone ?? ""} placeholder="10-digit mobile" />
+                </Field>
+                <Field label="Email">
+                  <Input name="email" type="email" defaultValue={gym.email ?? ""} placeholder="hello@yourgym.in" maxLength={120} />
+                </Field>
+                <Field label="Website">
+                  <Input name="website" defaultValue={gym.website ?? ""} placeholder="yourgym.in" maxLength={120} />
+                </Field>
+                <Field label="Instagram">
+                  <Input name="instagram" defaultValue={gym.instagram ?? ""} placeholder="@yourgym" maxLength={80} />
+                </Field>
+              </div>
               <div>
                 <Button variant="primary">Save</Button>
               </div>
+              <p className="text-xs text-muted">
+                Saved changes are recorded in the audit log. The name, address and GSTIN print on every invoice; the name is also used in WhatsApp messages and Fitron AI.
+              </p>
             </form>
+            <LogoForm logoSrc={gymLogoUrl(gym.logoKey)} hasLogo={!!gym.logoKey} />
           </Panel>
           <Panel title="Numbering">
             <form action={saveNumbering} className="flex flex-col gap-3">
@@ -121,30 +153,8 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       )}
       {tab === "billing" && (
         <div className="max-w-[720px]">
-          <Panel title="GST">
-            <form action={saveTax} className="flex flex-col gap-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="enabled" defaultChecked={tax.enabled} className="size-4" /> Charge GST on invoices
-              </label>
-              <div className="grid gap-3 sm:grid-cols-3">
-                <Field label="Rate (%)">
-                  <Input name="rate" type="number" step="0.01" min={0} max={28} defaultValue={tax.rate} />
-                </Field>
-                <Field label="Type">
-                  <Select name="type" defaultValue={tax.type}>
-                    <option value="CGST+SGST">CGST + SGST</option>
-                    <option value="IGST">IGST</option>
-                  </Select>
-                </Field>
-                <Field label="SAC code">
-                  <Input name="sac" defaultValue={tax.sac} />
-                </Field>
-              </div>
-              <p className="text-xs text-muted">Changes apply to new invoices only.</p>
-              <div>
-                <Button variant="primary">Save</Button>
-              </div>
-            </form>
+          <Panel title="Billing & GST">
+            <TaxForm tax={tax} invoicePrefix={numbering?.invoicePrefix ?? "INV-"} nextNumber={nextInvoice} />
           </Panel>
         </div>
       )}
@@ -265,9 +275,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 }
 
 /** One settings section: a heading over its form, as in the prototype. */
-function Panel({ title, id, children }: { title: string; id?: string; children: React.ReactNode }) {
+function Panel({ title, id, className, children }: { title: string; id?: string; className?: string; children: React.ReactNode }) {
   return (
-    <section id={id} className="flex scroll-mt-20 flex-col gap-3">
+    <section id={id} className={`flex scroll-mt-20 flex-col gap-3 ${className ?? ""}`}>
       <h3 className="text-xl">{title}</h3>
       {children}
     </section>

@@ -11,7 +11,7 @@ import { sendEmail } from "@/lib/integrations/email";
 import { audit } from "./audit";
 import { isUniqueViolation, UserError } from "./errors";
 import { notify } from "./notifications";
-import { getSetting } from "./settings";
+import { getGymProfile, getSetting } from "./settings";
 import { fromIso, toIso, todayIso } from "./time";
 
 type Tx = Prisma.TransactionClient | typeof db;
@@ -339,13 +339,19 @@ export async function applyFitronBillingEvent(ev: RzpEvent) {
 export async function getBillingInvoice(u: CurrentUser, id: string) {
   const sub = await db.branchSubscription.findFirst({ where: { id, orgId: u.orgId, status: "PAID" } });
   if (!sub) return null;
-  const [branch, gym, anyGstin] = await Promise.all([
+  const [branch, gym, tax, anyGstin] = await Promise.all([
     sub.branchId ? db.branch.findUnique({ where: { id: sub.branchId } }) : null,
-    getSetting<{ name?: string }>(u.orgId, "gym"),
+    getGymProfile(u.orgId),
+    getSetting<{ gstin?: string }>(u.orgId, "tax"),
     db.branch.findFirst({ where: { orgId: u.orgId, gstin: { not: null } }, orderBy: { createdAt: "asc" } }),
   ]);
   const buyer = branch?.gstin ? branch : anyGstin;
-  return { sub, branch, buyer: { name: gym?.name ?? u.orgName, gstin: buyer?.gstin ?? null, address: buyer?.address ?? branch?.address ?? "" }, seller: fitronSeller() };
+  return {
+    sub,
+    branch,
+    buyer: { name: gym.name, gstin: buyer?.gstin ?? tax?.gstin ?? null, address: gym.address || buyer?.address || branch?.address || "" },
+    seller: fitronSeller(),
+  };
 }
 
 function planReminder(plan: GymPlan, today: string) {

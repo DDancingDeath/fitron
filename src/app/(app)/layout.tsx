@@ -12,6 +12,8 @@ import { SideLogo } from "@/components/side-logo";
 import { BellLink, TrialBanner } from "@/components/shell";
 import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
+import { getGymProfile } from "@/lib/services/settings";
+import { gymLogoUrl } from "@/components/gym-logo";
 import { gymPlan } from "@/lib/services/saas";
 import { PLANS } from "@/lib/domain/pricing";
 import { daysBetween } from "@/lib/domain/dates";
@@ -22,7 +24,9 @@ const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_A
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
-  const [counts, plan] = await Promise.all([navCounts(u), gymPlan(u.orgId)]);
+  const [counts, plan, profile] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId)]);
+  const gymName = profile.name || u.orgName;
+  const logo = gymLogoUrl(profile.logoKey);
   const s = plan.standing;
   const left = s.kind === "TRIAL" ? daysBetween(s.until, todayIso()) + 1 : 0;
   const canPay = u.can("settings.manage");
@@ -61,18 +65,18 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
     <div className="flex min-h-screen">
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-5 overflow-x-hidden overflow-y-auto border-r border-line-soft bg-surface px-3.5 pb-6 lg:flex">
         <Link href="/dashboard" className="mt-4 -mb-1 block w-[200px]" aria-label="Dashboard">
-          <SideLogo />
+          <SideLogo src={logo} name={gymName} />
         </Link>
         <div className="flex flex-col gap-0.5 px-2">
           <div className="text-[11px] tracking-[0.1em] text-muted uppercase">Tenant</div>
-          <div className="text-[15px] font-semibold">{u.orgName}</div>
+          <div className="text-[15px] font-semibold">{gymName}</div>
           <div className="text-xs text-muted">{branchName}</div>
         </div>
         <NavLinks groups={groups} />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-line-soft bg-bg px-4 py-3 lg:px-10">
-          <MobileNav groups={groups} orgName={u.orgName} branchName={branchName} />
+          <MobileNav groups={groups} orgName={gymName} branchName={branchName} logo={logo} />
           <GlobalSearch />
           <div className="flex flex-none items-center gap-1.5 sm:gap-2.5 lg:ml-auto">
             <BranchSwitcher branches={u.branches} value={u.branch} />
