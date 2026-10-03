@@ -144,6 +144,22 @@ export async function sendTemplate(o: SendOpts) {
 }
 
 /**
+ * Sends one free-form text to the gym's own number (FITRON renewal reminders), not to a member: no
+ * template row, no de-dup. Recorded like every other message, so it shows on the WhatsApp page with
+ * "—" as the member; a failure raises the usual alert and never throws.
+ */
+export async function sendGymWhatsApp(o: { orgId: string; key: string; to: string; body: string }) {
+  const mode = (await getSetting<{ mode?: WaMode }>(o.orgId, "whatsapp"))?.mode ?? "demo";
+  const msg = await db.whatsAppMessage.create({ data: { orgId: o.orgId, memberId: null, templateKey: o.key, toNumber: o.to, body: o.body, provider: mode, status: "Queued", sentById: null } });
+  const result = await sendWhatsApp(mode, { localId: msg.id, to: o.to, body: o.body });
+  const saved = await db.whatsAppMessage.update({ where: { id: msg.id }, data: { status: result.status, providerMessageId: result.providerMessageId ?? null, error: result.error ?? null } });
+  if (result.status === "Failed") {
+    await db.$transaction((tx) => notify(tx, { orgId: o.orgId, type: "WA_FAILED", text: `WhatsApp renewal reminder to ${o.to} failed: ${result.error}`, link: "/whatsapp?status=Failed" }));
+  }
+  return saved;
+}
+
+/**
  * Runs an automatic message after the response is sent, so a slow provider never delays the desk.
  * Outside a request (jobs, tests) it runs in the background.
  */

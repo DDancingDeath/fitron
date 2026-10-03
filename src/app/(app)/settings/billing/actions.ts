@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import * as z from "zod";
 import { requirePermission } from "@/lib/auth/current";
 import { confirmCheckout, confirmDemoPayment, startPayment, submitUtr, type Checkout } from "@/lib/services/saas";
+import { saveBillingDetails as saveDetails, saveRenewalReminders as saveReminders } from "@/lib/services/subscription";
+import { billingDetailsInput, renewalInput } from "@/lib/validation/settings";
 import { UserError } from "@/lib/services/errors";
 
 type Result<T = null> = { ok: true; data: T } | { ok: false; error: string };
@@ -48,4 +51,33 @@ export async function confirmCheckoutAction(a: { orderId: string; paymentId: str
   const r = await wrap(() => confirmCheckout(u, a));
   revalidatePath("/", "layout");
   return r.ok ? { ok: true, data: null } : r;
+}
+
+const back = (params: Record<string, string>) => redirect(`/settings/billing?${new URLSearchParams(params)}`);
+
+/** Settings › Subscription forms: save, then back to the page with a notice (same pattern as Settings). */
+async function save<T extends z.ZodType>(schema: T, fd: FormData, section: string, fn: (v: z.infer<T>) => Promise<void>) {
+  const parsed = schema.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) back({ error: parsed.error.issues[0]?.message ?? "Check the form.", section });
+  try {
+    await fn(parsed.data as z.infer<T>);
+  } catch (e) {
+    if (e instanceof UserError) back({ error: e.message, section });
+    throw e;
+  }
+  revalidatePath("/settings/billing");
+  revalidatePath("/", "layout");
+  back({ saved: section });
+}
+
+/** Renewal reminders: how many days ahead, and whether WhatsApp and email go out. A lapsed gym can still change this. */
+export async function saveRenewalReminders(fd: FormData) {
+  const u = await requirePermission("settings.manage", { allowBlocked: true });
+  await save(renewalInput, fd, "reminders", (v) => saveReminders(u, v));
+}
+
+/** Billing details printed on FITRON's receipts. A lapsed gym can still change this. */
+export async function saveBillingDetails(fd: FormData) {
+  const u = await requirePermission("settings.manage", { allowBlocked: true });
+  await save(billingDetailsInput, fd, "details", (v) => saveDetails(u, v));
 }

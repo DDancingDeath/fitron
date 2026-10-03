@@ -13,6 +13,7 @@ import { BellLink, TrialBanner } from "@/components/shell";
 import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
 import { getGymProfile } from "@/lib/services/settings";
+import { getSubscriptionSettings } from "@/lib/services/subscription";
 import { gymLogoUrl } from "@/components/gym-logo";
 import { gymPlan } from "@/lib/services/saas";
 import { PLANS } from "@/lib/domain/pricing";
@@ -24,11 +25,14 @@ const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_A
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
-  const [counts, plan, profile] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId)]);
+  const [counts, plan, profile, sub] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId), getSubscriptionSettings(u.orgId)]);
   const gymName = profile.name || u.orgName;
   const logo = gymLogoUrl(profile.logoKey);
   const s = plan.standing;
-  const left = s.kind === "TRIAL" ? daysBetween(s.until, todayIso()) + 1 : 0;
+  const today = todayIso();
+  const left = s.kind === "TRIAL" ? daysBetween(s.until, today) + 1 : s.kind === "PAID" ? daysBetween(s.until, today) : 0;
+  // Prototype: a paid plan nearing its end shows "ends in N days" as many days ahead as Settings › Subscription says.
+  const expiring = s.kind === "PAID" && !plan.checking && left <= sub.remindDays;
   const canPay = u.can("settings.manage");
   const banner =
     plan.checking && (s.kind === "TRIAL" || s.kind === "LAPSED")
@@ -47,7 +51,21 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             ),
             cta: `Upgrade from ${fromPrice}/month`,
           }
-        : s.kind === "GRACE"
+        : expiring
+          ? {
+              alert: left <= 1,
+              body: (
+                <>
+                  Your {plan.name} plan ends in{" "}
+                  <strong>
+                    {left} {left === 1 ? "day" : "days"}
+                  </strong>{" "}
+                  ({fmtDate(s.until)}). Pay now to keep everything running.
+                </>
+              ),
+              cta: "Renew",
+            }
+          : s.kind === "GRACE"
           ? { alert: true, body: <>Your {plan.name} plan has ended. Renew before {fmtDate(s.readOnlyFrom)} to keep adding members and invoices.</>, cta: "Renew" }
           : s.kind === "LAPSED"
             ? { alert: true, body: <>Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.</>, cta: "Choose a plan" }

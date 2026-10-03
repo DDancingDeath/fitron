@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { reminderInput } from "./settings";
+import { billingDetailsInput, reminderInput, renewalInput } from "./settings";
 
 const base = { expiryDays: ["15", "0"], dedupDays: "3", dueEveryDays: "0", defaultMonths: "3", graceDays: "5", birthdays: "on" };
 
@@ -25,5 +25,39 @@ describe("reminderInput", () => {
     const r = reminderInput.safeParse({ ...base, [k]: v });
     expect(r.success).toBe(false);
     if (!r.success) expect(String(r.error.issues[0]!.path[0])).toBe(k);
+  });
+});
+
+describe("renewalInput", () => {
+  it("coerces the select and the checkboxes", () => {
+    expect(renewalInput.parse({ remindDays: "14", whatsapp: "on", email: "on" })).toEqual({ remindDays: 14, whatsapp: true, email: true });
+    expect(renewalInput.parse({ remindDays: "1" })).toEqual({ remindDays: 1, whatsapp: false, email: false });
+  });
+
+  it("only takes the listed days", () => {
+    const r = renewalInput.safeParse({ remindDays: "5", whatsapp: "on" });
+    expect(r.success).toBe(false);
+    if (!r.success) expect(r.error.issues[0]!.message).toBe("Pick 14, 7, 3 or 1 days.");
+  });
+});
+
+describe("billingDetailsInput", () => {
+  it("uppercases and checks the GSTIN, lowercases the email, trims the rest", () => {
+    expect(billingDetailsInput.parse({ legalName: "  Power Haus Fitness Pvt Ltd ", gstin: "20abcde1234f1z5", billingEmail: " Accounts@PowerHaus.in ", address: " C-7, Sector 4 " })).toEqual({
+      legalName: "Power Haus Fitness Pvt Ltd",
+      gstin: "20ABCDE1234F1Z5",
+      billingEmail: "accounts@powerhaus.in",
+      address: "C-7, Sector 4",
+    });
+  });
+
+  it("accepts blank fields and rejects a bad GSTIN or email", () => {
+    expect(billingDetailsInput.parse({ legalName: "", gstin: "", billingEmail: "", address: "" })).toEqual({});
+    const g = billingDetailsInput.safeParse({ gstin: "123" });
+    expect(g.success).toBe(false);
+    if (!g.success) expect(g.error.issues[0]!.message).toBe("That isn't a valid GSTIN.");
+    const e = billingDetailsInput.safeParse({ billingEmail: "not-an-email" });
+    expect(e.success).toBe(false);
+    if (!e.success) expect(e.error.issues[0]!.message).toBe("Enter a valid email.");
   });
 });

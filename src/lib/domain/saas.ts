@@ -1,6 +1,6 @@
 // FITRON's own billing of gyms: the Gym Accounting plan (see pricing.ts), and extra branches
 // paid monthly or yearly, plus GST.
-import { addDays, membershipEndDate, type IsoDate } from "./dates";
+import { addDays, daysBetween, membershipEndDate, type IsoDate } from "./dates";
 import { findPlan, PLANS } from "./pricing";
 
 /** Branches included before extra-branch payments start. */
@@ -104,3 +104,61 @@ export const gymPlanCards = () =>
     total: { MONTHLY: planPrice(p.key, "MONTHLY").total, YEARLY: planPrice(p.key, "YEARLY").total },
     card: p.card!,
   }));
+
+// ── Settings › Subscription: renewal reminders and billing details ─────────
+
+export const REMIND_DAYS = [14, 7, 3, 1] as const;
+export type RemindDays = (typeof REMIND_DAYS)[number];
+
+/** Setting "subscription": when to remind, on which channels, and what the FITRON receipts print. */
+export type SubscriptionSettings = {
+  remindDays: RemindDays;
+  whatsapp: boolean;
+  email: boolean;
+  legalName: string;
+  gstin: string;
+  billingEmail: string;
+  address: string;
+};
+
+export const DEFAULT_SUBSCRIPTION: SubscriptionSettings = { remindDays: 7, whatsapp: true, email: true, legalName: "", gstin: "", billingEmail: "", address: "" };
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+/** "2026-10-04" → "4 Oct 2026", for reminder texts (no React here). */
+export const longDate = (d: IsoDate) => `${Number(d.slice(8, 10))} ${MONTHS[Number(d.slice(5, 7)) - 1]} ${d.slice(0, 4)}`;
+
+export type RenewalReminder = { kind: "DUE" | "GRACE" | "LAPSED"; daysLeft: number; until: IsoDate; text: string };
+
+const dayWord = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
+
+/**
+ * The plan reminder to send today, if any: `remindDays` before the trial or paid period ends and
+ * again the day before (so remindDays 1 fires once), on the first day of grace, and on the day the
+ * gym turns read-only. Nothing while a UPI payment is being checked or for gyms FITRON set up by hand.
+ */
+export function renewalReminder(s: PlanStanding, planName: string, today: IsoDate, remindDays: number, checking: boolean): RenewalReminder | null {
+  if (checking || s.kind === "CUSTOM") return null;
+  const fire = new Set([remindDays, 1]);
+  if (s.kind === "TRIAL") {
+    const daysLeft = daysBetween(s.until, today) + 1; // the sign-up day counts
+    if (!fire.has(daysLeft)) return null;
+    return { kind: "DUE", daysLeft, until: s.until, text: `Your FITRON free trial ends in ${dayWord(daysLeft)} (${longDate(s.until)}). Choose a plan to keep adding members and invoices.` };
+  }
+  if (s.kind === "PAID") {
+    const daysLeft = daysBetween(s.until, today);
+    if (!fire.has(daysLeft)) return null;
+    return { kind: "DUE", daysLeft, until: s.until, text: `Your ${planName} plan ends in ${dayWord(daysLeft)} (${longDate(s.until)}). Renew to keep everything running.` };
+  }
+  if (s.kind === "GRACE") {
+    if (s.until !== addDays(today, -1)) return null;
+    return { kind: "GRACE", daysLeft: 0, until: s.until, text: `Your ${planName} plan has ended. The gym becomes read-only on ${longDate(s.readOnlyFrom)} unless renewed.` };
+  }
+  if (s.since !== today) return null;
+  return { kind: "LAPSED", daysLeft: 0, until: s.since, text: "Your FITRON plan has ended and the gym is now read-only. Your records are safe; renew to switch it back on." };
+}
+
+/** "Your Professional plan ends in 7 days (4 Oct 2026). Renew…" → "your Professional plan ends in 7 days", for an email subject. */
+export function reminderSubject(text: string) {
+  const first = text.split(/\.\s/)[0]!.replace(/\s*\([^)]*\)/g, "").replace(/\.$/, "");
+  return `FITRON: ${first.charAt(0).toLowerCase()}${first.slice(1)}`;
+}

@@ -58,6 +58,7 @@ export default async function FitronInvoicePage({ params }: PageProps<"/settings
             <p className="text-muted">Billed to</p>
             <p className="font-medium">{buyer.name}</p>
             {buyer.address && <p className="text-muted">{buyer.address}</p>}
+            {buyer.email && <p className="text-muted">{buyer.email}</p>}
             {buyer.gstin && <p className="text-muted">GSTIN {buyer.gstin}</p>}
           </div>
           <div className="overflow-x-auto">

@@ -137,7 +137,7 @@ export const JOBS: Job[] = [
   },
   {
     name: "billing.branches",
-    label: "Extra-branch plan reminders",
+    label: "Plan and branch renewal reminders",
     run: (orgId, today) => billingReminders(orgId, today),
   },
   {

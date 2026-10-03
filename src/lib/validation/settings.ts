@@ -98,3 +98,20 @@ export const reminderInput = z.object({
   birthdays: z.preprocess((v) => v === "on", z.boolean()),
 });
 export type ReminderInput = z.infer<typeof reminderInput>;
+
+/** Settings › Subscription › Renewal reminders. */
+export const renewalInput = z.object({
+  remindDays: z.coerce.number().pipe(z.literal([14, 7, 3, 1], { error: "Pick 14, 7, 3 or 1 days." })),
+  whatsapp: z.preprocess((v) => v === "on", z.boolean()),
+  email: z.preprocess((v) => v === "on", z.boolean()),
+});
+export type RenewalInput = z.infer<typeof renewalInput>;
+
+/** Settings › Subscription › Billing details, printed on FITRON's receipts. Blank fields clear the value. */
+export const billingDetailsInput = z.object({
+  legalName: opt(120),
+  gstin,
+  billingEmail: z.preprocess((v) => (typeof v === "string" ? v.trim().toLowerCase() || undefined : v), z.email({ error: "Enter a valid email." }).max(120).optional()),
+  address: opt(300),
+});
+export type BillingDetailsInput = z.infer<typeof billingDetailsInput>;
