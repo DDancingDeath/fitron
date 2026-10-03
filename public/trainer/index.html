@@ -995,7 +995,7 @@ class Component extends DCLogic {
     payments: [],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
     notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false, todaySets: [], setDraft: {}, pushOn: false, exVideos: {},
-    selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
+    selDay: ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()], dietPref: 'Non-veg', editSchedule: false,
     schedule: [
       { key:'wake', time:'7:00 AM', label:'Wake-up', short:'Wake-up', icon:'sun-horizon' },
       { key:'hydrate', time:'7:15 AM', label:'Hydration — a glass of water', short:'Hydration', icon:'drop' },
@@ -1256,7 +1256,7 @@ class Component extends DCLogic {
       this._flush({ consented: true });
     });
   };
-  cnDecline = () => this.setState({ screen: 'login', signup: false, cnErr: false, cnFrom: '' });
+  cnDecline = () => { if (this.state.me && !this.state.cnFrom) { this.logout(); return; } this.setState({ screen: this.state.cnFrom === 'pay' ? 'subscription' : 'login', signup: false, cnErr: false, cnFrom: '', payGateKind: '' }); };
   toggleGuardOk = () => this.setState(st => ({ ob: { ...st.ob, guardOk: !st.ob.guardOk } }));
   goProfile = () => this.setState({ screen: 'profile', moreOpen: false });
   pfToggleEdit = () => this.setState(st => ({ pfEdit: !st.pfEdit }));
@@ -1429,7 +1429,7 @@ class Component extends DCLogic {
         consent: { ...st.consent, ...(p.consentPrefs || {}) },
         water: t ? t.water : 0, habits: { workout:false, water:false, steps:false, protein:false, meals:false, sleep:false, ...(t ? t.habits : {}) }, workoutLogged: !!(t && t.workoutDone), todaySets: (t && Array.isArray(t.sets)) ? t.sets : [],
         prog: d.progress, review: d.review, coachUse: d.coach, notifs: this._notices(d), gym: d.gym || null, role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
-        signup: !m.onboarded, screen: !m.onboarded ? 'onboard' : (locked ? 'subscription' : (inApp ? st.screen : 'home')),
+        signup: !m.onboarded, screen: !m.onboarded ? (m.consentedAt ? 'onboard' : 'consent') : (locked ? 'subscription' : (inApp ? st.screen : 'home')),
         onboardStep: !m.onboarded ? 1 : st.onboardStep,
         subMode: m.access === 'LOCKED' ? 'plans' : 'manage',
         planMsg: pending ? 'Payment submitted — UTR ' + pending.utr + '. FITRON is checking it against the bank statement and will activate your plan, usually within a working day.'
