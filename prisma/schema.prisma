@@ -1295,6 +1295,15 @@ model TrainerPush {
 
   @@index([memberId])
 }
+/// Exercise form videos for the AI Trainer, one link per exercise in the app's library
+model TrainerContent {
+  /// The exercise's name as the app shows it
+  ex        String   @id
+  videoUrl  String
+  note      String?
+  updatedBy String?
+  updatedAt DateTime @updatedAt @db.Timestamptz
+}
 model TrainerCoachUsage {
   memberId String
   date     DateTime @db.Date
