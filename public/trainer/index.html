@@ -760,7 +760,7 @@
             <div class="pf-h"><span class="pf-hi"><i class="ph-duotone ph-crown-simple"></i></span><span class="pf-ht">Membership</span><button class="pf-btn" onClick="{{ goSub }}">Manage</button></div>
             <div class="pf-row"><i class="ph-duotone ph-seal-check pf-ri"></i><span class="pf-l">Plan</span><span class="pf-v">{{ pfPlanLine }}</span></div>
             <div class="pf-row"><i class="ph-duotone ph-calendar-dots pf-ri"></i><span class="pf-l">Renews</span><span class="pf-v">{{ renewDate }}</span></div>
-            <div class="pf-row"><i class="ph-duotone ph-buildings pf-ri"></i><span class="pf-l">Gym</span><span class="pf-v">{{ pfGym }}</span></div>
+            <div class="pf-row" style="cursor:pointer" onClick="{{ pfGymGo }}"><i class="ph-duotone ph-buildings pf-ri"></i><span class="pf-l">Gym</span><span class="pf-v tap">{{ pfGym }}</span></div>
           </div>
           <div class="pf-card">
             <div class="pf-h"><span class="pf-hi"><i class="ph-duotone ph-trophy"></i></span><span class="pf-ht">Achievements</span></div>
@@ -947,7 +947,15 @@
               <sc-for list="{{ equipCards }}" as="c" hint-placeholder-count="6"><div class="{{ c.cls }}" onClick="{{ c.pick }}"><i class="ph-duotone ph-{{ c.icon }}"></i><div><b>{{ c.label }}</b><span>{{ c.desc }}</span></div><sc-if value="{{ c.on }}" hint-placeholder-val="{{ false }}"><span class="ob-tick"><i class="ph-duotone ph-check"></i></span></sc-if></div></sc-for>
             </div></div>
             <sc-if value="{{ showGymName }}" hint-placeholder-val="{{ false }}">
-            <div class="ob-sec"><div class="ob-f"><label>Your gym</label><input class="ob-in" aria-label="Gym" placeholder="Optional" value="{{ obGymName }}" onInput="{{ setObGym }}"></div><p class="ob-help" style="margin-top:6px">Where you train, if you have a gym. Optional.</p></div>
+            <div class="ob-sec">
+              <sc-if value="{{ gymLinked }}" hint-placeholder-val="{{ false }}"><div class="card" style="flex-direction:row;align-items:center;gap:12px"><i class="ph-duotone ph-buildings goldc" style="font-size:24px"></i><div style="flex:1"><div style="font-weight:700;font-size:14px">{{ gymName }}</div><div class="mut" style="font-size:12px">{{ gymMemberLine }}</div></div><button class="btn btn-ghost" style="min-height:38px;padding:6px 12px;font-size:13px" onClick="{{ unlinkGym }}">Leave</button></div></sc-if>
+              <sc-if value="{{ gymNotLinked }}" hint-placeholder-val="{{ true }}">
+                <div class="ob-f"><label>Gym code</label><div style="display:flex;gap:8px"><input class="ob-in" style="flex:1;letter-spacing:.12em;text-transform:uppercase" aria-label="Gym code" placeholder="e.g. PHG7K2" value="{{ gymCode }}" onInput="{{ setGymCode }}"><button class="btn btn-gold" style="min-height:44px;padding:0 16px" onClick="{{ linkGym }}" disabled="{{ gymBusy }}">Link</button></div></div>
+                <p class="ob-help" style="margin-top:6px">If your gym is on FITRON, ask the front desk for its code: your gym then sees your training next to your membership.</p>
+                <div class="ob-f" style="margin-top:12px"><label>Your gym</label><input class="ob-in" aria-label="Gym" placeholder="Optional" value="{{ obGymName }}" onInput="{{ setObGym }}"></div><p class="ob-help" style="margin-top:6px">Where you train, if your gym is not on FITRON. Optional.</p>
+              </sc-if>
+              <sc-if value="{{ gymMsgOn }}" hint-placeholder-val="{{ false }}"><p class="ob-help" style="margin-top:8px;color:var(--gold)">{{ gymMsg }}</p></sc-if>
+            </div>
             </sc-if>
           </sc-if>
 
@@ -1171,7 +1179,7 @@ class Component extends DCLogic {
       { date:'2 Jul 2026', name:'Neha Gupta', amount:'₹299', method:'Card', plan:'Monthly', status:'Refunded' },
     ],
     suppList: [ { name:'Whey Protein', detail:'1 scoop · post-workout', icon:'barbell' }, { name:'Pre-Workout', detail:'1 scoop · before training', icon:'lightning' }, { name:'Creatine', detail:'5g · anytime', icon:'flask' } ],
-    notifs: [], notifGone: [],
+    notifs: [], notifGone: [], gym: null, gymCode: '', gymMsg: '', gymBusy: false,
     selDay: 'Mon', dietPref: 'Non-veg', editSchedule: false,
     schedule: [
       { key:'wake', time:'7:00 AM', label:'Wake-up', short:'Wake-up', icon:'sun-horizon' },
@@ -1479,6 +1487,29 @@ class Component extends DCLogic {
       return { ok: r.ok, status: r.status, data, error: (data && data.error) || (r.ok ? '' : 'Something went wrong. Try again.') };
     } catch (e) { return { ok: false, status: 0, data: {}, error: 'No connection. Check your internet and try again.' }; }
   }
+  // Gym Partnership: link to a gym on FITRON with its trainer code.
+  setGymCode = (e) => this.setState({ gymCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12), gymMsg: '' });
+  linkGym = async () => {
+    const code = (this.state.gymCode || '').trim();
+    if (!code) { this.setState({ gymMsg: 'Type the code your gym gave you.' }); return; }
+    if (!this.state.me) { this.setState({ gymMsg: 'Sign in first, then link your gym.' }); return; }
+    this.setState({ gymBusy: true, gymMsg: '' });
+    const r = await this._api('gym', 'POST', { code });
+    try { localStorage.removeItem('fitron.gym'); } catch (e) {}
+    if (r.ok && r.data.gym) this.setState(st => ({ gym: r.data.gym, gymBusy: false, gymCode: '', gymMsg: 'Linked to ' + r.data.gym.name + (r.data.gym.member ? ' as ' + r.data.gym.member.name + ' (' + r.data.gym.member.code + ').' : '.'), ob: { ...st.ob, gymName: r.data.gym.name } }));
+    else this.setState({ gymBusy: false, gymMsg: r.error || 'Could not link. Try again.' });
+  };
+  unlinkGym = async () => {
+    if (!window.confirm('Leave this gym? It will no longer see your training, and stops earning from your plan.')) return;
+    const r = await this._api('gym', 'DELETE');
+    if (r.ok) this.setState({ gym: null, gymMsg: 'You left the gym.' }); else this.setState({ gymMsg: r.error });
+  };
+  // A code from /trainer?gym=CODE links as soon as the member is signed in.
+  _autoLinkGym(d) {
+    let code = ''; try { code = localStorage.getItem('fitron.gym') || ''; } catch (e) {}
+    if (!code || (d.gym && d.gym.code === code)) { if (code) try { localStorage.removeItem('fitron.gym'); } catch (e) {} return; }
+    this.setState({ gymCode: code }, () => this.linkGym());
+  }
   // What needs the member's attention, from the server's own picture of the account and the week.
   _liveNotifs(st) { return (st.notifs || []).filter(n => !(st.notifGone || []).includes(n.id)); }
   _notices(d) {
@@ -1508,10 +1539,12 @@ class Component extends DCLogic {
   async restoreSession() {
     const msg = this._authMsg();
     // a plan picked on fitron.in (/trainer?plan=ai-premium) is remembered through the sign-in link
+    try { const gc = new URLSearchParams(window.location.search).get('gym'); if (gc) { localStorage.setItem('fitron.gym', gc.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12)); window.history.replaceState(null, '', window.location.pathname); } } catch (e) {}
+    try { const gc = localStorage.getItem('fitron.gym'); if (gc) this.setState({ gymCode: gc }); } catch (e) {}
     try { const pre = new URLSearchParams(window.location.search).get('plan'); if (pre === 'ai-pro' || pre === 'ai-premium') { localStorage.setItem('fitron.tier', pre); window.history.replaceState(null, '', window.location.pathname); } } catch (e) {}
     try { const t = localStorage.getItem('fitron.tier'); if (t === 'ai-pro' || t === 'ai-premium') this.setState({ tier: t }); } catch (e) {}
     const r = await this._api('me');
-    if (r.ok) { this.applyUser(r.data); return true; }
+    if (r.ok) { this.applyUser(r.data); this._autoLinkGym(r.data); return true; }
     if (msg) this.setState({ linkErr: msg });
     return false;
   }
@@ -1570,7 +1603,7 @@ class Component extends DCLogic {
       return { ...keep, ob, avatar: p.avatar || st.avatar, groc: p.groc || st.groc, chats: this._ch,
         consent: { ...st.consent, ...(p.consentPrefs || {}) },
         water: t ? t.water : 0, habits: { workout:false, water:false, steps:false, protein:false, meals:false, sleep:false, ...(t ? t.habits : {}) }, workoutLogged: !!(t && t.workoutDone),
-        prog: d.progress, review: d.review, coachUse: d.coach, notifs: this._notices(d), role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
+        prog: d.progress, review: d.review, coachUse: d.coach, notifs: this._notices(d), gym: d.gym || null, role: 'member', loginRole: 'member', moreOpen: false, linkSent: false, linkErr: '', authNote: '',
         signup: !m.onboarded, screen: !m.onboarded ? 'onboard' : (locked ? 'subscription' : (inApp ? st.screen : 'home')),
         onboardStep: !m.onboarded ? 1 : st.onboardStep,
         subMode: m.access === 'LOCKED' ? 'plans' : 'manage',
@@ -2382,7 +2415,8 @@ class Component extends DCLogic {
         return 'Starter plan';
       })(),
       pfPlanLine: this._planLine(),
-      pfGym: (ob.gymName || '').trim() || '—',
+      pfGym: st.gym ? st.gym.name + (st.gym.member ? ' · ' + st.gym.member.code : '') + ' · linked' : (ob.gymName || '').trim() || 'Link your gym',
+      pfGymGo: () => this.setState({ screen: 'onboard', onboardStep: 5, signup: true, moreOpen: false, obFrom: 'profile' }),
       pfEditLabel: st.pfEdit ? 'Done' : 'Edit',
       pfToggleEdit: this.pfToggleEdit, pfEditBody: this.pfEditBody,
       pfAch: (() => {
@@ -2694,7 +2728,8 @@ class Component extends DCLogic {
             card('equipment','Bodyweight only','No equipment at all','person-simple-run', true),
             card('equipment','Nothing yet','I am about to start','sparkle', true),
           ],
-      obGymName: o.gymName || '', setObGym: this.setOb('gymName'), showGymName: (o.equipment || []).includes('Full gym'),
+      obGymName: o.gymName || '', setObGym: this.setOb('gymName'), showGymName: true,
+      gymLinked: !!st.gym, gymNotLinked: !st.gym, gymName: st.gym ? st.gym.name : '', gymMemberLine: st.gym ? (st.gym.member ? 'Linked as ' + st.gym.member.name + ' · ' + st.gym.member.code : 'Linked · your gym sees your training') : '', gymCode: st.gymCode || '', setGymCode: this.setGymCode, linkGym: this.linkGym, unlinkGym: this.unlinkGym, gymBusy: !!st.gymBusy, gymMsg: st.gymMsg || '', gymMsgOn: !!st.gymMsg,
 
           dietCards: [
             card('diet','Veg','No meat, no egg','leaf'),

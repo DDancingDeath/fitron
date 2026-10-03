@@ -8,6 +8,7 @@ import { putSetting, saveBranch } from "@/lib/services/settings";
 import { branchInput, gymInput, numberingInput, taxInput } from "@/lib/validation/settings";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
+import { ensureTrainerCode } from "@/lib/services/trainer-gym";
 
 const back = (params: Record<string, string>) => redirect(`/settings?${new URLSearchParams(params)}`);
 const firstError = (e: z.ZodError) => e.issues.map((i) => `${String(i.path[0] ?? "")}: ${i.message}`)[0] ?? "Check the form.";
@@ -30,6 +31,14 @@ export async function saveGym(fd: FormData) {
   await save(gymInput, fd, "gym", async (v) => {
     await putSetting(u, "gym", v);
   });
+}
+
+/** The gym's AI Trainer code for the Gym Partnership, made once. */
+export async function makeTrainerCode() {
+  const u = await requirePermission("settings.manage");
+  await ensureTrainerCode(u.orgId);
+  revalidatePath("/settings");
+  back({ saved: "gym" });
 }
 
 export async function saveTax(fd: FormData) {

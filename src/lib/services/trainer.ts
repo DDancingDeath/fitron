@@ -9,6 +9,7 @@ import { emailReady, sendEmail } from "@/lib/integrations/email";
 import { cleanUtr, fitronAdmins, fitronUpi, upiLink } from "@/lib/integrations/upi";
 import { appUrl } from "./accounts";
 import { isUniqueViolation, UserError } from "./errors";
+import { gymView } from "./trainer-gym";
 import { sha256 } from "./trainer-session";
 import { fromIso, toIso, todayIso } from "./time";
 
@@ -93,7 +94,7 @@ function cleanHabits(h: unknown) {
   return out;
 }
 
-const dayLog = (d: { date: Date; water: number; habits: Prisma.JsonValue; workoutDone: boolean; focus: string | null; weightKg: number | null }): DayLog => ({
+export const dayLog = (d: { date: Date; water: number; habits: Prisma.JsonValue; workoutDone: boolean; focus: string | null; weightKg: number | null }): DayLog => ({
   date: toIso(d.date),
   water: d.water,
   habits: (d.habits ?? {}) as Record<string, boolean>,
@@ -170,6 +171,7 @@ export async function loadTrainer(memberId: string, today = todayIso()) {
     progress: prog,
     review,
     coach: await coachUsage(m, today),
+    gym: await gymView(m),
   };
 }
 
@@ -355,6 +357,7 @@ export async function exportTrainer(memberId: string) {
     chats: m.chats.map((c) => ({ title: c.title, updatedAt: c.updatedAt, messages: c.messages })),
     weeklyReviews: m.reviews.map((r) => ({ weekStart: toIso(r.weekStart), workouts: r.workouts, planned: r.planned, consistency: r.consistency, nutrition: r.nutrition, avgWater: r.avgWater, insight: r.insight, focus: r.focus })),
     payments: m.payments.map(paymentView),
+    gym: await gymView(m),
     // Devices signed in (the token itself is never included), sign-in emails, and AI Coach messages per day.
     signedInDevices: m.sessions.map((x) => ({ signedInAt: x.createdAt.toISOString(), lastSeenAt: x.lastSeenAt.toISOString(), expiresAt: x.expiresAt.toISOString(), ip: x.ip, device: x.userAgent })),
     signInEmails: links.map((t) => ({ sentAt: t.createdAt.toISOString(), usedAt: t.usedAt?.toISOString() ?? null })),
@@ -375,6 +378,6 @@ export async function deleteTrainerAccount(memberId: string) {
     db.trainerReview.deleteMany({ where: { memberId } }),
     db.trainerCoachUsage.deleteMany({ where: { memberId } }),
     db.trainerLoginToken.deleteMany({ where: { email } }),
-    db.trainerMember.update({ where: { id: memberId }, data: { email: `deleted-${memberId}@deleted.fitron.in`, name: "", profile: {}, emailVerifiedAt: null, deletedEmailHash: sha256(email) } }),
+    db.trainerMember.update({ where: { id: memberId }, data: { email: `deleted-${memberId}@deleted.fitron.in`, name: "", profile: {}, emailVerifiedAt: null, deletedEmailHash: sha256(email), orgId: null, gymMemberId: null, gymLinkedAt: null } }),
   ]);
 }

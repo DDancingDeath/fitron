@@ -4,12 +4,14 @@ import { getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { saveAutopay, saveBranchAction, saveGym, saveNumbering, saveTax, saveWhatsApp } from "./actions";
+import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveTax, saveWhatsApp } from "./actions";
 import { getWaSettings } from "@/lib/services/whatsapp";
 import { getAutopayMode } from "@/lib/services/autopay";
 import { providerStatus } from "@/lib/integrations/whatsapp";
 import { razorpayReady } from "@/lib/integrations/razorpay";
 import Link from "next/link";
+import { appUrl } from "@/lib/services/accounts";
+import { PARTNER_SHARE } from "@/lib/domain/pricing";
 
 export const metadata = { title: "Settings · Fitron" };
 
@@ -47,6 +49,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     getAutopayMode(u.orgId),
   ]);
   const waStatus = await providerStatus(wa.mode);
+  const trainerCode = tab === "gym" ? (await db.organization.findUniqueOrThrow({ where: { id: u.orgId }, select: { trainerCode: true } })).trainerCode : null;
   const rzpMissing = razorpayReady();
 
   return (
@@ -90,6 +93,29 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 <Button variant="primary">Save</Button>
               </div>
             </form>
+          </Panel>
+          <Panel title="AI Trainer · Gym Partnership">
+            {trainerCode ? (
+              <>
+                <p className="text-sm">
+                  Your gym&apos;s trainer code is <strong className="font-mono text-lg tracking-wider">{trainerCode}</strong>. Members type it into the FITRON AI Trainer (or open{" "}
+                  <a className="underline" href={`${appUrl()}/trainer?gym=${trainerCode}`} target="_blank" rel="noopener">
+                    {appUrl()}/trainer?gym={trainerCode}
+                  </a>
+                  ) to link to your gym.
+                </p>
+                <p className="text-xs text-muted">
+                  You see their training next to their membership and earn {Math.round(PARTNER_SHARE * 100)}% of what they pay FITRON for the AI Trainer. <Link className="underline" href="/partnership">Open Gym Partnership</Link>.
+                </p>
+              </>
+            ) : (
+              <form action={makeTrainerCode} className="flex flex-col gap-3">
+                <p className="text-sm text-muted">Make a code your members type into the FITRON AI Trainer to link to your gym. You then see their training here and earn {Math.round(PARTNER_SHARE * 100)}% of what they pay FITRON for it.</p>
+                <div>
+                  <Button variant="primary">Make our trainer code</Button>
+                </div>
+              </form>
+            )}
           </Panel>
         </div>
       )}

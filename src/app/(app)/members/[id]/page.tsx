@@ -38,6 +38,8 @@ import { addDays, daysBetween } from "@/lib/domain/dates";
 import { AssignForm, ProgressForm } from "./fitness";
 import { SendOneForm } from "../../whatsapp/wa-forms";
 import { listMessages, listTemplates } from "@/lib/services/whatsapp";
+import { trainerStatusFor } from "@/lib/services/trainer-gym";
+import { findPlan } from "@/lib/domain/pricing";
 
 export const metadata = { title: "Member · Fitron" };
 
@@ -91,6 +93,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
   const receivers = history ? await db.user.findMany({ where: { id: { in: [...new Set(history.payments.map((p) => p.receivedById))] } }, select: { id: true, name: true } }) : [];
   const receivedBy = new Map(receivers.map((x) => [x.id, x.name]));
   const createdBy = m.createdById ? await db.user.findUnique({ where: { id: m.createdById }, select: { name: true } }) : null;
+  const trainer = m.walkIn ? null : await trainerStatusFor(u, m.id, today);
 
   const workout = workouts.find((w) => w.id === m.workoutPlanId);
   const diet = diets.find((d) => d.id === m.dietPlanId);
@@ -259,6 +262,19 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
             <Row k="WhatsApp" v={m.whatsapp ?? m.phone} />
             <Row k="Email" v={m.email} />
           </Section>
+          {trainer && (
+            <Section title="AI Trainer">
+              <Row k="Plan" v={`${findPlan(trainer.plan)?.name ?? trainer.plan} · ${trainer.access === "ACTIVE" ? `paid till ${fmtShort(trainer.paidUntil!)}` : trainer.access === "TRIAL" ? `free trial till ${fmtShort(trainer.trialEndsAt!)}` : "no plan"}`} />
+              <Row k="This week" v={`${trainer.weekWorkouts} of ${trainer.weekPlanned} workouts`} />
+              <Row k="Streak" v={trainer.streak ? `${trainer.streak} days` : "—"} />
+              <Row k="Workouts" v={`${trainer.totalWorkouts} logged`} />
+              <Row k="Last seen" v={trainer.lastSeenAt ? fmtStamp(trainer.lastSeenAt) : null} />
+              <Row k="Linked" v={trainer.linkedAt ? fmtStamp(trainer.linkedAt) : null} />
+              <p className="mt-2 text-xs text-muted">
+                Linked through the Gym Partnership. <Link className="underline" href="/partnership">All linked members</Link>
+              </p>
+            </Section>
+          )}
           <Section title="Address">
             <Row k="House / flat" v={m.house} />
             <Row k="Area / street" v={m.area} />

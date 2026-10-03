@@ -56,5 +56,6 @@ This creates the gym, its first branch, the default roles and the Super Admin ac
 - Staff: add, edit, reset password, deactivate (signs them out).
 - My profile (avatar menu, top right): edit your name and mobile, upload a photo, change your password (signs out your other devices), see your recent activity.
 - Every change is written to the audit log.
+- Gym Partnership: Settings makes the gym's trainer code; members type it into the AI Trainer (or open `/trainer?gym=CODE`) to link. Their record at the gym is matched by email or phone, their training shows on their member profile, and the Gym Partnership page lists linked members and the gym's 70% share of each month's AI Trainer payments.
 
 Money is stored as integer paise. Invoice and membership status are computed, never stored.
