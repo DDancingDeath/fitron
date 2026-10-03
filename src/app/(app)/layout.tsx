@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/lib/auth/current";
+import { requireUser, upgradePath } from "@/lib/auth/current";
 import { NAV } from "@/lib/nav";
 import { NavLinks } from "@/components/nav-links";
 import { MobileNav } from "@/components/mobile-nav";
@@ -47,9 +47,12 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           : s.kind === "LAPSED"
             ? { alert: true, body: <>Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.</>, cta: "Choose a plan" }
             : null;
+  // Sections the role may use stay listed even when the plan doesn't open them: locked, leading to the plans.
   const groups = NAV.map((g) => ({
     ...g,
-    items: g.items.filter((i) => !i.perm || u.can(i.perm)).map((i) => ({ ...i, badge: i.count ? counts[i.count] : undefined })),
+    items: g.items
+      .filter((i) => !i.perm || u.can(i.perm))
+      .map((i) => (i.feature && !u.has(i.feature) ? { ...i, locked: true, href: upgradePath(u, i.feature) } : { ...i, badge: i.count ? counts[i.count] : undefined })),
   })).filter((g) => g.items.length);
   const branchName = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
 

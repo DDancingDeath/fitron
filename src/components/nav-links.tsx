@@ -17,6 +17,7 @@ import {
   HandshakeIcon,
   IdentificationBadgeIcon,
   ListMagnifyingGlassIcon,
+  LockSimpleIcon,
   ReceiptIcon,
   RepeatIcon,
   ScalesIcon,
@@ -82,10 +83,12 @@ export function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigat
                 href={i.href}
                 onClick={onNavigate}
                 aria-current={on ? "page" : undefined}
-                className={cx("flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm hover:bg-accent-soft", on ? "bg-accent-soft text-accent-strong" : "text-fg")}
+                title={i.locked ? "Not in your plan yet. Tap to see plans." : undefined}
+                className={cx("flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm hover:bg-accent-soft", on ? "bg-accent-soft text-accent-strong" : i.locked ? "text-muted" : "text-fg")}
               >
                 <I size={18} weight="duotone" className="shrink-0" />
                 <span className="flex-1">{i.label}</span>
+                {i.locked && <LockSimpleIcon size={14} weight="duotone" className="shrink-0 text-muted" aria-label="Needs a bigger plan" />}
                 {!!i.badge && <span className="min-w-5 rounded-full bg-alert-soft px-1.5 py-px text-center text-[11px] text-alert-strong">{i.badge > 99 ? "99+" : i.badge}</span>}
               </Link>
             );

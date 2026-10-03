@@ -9,7 +9,7 @@ export async function GET(req: Request) {
   const u = await getCurrentUser();
   if (!u) return new Response("Sign in first.", { status: 401 });
   if (u.planBlocked) return new Response(PLAN_ENDED, { status: 402 });
-  if (!u.can("attendance.manage")) return new Response("Not allowed.", { status: 403 });
+  if (!u.can("attendance.manage") || !u.has("attendance")) return new Response("Not allowed.", { status: 403 });
   const d = new URL(req.url).searchParams.get("date");
   const date = d && /^\d{4}-\d{2}-\d{2}$/.test(d) ? d : todayIso();
   const { rows } = await listDay(u, date);

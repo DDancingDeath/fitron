@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { ArrowsClockwiseIcon, DoorOpenIcon, FingerprintIcon, InfoIcon, LockKeyIcon, MagnifyingGlassIcon, PlusIcon, ScanSmileyIcon } from "@phosphor-icons/react/dist/ssr";
-import { requirePermission } from "@/lib/auth/current";
+import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { listDevices, recentAccess } from "@/lib/services/biometric";
 import { getAccessRules } from "@/lib/services/attendance";
@@ -19,7 +19,8 @@ export const metadata = { title: "Biometric & doors · Fitron" };
 const box = "flex flex-col gap-3.5 rounded-lg bg-surface p-5";
 
 export default async function DevicesPage({ searchParams }: PageProps<"/settings/devices">) {
-  const u = await requirePermission("settings.manage");
+  await requirePermission("settings.manage");
+  const u = await requireFeature("biometric");
   const sp = await searchParams;
   const s = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const q = s("q")?.trim();

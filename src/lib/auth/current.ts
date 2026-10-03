@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { gymPlan } from "@/lib/services/saas";
+import { PERMISSION_FEATURE, planHas, type Feature, type GymPlanView } from "@/lib/domain/features";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { readSession } from "./session";
@@ -28,6 +29,10 @@ export type CurrentUser = {
   can: (p: Permission) => boolean;
   /** The gym's free trial or paid plan has ended and nothing is being paid: everything but paying is closed. */
   planBlocked: boolean;
+  /** The gym's FITRON plan, which decides which sections of the console are open. */
+  plan: GymPlanView;
+  /** Whether the gym's plan opens a feature (src/lib/domain/features.ts). */
+  has: (f: Feature) => boolean;
 };
 
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
@@ -54,6 +59,7 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     picked && branches.some((b) => b.id === picked) ? picked : canAll && (!picked || picked === "ALL") ? "ALL" : (branches[0]?.id ?? "");
   const branchIds = branch === "ALL" ? branches.map((b) => b.id) : [branch];
   const plan = await gymPlan(user.orgId);
+  const planView: GymPlanView = { key: plan.key, name: plan.name, custom: plan.terms.custom };
 
   return {
     id: user.id,
@@ -69,6 +75,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
     branchIds,
     can: (p) => perms.has(p),
     planBlocked: plan.standing.kind === "LAPSED" && !plan.checking,
+    plan: planView,
+    has: (f) => planHas(planView, f),
   };
 });
 
@@ -90,6 +98,18 @@ export async function requireUser(opts: { allowBlocked?: boolean } = {}) {
 export async function requirePermission(p: Permission, opts: { allowBlocked?: boolean } = {}) {
   const u = await requireUser(opts);
   if (!u.can(p)) redirect("/dashboard?denied=1");
+  const f = PERMISSION_FEATURE[p];
+  if (f && !u.has(f)) redirect(upgradePath(u, f));
+  return u;
+}
+
+/** Where someone lands when their gym's plan doesn't open a section: the plans, or a note for staff who can't pay. */
+export const upgradePath = (u: CurrentUser, f: Feature) => (u.can("settings.manage") ? `/settings/billing?upgrade=${f}` : `/dashboard?locked=${f}`);
+
+/** The signed-in user, on a plan that opens the feature; else off to upgrade. */
+export async function requireFeature(f: Feature, opts: { allowBlocked?: boolean } = {}) {
+  const u = await requireUser(opts);
+  if (!u.has(f)) redirect(upgradePath(u, f));
   return u;
 }
 
