@@ -1266,7 +1266,6 @@ class Component extends DCLogic {
   goSignupScreen = () => this.setState({ screen: 'signup', signup: true, moreOpen: false, linkSent: false, linkErr: '', authNote: '', signinMode: false });
   goEmailSignin = () => this.setState({ screen: 'signup', signup: true, moreOpen: false, linkSent: false, linkErr: '', authNote: '', signinMode: true });
   googleLogin = () => { window.location.href = '/auth/google?for=trainer&next=/trainer'; };
-  truecallerLogin = () => this.setState({ screen: 'signup', signup: true, moreOpen: false, linkSent: false, linkErr: '', signinMode: true, authNote: 'Truecaller sign-in is coming soon. For now, use Google or an email link: it signs you in, or creates your account if you are new.' });
   startSignup = () => this.setState(st => ({ screen: 'onboard', signup: true, moreOpen: false, subMode: 'plans', ob: { ...st.ob, email: st.ob.email || st.loginMail } }));
   // nobody pays before agreeing to the Terms and Privacy Policy — every pay button routes through this gate
   payGate(kind) {
@@ -2382,7 +2381,7 @@ class Component extends DCLogic {
       loginRole: st.loginRole, setRoleMember: () => this.setRole('member'), setRoleAdmin: () => this.setRole('admin'),
       linkSent: !!st.linkSent, linkNotSent: !st.linkSent, sendLink: this.sendLink, resendLink: this.resendLink, linkErr: st.linkErr || '', linkHasErr: !!st.linkErr, showLanding: s === 'landing', waitDone: !!st.waitDone, waitNotDone: !st.waitDone, joinWait: this.joinWait, soon: this.soon, soonOpen: !!st.soonOpen,
       demoLogin: false,
-      doLogin: this.googleLogin, googleLogin: this.googleLogin, truecallerLogin: this.truecallerLogin, goEmailSignin: this.goEmailSignin, checkLink: this.checkLink,
+      doLogin: this.googleLogin, googleLogin: this.googleLogin, goEmailSignin: this.goEmailSignin, checkLink: this.checkLink,
       chromeDesk: D && isApp && !st.signup && s !== 'coach', chromeMobile: !D && isApp && !st.signup && s !== 'coach',
       // the profile screen carries its own bar, so the app header steps aside and lets the photo reach the top edge
       chromeTop: !D && isApp && !st.signup && s !== 'profile' && s !== 'coach',
