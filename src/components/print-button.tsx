@@ -1,13 +1,13 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { Button } from "./ui";
+import { PrinterIcon } from "@phosphor-icons/react";
 
-/** Opens the browser's print dialog, where the page can also be saved as a PDF. */
-export function PrintButton({ children, variant = "default" }: { children: ReactNode; variant?: "default" | "primary" }) {
+/** "Print / PDF": the browser's print dialog, which also saves as PDF. */
+export function PrintButton({ label = "Print / PDF" }: { label?: string }) {
   return (
-    <Button variant={variant} type="button" onClick={() => window.print()}>
-      {children}
-    </Button>
+    <button type="button" onClick={() => window.print()} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7 print:hidden">
+      <PrinterIcon size={16} weight="duotone" />
+      {label}
+    </button>
   );
 }

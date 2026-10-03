@@ -8,7 +8,7 @@ import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { sellMembership } from "./billing";
 import { applyDeliveryStatus, sendTemplate } from "./whatsapp";
-import { applyRazorpayEvent, changeMandate, createMandate, runAutopayDay } from "./autopay";
+import { applyRazorpayEvent, autopayStats, changeMandate, createMandate, listMandates, retryDemoDebit, runAutopayDay } from "./autopay";
 import { runDailyJobs } from "./jobs";
 import { listNotifications } from "./notifications";
 import { todayIso } from "./time";
@@ -87,6 +87,21 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     expect(ms[1]!.startDate.toISOString().slice(0, 10)).toBe(debit);
     const pay = await db.payment.findFirst({ where: { memberId: m.id, txnRef: { startsWith: "demo_" } } });
     expect(pay).toMatchObject({ amount: 118000, method: "UPI" });
+  });
+
+  it("a failed demo debit can be retried, and the screen counts it as collected", async () => {
+    const m = await newMember();
+    await sellMembership(admin, m.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: 118000, payMethod: "UPI" });
+    await expect(createMandate(admin, { memberId: m.id, planId, vpa: "not a upi id" })).rejects.toThrow(/UPI ID/);
+    const md = await createMandate(admin, { memberId: m.id, planId, vpa: "Riya@OkIcici" });
+    expect(md.vpa).toBe("riya@okicici");
+    await expect(retryDemoDebit(admin, md.id)).rejects.toThrow(/Only a failed debit/);
+    await db.autopayMandate.update({ where: { id: md.id }, data: { status: "Failed", retries: 1 } });
+    expect(await retryDemoDebit(admin, md.id)).toBe("renewed");
+    expect((await db.autopayMandate.findUniqueOrThrow({ where: { id: md.id } })).status).toBe("Active");
+    const stats = await autopayStats(admin, await listMandates(admin));
+    expect(stats.debits.get(md.id)).toBe(1);
+    expect(stats.collected).toBeGreaterThanOrEqual(118000);
   });
 
   it("Razorpay webhooks: signature check, charge renews once, failure alerts", async () => {

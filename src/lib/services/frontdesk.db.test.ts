@@ -5,9 +5,9 @@ import { addDays } from "@/lib/domain/dates";
 import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { cancelInvoice, getInvoice, sellMembership } from "./billing";
-import { attendanceBoard, checkIn, checkOut, listDay } from "./attendance";
-import { book, saveSlot, setBookingStatus, weekdayOf } from "./classes";
-import { adjustStock, posSale, saveProduct } from "./pos";
+import { checkIn, checkInGuest, listDay } from "./attendance";
+import { book, bookedMembers, markAllAttended, saveSlot, setBookingStatus, weekdayOf } from "./classes";
+import { adjustStock, posSale, saveProduct, soldSince } from "./pos";
 import { createLead, getLead, setLeadStage } from "./leads";
 import { listNotifications } from "./notifications";
 import { todayIso } from "./time";
@@ -37,12 +37,27 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await expect(book(admin, slot.id, date, a.id)).rejects.toThrow(/already booked/);
     await expect(book(admin, slot.id, addDays(date, 1), a.id)).rejects.toThrow(/doesn't run/);
 
-    const { promoted } = await setBookingStatus(admin, bb.id, "Cancelled");
+    const { promoted, promotedId } = await setBookingStatus(admin, bb.id, "Cancelled");
     expect(promoted).toBe(c.name);
+    expect(promotedId).toBe(c.id);
     const statuses = await db.booking.findMany({ where: { classSlotId: slot.id }, select: { memberId: true, status: true } });
     expect(statuses.find((s) => s.memberId === c.id)?.status).toBe("Booked");
     expect((await listNotifications(admin)).some((n) => n.type === "WAITLIST")).toBe(true);
     await expect(setBookingStatus(admin, bb.id, "Attended")).rejects.toThrow(/day of the class/);
+    await expect(markAllAttended(admin, slot.id, date)).rejects.toThrow(/day of the class/);
+    expect((await bookedMembers(admin, slot.id, date)).sort()).toEqual([a.id, c.id].sort());
+  });
+
+  it("mark all attended marks every booked place in today's session", async () => {
+    const slot = await saveSlot(admin, null, { name: "Yoga", trainerId: admin.id, weekday: weekdayOf(today), startTime: "23:30", durationMin: 45, capacity: 5 });
+    const [a, b] = [await newMember(), await newMember()];
+    await book(admin, slot.id, today, a.id);
+    const bb = await book(admin, slot.id, today, b.id);
+    await setBookingStatus(admin, bb.id, "No-show");
+    expect(await markAllAttended(admin, slot.id, today)).toBe(1);
+    const rows = await db.booking.findMany({ where: { classSlotId: slot.id }, select: { memberId: true, status: true } });
+    expect(rows.find((r) => r.memberId === a.id)?.status).toBe("Attended");
+    expect(rows.find((r) => r.memberId === b.id)?.status).toBe("No-show");
   });
 
   it("POS sale decrements stock, refuses to oversell, and cancelling puts it back", async () => {
@@ -69,11 +84,23 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     await expect(adjustStock(admin, p.id, { qty: -25 })).rejects.toThrow(/Only 20/);
   });
 
+  it("a restock can be booked as an Inventory expense, and sales count toward sold (30 d)", async () => {
+    const p = await saveProduct(admin, null, { sku: "STRAP", name: "Lifting straps", category: "Accessories", price: 54900, cost: 21000, trackStock: true, reorderLevel: 5, gstApplicable: true });
+    await expect(adjustStock(admin, p.id, { qty: 8, asExpense: true })).rejects.toThrow(/cost per unit/);
+    await adjustStock(admin, p.id, { qty: 8, unitCost: 21000, vendor: "NutriHub", asExpense: true });
+    const mv = await db.stockMovement.findFirstOrThrow({ where: { productId: p.id, reason: "RESTOCK" }});
+    const exp = await db.expense.findUniqueOrThrow({ where: { id: mv.expenseId! }, include: { category: true } });
+    expect(exp).toMatchObject({ amount: 168000, vendor: "NutriHub", description: "Restock Lifting straps × 8" });
+    expect(exp.category.name).toBe("Inventory");
+    await posSale(admin, { method: "Cash", items: [{ productId: p.id, qty: 3 }] });
+    expect((await soldSince([p.id], addDays(today, -30))).get(p.id)).toBe(3);
+  });
+
   it("check-in follows the entry rules, and staff can override with a reason", async () => {
     const active = await newMember();
     await sellMembership(admin, active.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: 0 });
     expect(await checkIn(admin, active.id)).toMatchObject({ ok: true });
-    await expect(checkIn(admin, active.id)).rejects.toThrow(/already inside/);
+    expect(await checkIn(admin, active.id)).toMatchObject({ ok: false, kind: "inside", blocked: expect.stringMatching(/Already inside/) });
 
     const never = await newMember();
     expect(await checkIn(admin, never.id)).toMatchObject({ ok: false, blocked: "No membership yet" });
@@ -92,33 +119,17 @@ describe.skipIf(!hasDb)("front desk (database)", () => {
     const m = await createMember(admin, { name: "Asha Lead", gender: "Female", phone: "9844400001", source: "Instagram", tags: [] }, { leadId: lead.id });
     expect(await getLead(admin, lead.id)).toMatchObject({ stage: "Won", memberId: m.id });
   });
-});
 
-describe.skipIf(!hasDb)("attendance board (database)", () => {
-  it("counts the day, flags dues, and lists active members who haven't visited", async () => {
-    const gym = await makeGym();
-    const admin = pick(await gym.user("Super Admin"), gym.a.id);
-    const today = todayIso();
-    const planId = (await createPlan(admin, { name: "Monthly", kind: "Membership", months: 1, price: 150000, regFee: 0, discount: 0, gstApplicable: true, features: [] })).id;
-    const member = async (n: number) => createMember(admin, { name: `Board ${n}`, gender: "Male", phone: String(9844400000 + n), source: "Walk-in", tags: [] });
-    const [paid, owes, idle, lapsed] = [await member(1), await member(2), await member(3), await member(4)];
-    for (const m of [paid, owes, idle]) await sellMembership(admin, m.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: m === owes ? 0 : 177000, payMethod: "UPI" });
-    await sellMembership(admin, lapsed.id, { planId, startDate: addDays(today, -90), discount: 0, includeRegFee: false, payAmount: 177000, payMethod: "UPI" });
-
-    await checkIn(admin, paid.id);
-    await checkIn(admin, owes.id);
-    const visit = await db.attendance.findFirstOrThrow({ where: { memberId: paid.id } });
-    await db.attendance.update({ where: { id: visit.id }, data: { checkIn: new Date(Date.now() - 90 * 60_000) } });
-    await checkOut(admin, visit.id);
-
-    const b = await attendanceBoard(admin, today);
-    expect(b.stats).toMatchObject({ checkIns: 2, unique: 2, active: 3 });
-    expect(b.inside).toBe(1);
-    expect(b.stats.avgMinutes).toBeGreaterThanOrEqual(89);
-    expect(b.rows.find((r) => r.memberId === owes.id)?.flag).toEqual({ text: "₹1,770 due", alert: true });
-    expect(b.rows.find((r) => r.memberId === paid.id)).toMatchObject({ planName: "Monthly", flag: null });
-    // Only active members count as idle, and an expired one is left out.
-    expect(b.idle.map((m) => m.id)).toEqual([idle.id]);
-    expect(b.hours).toHaveLength(18);
+  it("a trial visitor becomes a lead, and only an Admin can let a blocked member in", async () => {
+    const gym2 = await makeGym();
+    const desk = await gym2.user("Receptionist", [gym2.a.id]);
+    expect(await checkInGuest(desk, "Trial Tara", "9876566001", "Trial")).toEqual({ lead: true });
+    expect(await db.lead.findFirst({ where: { orgId: gym2.org.id, phone: "9876566001" } })).toMatchObject({ stage: "Trial done", source: "Walk-in" });
+    expect(await checkInGuest(desk, "Trial Tara", "9876566001", "Trial")).toEqual({ lead: false });
+    expect(await checkInGuest(desk, "Day Dev", undefined, "Day pass")).toEqual({ lead: false });
+    const admin = pick(await gym2.user("Super Admin"), gym2.a.id);
+    const none = await createMember(admin, { name: "No Plan", gender: "Male", phone: "9876566002", source: "Walk-in", tags: [] });
+    expect(await checkIn(desk, none.id)).toMatchObject({ ok: false, kind: "expired" });
+    await expect(checkIn(desk, none.id, { override: "Allowed by staff" })).rejects.toThrow(/Only an Admin/);
   });
 });

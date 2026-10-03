@@ -14,11 +14,19 @@ export async function listPlans(u: CurrentUser, opts: { activeOnly?: boolean } =
   return plans;
 }
 
-export const getPlan = (u: CurrentUser, id: string) => db.membershipPlan.findFirst({ where: { orgId: u.orgId, id } });
+export const getPlan = (u: CurrentUser, id: string) => db.membershipPlan.findFirst({ where: { orgId: u.orgId, id }, include: { prices: true } });
+
+/** Splits the form into the plan's own columns and its category prices. */
+function split(input: PlanInput) {
+  const { femalePrice, studentPrice, malePrice, ...plan } = input;
+  const prices = ([["Female", femalePrice], ["Student", studentPrice], ["Male", malePrice]] as const).filter(([, v]) => v != null && v > 0).map(([category, price]) => ({ category, price: price! }));
+  return { plan, prices };
+}
 
 export async function createPlan(u: CurrentUser, input: PlanInput) {
+  const { plan, prices } = split(input);
   return db.$transaction(async (tx) => {
-    const p = await tx.membershipPlan.create({ data: { ...input, orgId: u.orgId } });
+    const p = await tx.membershipPlan.create({ data: { ...plan, orgId: u.orgId, prices: { create: prices } } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "plan.create", entity: "MembershipPlan", entityId: p.id, after: p });
     return p;
   });
@@ -28,8 +36,10 @@ export async function createPlan(u: CurrentUser, input: PlanInput) {
 export async function updatePlan(u: CurrentUser, id: string, input: PlanInput) {
   const before = await getPlan(u, id);
   if (!before) throw new UserError("Plan not found.");
+  const { plan, prices } = split(input);
   return db.$transaction(async (tx) => {
-    const after = await tx.membershipPlan.update({ where: { id }, data: input });
+    await tx.planPrice.deleteMany({ where: { planId: id } });
+    const after = await tx.membershipPlan.update({ where: { id }, data: { ...plan, prices: { create: prices } } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "plan.update", entity: "MembershipPlan", entityId: id, before, after });
     return after;
   });

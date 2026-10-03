@@ -189,3 +189,123 @@ export async function listAudit(u: CurrentUser, f: { q?: string; userId?: string
     users,
   };
 }
+
+const METHOD_LIST = ["UPI", "Cash", "Card", "Bank Transfer", "Other"];
+
+/** What is still owed on non-cancelled invoices matching `where`, counting payments up to `upTo` (inclusive). */
+async function owed(u: CurrentUser, invoiceDate: { gte?: Date; lte?: Date }, upTo?: string) {
+  const invs = await db.invoice.findMany({
+    where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ISSUED", date: invoiceDate },
+    select: { total: true, payments: { where: { status: "SUCCESS", ...(upTo ? { date: { lte: fromIso(upTo) } } : {}) }, select: { amount: true } } },
+  });
+  return invs.reduce((s, i) => s + Math.max(0, i.total - i.payments.reduce((a, p) => a + p.amount, 0)), 0);
+}
+
+/** Money on hand across every method at the end of `upTo`: the cash and bank books' closing balances added up. */
+export async function moneyOnHand(u: CurrentUser, upTo: string, method?: string) {
+  const opening = await getSetting<{ asOf?: string }>(u.orgId, "opening");
+  const from = opening?.asOf && opening.asOf <= upTo ? opening.asOf : "2000-01-01";
+  let total = 0;
+  for (const m of method ? [method] : METHOD_LIST) total += (await ledger(u, m, { from, to: upTo })).closing;
+  return total;
+}
+
+/** The P&L's "Reconciliation" column (prototype): what was invoiced, collected and is still owed in the period. */
+export async function reconciliation(u: CurrentUser, p: Period) {
+  const range = { gte: fromIso(p.from), lte: fromIso(p.to) };
+  const [pl, onThese, allOwed, cash, capex] = await Promise.all([
+    profitAndLoss(u, p),
+    owed(u, range),
+    owed(u, {}),
+    moneyOnHand(u, p.to, "Cash"),
+    db.expense.aggregate({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: true, date: range }, _sum: { amount: true } }),
+  ]);
+  const cashIn = pl.collectedByMethod.find((x) => x.key === "Cash")?.amount ?? 0;
+  return {
+    pl,
+    rows: [
+      ["Revenue invoiced", pl.totalRevenue],
+      ["Tax collected", pl.gstCollected],
+      ["Collected in period", pl.collected],
+      ["Cash collections", cashIn],
+      ["Bank / UPI / card collections", pl.collected - cashIn],
+      ["Outstanding on these invoices", onThese],
+      ["Total outstanding receivables", allOwed],
+      ["Cash in hand (est.)", cash],
+      ["Asset purchases (capitalised, not in P&L)", capex._sum.amount ?? 0],
+      ["Depreciation charged (non-cash)", pl.depreciation],
+    ] as [string, number][],
+  };
+}
+
+/** The "Month-end closing" summary for one month (prototype), with the lock state across the picked branches. */
+export async function monthClose(u: CurrentUser, ym: string) {
+  const p = monthPeriod(ym);
+  const dayBefore = addDays(p.from, -1);
+  const range = { gte: fromIso(p.from), lte: fromIso(p.to) };
+  const [pl, opening, closing, receivable, capex, locks] = await Promise.all([
+    profitAndLoss(u, p),
+    moneyOnHand(u, dayBefore),
+    moneyOnHand(u, p.to),
+    owed(u, { lte: fromIso(p.to) }, p.to),
+    db.expense.aggregate({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: true, date: range }, _sum: { amount: true } }),
+    db.monthLock.count({ where: { branchId: { in: u.branchIds }, month: ym } }),
+  ]);
+  const by = (m: string) => pl.collectedByMethod.find((x) => x.key === m)?.amount ?? 0;
+  return {
+    locked: locks === u.branchIds.length,
+    partly: locks > 0 && locks < u.branchIds.length,
+    rows: [
+      ["Opening balance", opening, true],
+      ["Total revenue (invoiced)", pl.totalRevenue],
+      ["Total collections", pl.collected],
+      ["Cash collection", by("Cash")],
+      ["UPI collection", by("UPI")],
+      ["Bank transfer collection", by("Bank Transfer")],
+      ["Card collection", by("Card")],
+      ["Other collection", by("Other")],
+      ["Outstanding receivables at month end", receivable],
+      ["Operating expenses", pl.totalExpenses],
+      ["Asset purchases (capitalised)", capex._sum.amount ?? 0],
+      ["Depreciation (non-cash)", pl.depreciation],
+      ["Net profit", pl.net, true],
+      ["Closing balance", closing, true],
+    ] as [string, number, boolean?][],
+  };
+}
+
+export const LEDGERS = ["income", "expense", "payment", "receivable"] as const;
+export type LedgerKind = (typeof LEDGERS)[number];
+
+/** The prototype's four ledgers as plain tables. Money columns are paise; reversed payments are flagged. */
+export async function ledgerTable(u: CurrentUser, kind: LedgerKind) {
+  const scope = { orgId: u.orgId, branchId: { in: u.branchIds } };
+  if (kind === "income") {
+    const invs = await db.invoice.findMany({ where: { ...scope, status: "ISSUED" }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 120, include: { member: { select: { name: true } }, items: { select: { category: true, amount: true } } } });
+    return {
+      cols: ["Date", "Invoice", "Member", "Category", "Amount"],
+      money: [4],
+      rows: invs.flatMap((i) => i.items.map((l) => [i.date, i.number, i.member.name, l.category, l.amount] as (string | number | Date)[])),
+      note: "Latest 120 invoices, one row per line item (net of discount, before GST)",
+    };
+  }
+  if (kind === "expense") {
+    const ex = await db.expense.findMany({ where: { ...scope, status: "ACTIVE" }, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 150, include: { category: { select: { name: true } } } });
+    return { cols: ["Date", "Expense", "Category", "Vendor", "Method", "Amount"], money: [5], rows: ex.map((e) => [e.date, e.code, e.category.name, e.vendor ?? "", e.method, e.amount] as (string | number | Date)[]), note: `${ex.length} rows` };
+  }
+  if (kind === "payment") {
+    const ps = await db.payment.findMany({ where: scope, orderBy: [{ date: "desc" }, { createdAt: "desc" }], take: 150, include: { member: { select: { name: true } }, invoice: { select: { number: true } } } });
+    return {
+      cols: ["Date", "Payment", "Invoice", "Member", "Method", "Status", "Amount"],
+      money: [6],
+      rows: ps.map((p) => [p.date, p.code, p.invoice.number, p.member.name, p.method, p.status === "SUCCESS" ? "Success" : "Reversed", p.status === "SUCCESS" ? p.amount : -p.amount] as (string | number | Date)[]),
+      note: "Reversed payments stay in the ledger in brackets",
+    };
+  }
+  const invs = await db.invoice.findMany({ where: { ...scope, status: "ISSUED" }, orderBy: { dueDate: "asc" }, include: { member: { select: { name: true } }, payments: { where: { status: "SUCCESS" }, select: { amount: true } } } });
+  const rows = invs
+    .map((i) => ({ i, paid: i.payments.reduce((a, p) => a + p.amount, 0) }))
+    .filter((x) => x.paid < x.i.total)
+    .map(({ i, paid }) => [i.number, i.member.name, i.date, i.dueDate, i.total, paid, i.total - paid] as (string | number | Date)[]);
+  return { cols: ["Invoice", "Member", "Invoice date", "Due", "Total", "Paid", "Balance"], money: [4, 5, 6], rows, note: `${rows.length} invoices with a balance` };
+}

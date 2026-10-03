@@ -1,67 +1,41 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
-import { CircleNotchIcon, PaperPlaneTiltIcon } from "@phosphor-icons/react";
-import { Button, Notice } from "@/components/ui";
+import Image from "next/image";
+import Link from "next/link";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { ArrowRightIcon, ArrowUpIcon, ArrowsClockwiseIcon, CircleNotchIcon, CurrencyInrIcon, FunnelIcon, PackageIcon, PaperPlaneTiltIcon, TrendUpIcon, UserCircleMinusIcon, WarningIcon } from "@phosphor-icons/react";
+import { cx } from "@/components/ui";
+import type { BriefCard } from "@/lib/services/ai-local";
 import { dismissProposalAction, sendProposalAction } from "./actions";
 
 type Proposal = { id: string; summary: string; members: number; body: string };
-type Turn = { role: "user" | "assistant"; content: string; steps?: string[]; proposals?: Proposal[]; error?: string };
+type Turn = { role: "user" | "assistant"; content: string; proposals?: Proposal[]; error?: string };
 
-const LABEL: Record<string, string> = {
-  get_overview: "Looked at today's numbers",
-  list_members: "Listed members",
-  find_member: "Found the member",
-  revenue_breakdown: "Read the accounts",
-  class_and_attendance: "Checked attendance and classes",
-  propose_action: "Drafted a message",
+const STEP: Record<string, string> = {
+  get_overview: "Checking today's numbers…",
+  list_members: "Looking up members…",
+  find_member: "Finding the member…",
+  revenue_breakdown: "Reading the accounts…",
+  class_and_attendance: "Checking classes and attendance…",
+  propose_action: "Drafting a message…",
 };
+const SUGGESTIONS = ["Who should I follow up with today?", "How is this month vs last month?", "Which members are at risk?", "Draft reminders for pending dues", "Which classes are underbooked?"];
+const GREETING: Turn = { role: "assistant", content: "Hi! I read your gym's live data. Ask me about members, renewals, dues, classes or this month's numbers. I'll draft messages, but nothing is sent until you press Send." };
 
-const SUGGESTIONS = ["How is this month going?", "Who should we call today?", "Which members owe the most?", "Remind members expiring this week to renew"];
-
-function ProposalCard({ p }: { p: Proposal }) {
-  const [sent, send, sending] = useActionState(sendProposalAction.bind(null, p.id), undefined);
-  const [dropped, drop, dropping] = useActionState(dismissProposalAction.bind(null, p.id), undefined);
-  const done = sent?.ok || dropped?.ok;
-  return (
-    <div className="mt-2 rounded-lg border border-accent/50 bg-accent-soft p-3 text-sm">
-      <p className="font-semibold">
-        {p.summary} · {p.members} member{p.members === 1 ? "" : "s"}
-      </p>
-      <p className="mt-1 whitespace-pre-line text-muted">{p.body}</p>
-      {sent?.message && <p className={sent.ok ? "mt-2 text-ok" : "mt-2 text-alert"}>{sent.message}</p>}
-      {dropped?.ok && <p className="mt-2 text-muted">Not sent.</p>}
-      {!done && (
-        <div className="mt-2 flex gap-2">
-          <form action={send}>
-            <Button variant="primary" disabled={sending || dropping}>
-              {sending ? "Sending…" : "Send on WhatsApp"}
-            </Button>
-          </form>
-          <form action={drop}>
-            <Button disabled={sending || dropping}>Don&apos;t send</Button>
-          </form>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function AiChat({ ready }: { ready: boolean }) {
-  const [turns, setTurns] = useState<Turn[]>([]);
+/** The conversation, streamed from /api/ai/chat (the model, or the built-in answers without a key). */
+export function useAiChat() {
+  const [turns, setTurns] = useState<Turn[]>([GREETING]);
   const [busy, setBusy] = useState(false);
   const [step, setStep] = useState("");
-  const input = useRef<HTMLInputElement>(null);
-
   async function ask(q: string) {
     if (!q.trim() || busy) return;
-    const history = [...turns.filter((t) => !t.error && t.content), { role: "user" as const, content: q.trim() }];
-    setTurns([...turns, { role: "user", content: q.trim() }, { role: "assistant", content: "", steps: [], proposals: [] }]);
+    const history = [...turns.slice(1).filter((t) => !t.error && t.content), { role: "user" as const, content: q.trim() }];
+    setTurns((ts) => [...ts, { role: "user", content: q.trim() }, { role: "assistant", content: "", proposals: [] }]);
     setBusy(true);
-    setStep("Thinking…");
+    setStep("Reading your gym data…");
     const patch = (f: (t: Turn) => Turn) => setTurns((ts) => [...ts.slice(0, -1), f(ts[ts.length - 1]!)]);
     try {
-      const res = await fetch("/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: history.map(({ role, content }) => ({ role, content })) }) });
+      const res = await fetch("/api/ai/chat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ messages: history.slice(-20).map(({ role, content }) => ({ role, content })) }) });
       if (!res.ok || !res.body) {
         const j = await res.json().catch(() => ({}));
         patch((t) => ({ ...t, error: j.error ?? "Something went wrong." }));
@@ -81,10 +55,7 @@ export function AiChat({ ready }: { ready: boolean }) {
           if (!line.trim()) continue;
           const e = JSON.parse(line);
           if (e.type === "text") patch((t) => ({ ...t, content: t.content ? `${t.content}\n\n${e.text}` : e.text }));
-          if (e.type === "tool") {
-            setStep(`${LABEL[e.name] ?? e.name}…`);
-            patch((t) => ({ ...t, steps: [...(t.steps ?? []), LABEL[e.name] ?? e.name] }));
-          }
+          if (e.type === "tool") setStep(STEP[e.name] ?? "Working…");
           if (e.type === "proposal") patch((t) => ({ ...t, proposals: [...(t.proposals ?? []), e] }));
           if (e.type === "error") patch((t) => ({ ...t, error: e.message }));
         }
@@ -96,45 +67,77 @@ export function AiChat({ ready }: { ready: boolean }) {
       setStep("");
     }
   }
+  return { turns, busy, step, ask };
+}
 
-  if (!ready)
-    return (
-      <div className="p-[18px]">
-        <Notice>
-          Fitron AI answers questions about your members, money and classes, and drafts WhatsApp messages for you to approve. To switch it on, the server needs an ANTHROPIC_API_KEY. The brief and risk list on this page work without it.
-        </Notice>
+function ProposalButtons({ p }: { p: Proposal }) {
+  const [sent, send, sending] = useActionState(sendProposalAction.bind(null, p.id), undefined);
+  const [dropped, drop, dropping] = useActionState(dismissProposalAction.bind(null, p.id), undefined);
+  const chip = "inline-flex items-center rounded-full border border-line bg-bg px-3 py-1.5 text-[13px] font-semibold hover:bg-fg/7 disabled:opacity-45";
+  if (sent?.message) return <div className={cx("mt-2.5 text-[13px]", sent.ok ? "text-ok" : "text-alert")}>{sent.message}</div>;
+  if (dropped?.ok) return <div className="mt-2.5 text-[13px] text-muted">Not sent.</div>;
+  return (
+    <div className="mt-2.5 flex flex-col gap-2">
+      <details className="text-[13px] text-muted">
+        <summary className="cursor-pointer">Message to {p.members} member{p.members === 1 ? "" : "s"}</summary>
+        <p className="mt-1 whitespace-pre-line">{p.body}</p>
+      </details>
+      <div className="flex flex-wrap gap-1.5">
+        <form action={send}>
+          <button className={chip} disabled={sending || dropping}>
+            {sending ? "Sending…" : p.summary.replace(/^(\w)/, (c) => c.toUpperCase())}
+          </button>
+        </form>
+        <form action={drop}>
+          <button className={cx(chip, "font-normal")} disabled={sending || dropping}>
+            Don&apos;t send
+          </button>
+        </form>
       </div>
-    );
+    </div>
+  );
+}
 
+/** The chat column: messages, suggestion chips and the input. `drawer` is the side panel behind "Ask Fitron AI". */
+export function ChatPanel({ chat, drawer = false }: { chat: ReturnType<typeof useAiChat>; drawer?: boolean }) {
+  const { turns, busy, step, ask } = chat;
+  const [text, setText] = useState("");
+  const end = useRef<HTMLDivElement>(null);
+  useEffect(() => end.current?.scrollIntoView({ block: "end" }), [turns, busy]);
+  const submit = () => {
+    const q = text;
+    setText("");
+    void ask(q);
+  };
   return (
     <>
-      <div className="flex max-h-[520px] flex-1 flex-col gap-3 overflow-y-auto p-[18px]">
-        {turns.length === 0 && <p className="self-start rounded-2xl bg-bg px-[15px] py-[11px] text-sm leading-relaxed">Hi! Ask me about members, money, renewals or classes. I only read what your role can see, and I never send anything without your OK.</p>}
-        {turns.map((t, i) =>
-          t.role === "user" ? (
-            <p key={i} className="max-w-[86%] self-end rounded-2xl bg-accent px-[15px] py-[11px] text-sm leading-relaxed whitespace-pre-wrap text-accent-ink">
-              {t.content}
-            </p>
-          ) : (
-            <div key={i} className="max-w-[86%] self-start rounded-2xl bg-bg px-[15px] py-[11px] text-sm leading-relaxed">
-              {t.steps && t.steps.length > 0 && <p className="mb-1 text-xs text-muted">{t.steps.join(" · ")}</p>}
-              {t.content && <div className="whitespace-pre-line">{t.content}</div>}
-              {t.proposals?.map((p) => <ProposalCard key={p.id} p={p} />)}
-              {t.error && <p className="text-alert">{t.error}</p>}
-              {!t.content && !t.error && busy && i === turns.length - 1 && (
-                <p className="flex items-center gap-2 text-[13px] text-muted">
-                  <CircleNotchIcon size={16} weight="duotone" className="animate-spin text-accent" />
-                  {step}
-                </p>
-              )}
-            </div>
-          ),
+      <div className={cx("flex min-h-0 flex-1 flex-col overflow-y-auto", drawer ? "gap-3.5 px-6 pt-5 pb-3" : "max-h-[520px] gap-3 p-[18px]")}>
+        {turns.map((t, i) => (
+          <div
+            key={i}
+            className={cx(
+              "max-w-[86%] px-[15px] py-[11px] text-sm leading-[1.55] whitespace-pre-wrap",
+              drawer ? "rounded-[18px] border border-line-soft text-[14.5px]" : "rounded-2xl shadow-sm",
+              t.role === "user" ? "self-end bg-fg text-bg" : cx("self-start", drawer ? "bg-surface" : "bg-bg"),
+            )}
+          >
+            {t.content}
+            {t.error && <span className="text-alert">{t.error}</span>}
+            {t.proposals?.map((p) => <ProposalButtons key={p.id} p={p} />)}
+          </div>
+        ))}
+        {busy && (
+          <div className="flex items-center gap-2 self-start rounded-2xl px-3.5 py-2.5 text-[13px] text-muted">
+            <CircleNotchIcon size={16} weight="duotone" className="animate-spin text-accent" />
+            {step}
+          </div>
         )}
+        <div ref={end} />
       </div>
-      <div className="flex flex-col gap-2.5 border-t border-line px-[18px] pt-3 pb-4">
-        <div className="flex gap-1.5 overflow-x-auto [scrollbar-width:none]">
-          {SUGGESTIONS.map((s) => (
-            <button key={s} type="button" onClick={() => ask(s)} disabled={busy} className="flex-none rounded-full border border-line px-3 py-1.5 text-[13px] whitespace-nowrap hover:border-accent hover:text-accent">
+      <div className={cx("flex flex-none flex-col gap-2.5 border-t border-line", drawer ? "py-3 pb-[18px]" : "px-[18px] pt-3 pb-4")}>
+        <div className={cx("flex gap-1.5 overflow-x-auto [scrollbar-width:none]", drawer && "px-6")}>
+          {(turns.length <= 2 ? SUGGESTIONS : SUGGESTIONS.slice(0, 3)).map((s) => (
+            <button key={s} type="button" onClick={() => ask(s)} disabled={busy} className="flex-none rounded-full border border-line px-3 py-1.5 text-[13px] whitespace-nowrap hover:border-accent hover:text-accent disabled:opacity-50">
               {s}
             </button>
           ))}
@@ -142,24 +145,77 @@ export function AiChat({ ready }: { ready: boolean }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            const q = input.current!.value;
-            input.current!.value = "";
-            void ask(q);
+            submit();
           }}
-          className="flex items-center gap-2 rounded-[14px] border border-fg/30 bg-bg py-1.5 pr-1.5 pl-3.5"
+          className={cx("flex items-center gap-2 border border-fg/25", drawer ? "mx-6 rounded-full bg-surface py-1 pr-1 pl-4" : "rounded-[14px] bg-bg py-1.5 pr-1.5 pl-3.5")}
         >
           <input
-            ref={input}
-            placeholder="Ask anything about your gym…"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={drawer ? "Ask about members, dues, revenue…" : "Ask anything about your gym…"}
             aria-label="Ask Fitron AI"
-            className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] text-fg outline-0 placeholder:text-fg/60"
             maxLength={4000}
+            className="min-w-0 flex-1 border-0 bg-transparent py-2 text-[15px] text-fg outline-0 placeholder:text-fg/55"
           />
-          <Button variant="primary" disabled={busy} aria-label="Send" className="rounded-[10px] px-3.5">
-            <PaperPlaneTiltIcon size={18} weight="duotone" />
-          </Button>
+          <button disabled={busy || !text.trim()} aria-label="Send" className={cx("grid flex-none place-items-center bg-accent text-accent-ink hover:bg-accent-hover disabled:opacity-45", drawer ? "h-10 w-10 rounded-full" : "rounded-[10px] px-3.5 py-2.5")}>
+            {drawer ? <ArrowUpIcon size={18} weight="bold" /> : <PaperPlaneTiltIcon size={18} weight="duotone" />}
+          </button>
         </form>
       </div>
     </>
+  );
+}
+
+const ICON = { risk: UserCircleMinusIcon, renew: ArrowsClockwiseIcon, money: CurrencyInrIcon, trend: TrendUpIcon, stock: PackageIcon, autopay: WarningIcon, lead: FunnelIcon };
+
+/** The full Fitron AI page: today's brief on the left (its buttons can ask the chat), the chat on the right. */
+export function AiWorkspace({ brief, today }: { brief: BriefCard[]; today: string }) {
+  const chat = useAiChat();
+  return (
+    <div className="grid items-start gap-5 [grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr))]">
+      <section className="flex flex-col gap-1 rounded-lg bg-surface p-5">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-[17px]">Today&apos;s brief</h3>
+          <span className="text-xs text-muted">{today}</span>
+        </div>
+        {brief.map((b) => {
+          const Icon = ICON[b.icon];
+          return (
+            <div key={b.title} className="flex items-start gap-3 border-t border-line py-3">
+              <span className="grid h-9 w-9 flex-none place-items-center rounded-[10px] bg-accent-soft">
+                <Icon size={18} weight="duotone" className="text-accent" />
+              </span>
+              <div className="flex min-w-0 flex-1 flex-col gap-[3px]">
+                <div className="text-sm font-semibold">{b.title}</div>
+                <div className="text-[13px] leading-[1.55] text-fg/80">{b.text}</div>
+                {b.action &&
+                  (b.action.href ? (
+                    <Link href={b.action.href} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-md border border-line px-3 py-1.5 text-[13px] font-semibold hover:bg-fg/7">
+                      {b.action.label}
+                      <ArrowRightIcon size={14} weight="duotone" />
+                    </Link>
+                  ) : (
+                    <button type="button" onClick={() => chat.ask(b.action!.ask!)} className="mt-1.5 inline-flex items-center gap-1.5 self-start rounded-md border border-line px-3 py-1.5 text-[13px] font-semibold hover:bg-fg/7">
+                      {b.action.label}
+                      <ArrowRightIcon size={14} weight="duotone" />
+                    </button>
+                  ))}
+              </div>
+            </div>
+          );
+        })}
+        {!brief.length && <p className="border-t border-line py-3 text-sm text-muted">Nothing needs attention right now.</p>}
+      </section>
+      <section className="flex min-h-[560px] flex-col overflow-hidden rounded-lg bg-surface">
+        <div className="flex items-center gap-2.5 border-b border-line px-[18px] py-3.5">
+          <Image src="/fitron-mark.png" alt="" width={30} height={30} className="rounded-full" />
+          <div>
+            <div className="text-sm font-semibold">Chat with Fitron AI</div>
+            <div className="text-xs text-muted">Ask about members, money, renewals or staff</div>
+          </div>
+        </div>
+        <ChatPanel chat={chat} />
+      </section>
+    </div>
   );
 }

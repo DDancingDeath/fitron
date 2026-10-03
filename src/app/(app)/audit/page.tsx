@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DownloadSimpleIcon, PrinterIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
+import { DownloadSimpleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { listAudit } from "@/lib/services/accounting";
@@ -86,10 +86,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
           <h1 className="mt-1 text-[28px] lg:text-[40px]">Audit log</h1>
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
-          <PrintButton>
-            <PrinterIcon size={16} weight="duotone" />
-            Print / PDF
-          </PrintButton>
+          <PrintButton />
           <LinkButton href={`/audit/csv?${new URLSearchParams(Object.entries({ range, from: s("from"), to: s("to"), sev: severity, mod, user: s("user"), q: s("q") }).filter(([, v]) => v) as [string, string][])}`} prefetch={false}>
             <DownloadSimpleIcon size={16} weight="duotone" />
             CSV

@@ -9,7 +9,7 @@ export function MandateForm({ members, plans }: { members: { id: string; label: 
   return (
     <form action={action} className="flex flex-col gap-3">
       {state?.message && <Notice tone="alert">{state.message}</Notice>}
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3">
         <Field label="Member">
           <Input name="member" list="ap-members" placeholder="Member ID or name" autoComplete="off" required />
           <datalist id="ap-members">
@@ -17,6 +17,9 @@ export function MandateForm({ members, plans }: { members: { id: string; label: 
               <option key={m.id} value={m.label} />
             ))}
           </datalist>
+        </Field>
+        <Field label="Member's UPI ID" hint="Optional. The member can also pick it while approving.">
+          <Input name="vpa" placeholder="name@okicici" autoComplete="off" />
         </Field>
         <Field label="Plan">
           <Select name="planId" required defaultValue="">

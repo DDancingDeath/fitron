@@ -3,7 +3,7 @@ import { hasDb, makeGym, pick } from "@/test/db";
 import { addMonths } from "@/lib/domain/dates";
 import { createMember } from "./members";
 import { createInvoice } from "./billing";
-import { createExpense, listExpenses, voidExpense } from "./expenses";
+import { createExpense, expenseTrend, listExpenses, voidExpense } from "./expenses";
 import { listAudit, lockMonth, monthPeriod, profitAndLoss, unlockMonth } from "./accounting";
 import { REPORTS } from "./reports";
 import { todayIso } from "./time";
@@ -45,6 +45,11 @@ describe.skipIf(!hasDb)("expenses and accounting (database)", () => {
     expect(pl.totalExpenses).toBe(3000000);
     await expect(voidExpense(admin, power.id, "Again")).rejects.toThrow(/Already voided/);
     expect((await listExpenses(admin, { includeVoid: true })).find((e) => e.id === power.id)?.voidReason).toBe("Duplicate entry");
+
+    // The monthly trend counts active expenses only, per category when one is picked.
+    const months = [lastMonth, todayIso().slice(0, 7)];
+    expect(await expenseTrend(admin, months)).toEqual([{ month: lastMonth, amount: 3000000 }, { month: months[1], amount: 0 }]);
+    expect((await expenseTrend(admin, months, "electricity"))[0]!.amount).toBe(0);
   });
 
   it("a locked month blocks an Accountant, not a Super Admin, and unlocks again", async () => {

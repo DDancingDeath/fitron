@@ -7,6 +7,10 @@ import { memberInput } from "@/lib/validation/member";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { createMember, deleteMember, restoreMember, setSuspended, updateMember } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
+import { freezeMembership, transferMember, unfreezeMembership } from "@/lib/services/freeze";
+import { sendTemplate } from "@/lib/services/whatsapp";
+import { rupeesText } from "@/lib/domain/whatsapp";
+import { fmtDate } from "@/lib/format";
 import { enrol, eraseBiometrics } from "@/lib/services/biometric";
 import { DOC_KINDS, deleteDocument, replaceDocument, uploadDocument } from "@/lib/services/documents";
 
@@ -111,4 +115,63 @@ export async function replaceDocumentAction(memberId: string, docId: string, fd:
 export async function deleteDocumentAction(memberId: string, docId: string, fd: FormData) {
   const u = await requirePermission("documents.manage");
   await docAction(memberId, () => deleteDocument(u, docId, String(fd.get("reason") ?? "")), "Document removed. It stays in the history.");
+}
+
+/** After a profile action: back to the profile with the result shown at the top. */
+function backToProfile(id: string, msg: string, tab?: string): never {
+  revalidatePath(`/members/${id}`);
+  redirect(`/members/${id}?${new URLSearchParams({ ...(tab ? { tab } : {}), msg })}`);
+}
+
+async function profileAction(id: string, fn: () => Promise<string>, failTo?: string) {
+  let msg: string;
+  try {
+    msg = await fn();
+  } catch (e) {
+    if (!(e instanceof UserError)) throw e;
+    if (failTo) redirect(`/members/${id}?${new URLSearchParams({ do: failTo, err: e.message })}`);
+    msg = e.message;
+  }
+  backToProfile(id, msg);
+}
+
+export async function freezeAction(id: string, fd: FormData) {
+  const u = await requirePermission("memberships.renew");
+  await profileAction(
+    id,
+    async () => {
+      const r = await freezeMembership(u, id, { days: Number(fd.get("days")), from: String(fd.get("from") ?? ""), reason: String(fd.get("reason") ?? "Other") });
+      return `Membership frozen for ${r.freeze.days} days. End date moved to ${fmtDate(r.newEnd)}.`;
+    },
+    "freeze",
+  );
+}
+
+export async function unfreezeAction(id: string) {
+  const u = await requirePermission("memberships.renew");
+  await profileAction(id, async () => {
+    const r = await unfreezeMembership(u, id);
+    return `Unfrozen. ${r.returned} unused day${r.returned === 1 ? "" : "s"} taken off; membership now ends ${fmtDate(r.newEnd)}.`;
+  });
+}
+
+export async function transferAction(id: string, fd: FormData) {
+  const u = await requirePermission("members.edit");
+  await profileAction(
+    id,
+    async () => {
+      const to = String(fd.get("to") ?? "");
+      await transferMember(u, id, to, String(fd.get("reason") ?? "").trim() || undefined);
+      return `Moved to ${u.branches.find((b) => b.id === to)?.name}. Past invoices stay with the old branch.`;
+    },
+    "transfer",
+  );
+}
+
+export async function sendInvoiceWaAction(id: string, invoiceId: string, number: string, total: number) {
+  const u = await requirePermission("whatsapp.send");
+  await profileAction(id, async () => {
+    const sent = await sendTemplate({ orgId: u.orgId, memberId: id, key: "invoice", userId: u.id, invoiceId, vars: { invoice_number: number, amount: rupeesText(total) } });
+    return sent?.status === "Failed" ? `Invoice ${number} could not be sent: ${sent.error}` : `Invoice ${number} sent on WhatsApp.`;
+  });
 }

@@ -49,6 +49,9 @@ export const restockInput = z.object({
   qty: z.coerce.number({ error: "Enter a quantity." }).int().refine((n) => n !== 0, { error: "Enter a quantity." }),
   unitCost: z.preprocess((v) => (v === "" || v == null ? undefined : v), rupees.optional()),
   note: optionalText,
+  vendor: optionalText,
+  /** Restocking from the POS screen can book the purchase as an Inventory expense (prototype). */
+  asExpense: z.preprocess((v) => v === "on" || v === true, z.boolean()).optional(),
 });
 
 export const posSaleInput = z.object({
@@ -129,4 +132,6 @@ export const accessInput = z.object({
   graceDays: z.coerce.number().int().min(0).max(60),
   blockDues: z.preprocess((v) => v === "on", z.boolean()),
   duesLimit: z.preprocess((v) => (v === "" || v == null ? "0" : v), rupees),
+  hoursFrom: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
+  hoursTo: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
 });
