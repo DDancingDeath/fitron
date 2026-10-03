@@ -92,10 +92,11 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
     await db.trainerCoachUsage.update({ where: { memberId_date: { memberId: m.id, date: fromIso(today) } }, data: { count: 24 } });
     expect(await takeCoachMessage(t, today)).toEqual({ ok: true, used: 25, limit: 25 });
     expect(await takeCoachMessage(t, today)).toMatchObject({ ok: false, reason: "LIMIT" });
+    expect(await takeCoachMessage(t, today)).toMatchObject({ ok: false, reason: "LIMIT" });
 
-    // AI Premium has the higher limit.
+    // AI Premium has the higher limit, and messages turned away earlier don't use it up.
     const p = await db.trainerMember.update({ where: { id: m.id }, data: { plan: "ai-premium" } });
-    expect(await takeCoachMessage(p, today)).toMatchObject({ ok: true, limit: 100 });
+    expect(await takeCoachMessage(p, today)).toEqual({ ok: true, used: 26, limit: 100 });
   });
 
   it("a UPI payment waits for FITRON, and confirming it starts the plan after the trial", async () => {
@@ -172,10 +173,16 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
     await saveTrainerState(m.id, { profile: { ob: { name: "Del", weight: "80" } }, day: { water: 1 } });
     await saveTrainerChat(m.id, "c1", "Hi", [{ role: "user", text: "Hi" }]);
     const pay = await startTrainerPayment(m.id, { plan: "ai-pro", cycle: "MONTHLY", kind: "purchase" });
+    await db.trainerSession.create({ data: { id: `secret-${m.id}`, memberId: m.id, expiresAt: new Date(Date.now() + 86_400_000), ip: "203.0.113.5", userAgent: "Phone" } });
+    await db.trainerCoachUsage.create({ data: { memberId: m.id, date: fromIso(todayIso()), count: 3 } });
     const x = await exportTrainer(m.id);
     expect(x.account.email).toBe(m.email);
+    expect(x.account.signupVia).toBe("EMAIL");
     expect(x.days).toHaveLength(1);
     expect(x.chats).toHaveLength(1);
+    expect(x.signedInDevices).toEqual([expect.objectContaining({ ip: "203.0.113.5", device: "Phone" })]);
+    expect(x.coachMessagesPerDay).toEqual([{ date: todayIso(), messages: 3 }]);
+    expect(JSON.stringify(x)).not.toContain(`secret-${m.id}`);
 
     await deleteTrainerAccount(m.id);
     const gone = await member(m.id);
@@ -214,10 +221,11 @@ describe.skipIf(!hasDb)("AI Trainer (database)", () => {
 
   it("the coach prompt uses the saved onboarding answers over what the app sent", () => {
     const lines = profileLines({ ob: { name: "Asha", goal: "Lose fat", injuries: ["Knee"], timeOfDay: "Morning", supps: ["Whey"], suppCustom: ["Creatine"] } }, { name: "Old", kcal: 1800 });
-    expect(lines).toEqual(["- Name: Asha", "- Main goal: Lose fat", "- Injuries: Knee", "- Trains at: Morning", "- Supplements: Whey, Creatine", "- Calorie target (kcal/day): 1800"]);
+    expect(lines).toEqual(["- Main goal: Lose fat", "- Injuries: Knee", "- Trains at: Morning", "- Supplements: Whey, Creatine", "- Calorie target (kcal/day): 1800"]);
     const sys = coachSystem({ name: "Asha", plan: "ai-premium" }, lines);
     expect(sys).toContain("AI Premium plan");
     expect(sys).toContain("- Main goal: Lose fat");
+    expect(sys).not.toMatch(/Asha|Old/);
     // City and state only when the member left "Use my city for food suggestions" on.
     const where = { ob: { city: "Ranchi", state: "Jharkhand", goal: "Lose fat" } };
     expect(profileLines(where, {})).toContain("- City: Ranchi");

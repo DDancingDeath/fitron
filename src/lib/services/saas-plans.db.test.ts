@@ -45,7 +45,7 @@ describe.skipIf(!hasDb)("FITRON plans paid by UPI + UTR (database)", () => {
     const c = await startPayment(owner, { kind: "PLAN", plan: "enterprise" }, "MONTHLY");
     if (c.mode !== "UPI") throw new Error("expected UPI");
     expect(c.total).toBe(4_71_882);
-    expect(c.link).toMatch(/^upi:\/\/pay\?pa=fitron%40okaxis&pn=FITRON&am=4718\.82&cu=INR&tn=FIT-/);
+    expect(c.link).toMatch(/^upi:\/\/pay\?pa=fitron@okaxis&pn=FITRON&am=4718\.82&cu=INR&tn=FIT-/);
     expect(c.qr).toMatch(/^<svg/);
 
     await expect(submitUtr(owner, c.id, "12345")).rejects.toThrow(/12-digit/);

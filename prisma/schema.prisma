@@ -1234,7 +1234,8 @@ model TrainerReview {
 model TrainerPayment {
   id           String        @id @default(cuid())
   memberId     String
-  member       TrainerMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  /// Restrict: payment records are kept for tax, so a member row with payments can't be deleted outright
+  member       TrainerMember @relation(fields: [memberId], references: [id], onDelete: Restrict)
   /// ai-pro | ai-premium
   plan         String
   /// MONTHLY | YEARLY

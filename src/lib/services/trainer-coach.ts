@@ -8,8 +8,9 @@ import { todayIso } from "./time";
 
 export type CoachTurn = { role: "user" | "assistant"; text: string };
 
+// No name or email: the consent screen promises members they aren't sent to the AI provider.
 const FIELDS: [string, string][] = [
-  ["name", "Name"], ["age", "Age"], ["sex", "Sex"], ["height", "Height (cm)"], ["weight", "Weight (kg)"],
+  ["age", "Age"], ["sex", "Sex"], ["height", "Height (cm)"], ["weight", "Weight (kg)"],
   ["goal", "Main goal"], ["extras", "Also wants"], ["trainNow", "Trains now"], ["dayLike", "Their day"],
   ["injuries", "Injuries"], ["injuryNote", "Injury note"], ["days", "Training days"], ["session", "Session length"],
   ["trainAt", "Trains at"], ["wake", "Wakes"], ["sleep", "Sleeps"], ["equipment", "Equipment"], ["gymName", "Gym"],

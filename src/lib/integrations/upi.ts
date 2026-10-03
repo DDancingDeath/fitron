@@ -13,10 +13,11 @@ export function fitronUpi() {
   return id ? { id, name: env("FITRON_UPI_NAME") || "FITRON" } : null;
 }
 
-/** A standard UPI payment link (NPCI deep link) with the amount filled in. Amount in paise. */
+/** A standard UPI payment link (NPCI deep link) with the amount filled in. Amount in paise.
+ *  The @ in the UPI ID stays as it is: some UPI apps reject an ID written as name%40bank. */
 export function upiLink(a: { id: string; name: string; amount: number; note: string }) {
   const q = new URLSearchParams({ pa: a.id, pn: a.name, am: (a.amount / 100).toFixed(2), cu: "INR", tn: a.note });
-  return `upi://pay?${q.toString().replace(/\+/g, "%20")}`;
+  return `upi://pay?${q.toString().replace(/\+/g, "%20").replace(/%40/g, "@")}`;
 }
 
 /** The link as an SVG QR code, safe to inline. */

@@ -32,6 +32,26 @@ if [ ! -f .env ]; then
   read -r -p "Domain: " DOMAIN
   DOMAIN=${DOMAIN#https://}; DOMAIN=${DOMAIN#http://}; DOMAIN=${DOMAIN%%/*}; DOMAIN=${DOMAIN#www.}
   [ -n "$DOMAIN" ] || { echo "A domain is needed for HTTPS."; exit 1; }
+
+  say "Payments to FITRON"
+  echo "Gyms and AI Trainer members pay by scanning a QR for your UPI ID, then type the UTR for you to confirm."
+  echo "Leave it empty to try FITRON in demo mode first (nothing is charged)."
+  while :; do
+    read -r -p "Your UPI ID (printed under your QR, e.g. 98xxxxxxxx@ybl): " UPI
+    UPI=$(printf '%s' "$UPI" | tr -d '[:space:]')
+    [ -z "$UPI" ] || [[ "$UPI" =~ ^[A-Za-z0-9._-]+@[A-Za-z0-9]+$ ]] && break
+    echo "That doesn't look like a UPI ID. It has one @, like name@okaxis."
+  done
+  ADMIN=""
+  if [ -n "$UPI" ]; then
+    while :; do
+      read -r -p "Your email (you'll confirm payments with it, and use it for your login below): " ADMIN
+      ADMIN=$(printf '%s' "$ADMIN" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+      [[ "$ADMIN" =~ ^[^@|]+@[^@|]+\.[^@|]+$ ]] && break
+      echo "Please type a valid email."
+    done
+  fi
+
   # Every setting from .env.example, blank, then the ones we can generate.
   grep -E '^[A-Z_]+=' ../.env.example | grep -v '^DATABASE_URL=' | sed -E 's/=.*/=/' > .env
   set_env() { sed -i "s|^$1=.*|$1=$2|" .env; grep -q "^$1=" .env || echo "$1=$2" >> .env; }
@@ -44,6 +64,8 @@ if [ ! -f .env ]; then
   set_env AI_MODEL "claude-sonnet-5"
   set_env FITRON_LEGAL_NAME "Fitron Technologies"
   set_env FITRON_UPI_NAME "FITRON"
+  set_env FITRON_UPI_ID "$UPI"
+  set_env FITRON_ADMIN_EMAILS "$ADMIN"
   set_env MAIL_FROM '"FITRON <hello@fitron.in>"'
   set_env ENQUIRY_TO "hello@fitron.in"
   set_env BACKUP_KEEP_DAYS 14

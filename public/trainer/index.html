@@ -1665,7 +1665,8 @@ class Component extends DCLogic {
     if (k === 'purchase') return { ...c, title: 'Unlock your plan' };
     return { ...c, title: 'Upgrade to Yearly' };
   }
-  upiUri() { return (this.state.payInfo && this.state.payInfo.link) || '#'; }
+  // until the payment is ready, tapping the button stays on this page (a bare '#' would reload it: <base href>)
+  upiUri() { return (this.state.payInfo && this.state.payInfo.link) || location.pathname + location.search + '#'; }
   drawQR(tries) {
     tries = tries || 0;
     const canvas = document.getElementById('fitron-qr');
@@ -1844,14 +1845,16 @@ class Component extends DCLogic {
   coachProfile() {
     const st = this.state, o = st.ob || {}, si = st.suppInfo || {};
     const supp = Object.keys(si).map(k => { const v = si[k] || {}; return v.brand ? v.brand + ' ' + (v.per || '?') + 'g x ' + (v.servings || '?') + ' a day' : ''; }).filter(Boolean).join('; ');
+    // no name: it isn't sent to the AI provider (see the consent screen); city only if they allowed it
+    const near = !(st.consent && st.consent.city === false);
     return {
-      name: o.name, age: o.age, sex: o.sex, height: o.height, weight: o.weight,
+      age: o.age, sex: o.sex, height: o.height, weight: o.weight,
       goal: o.goal, extras: o.extras, trainNow: o.trainNow, dayLike: o.dayLike,
       injuries: o.injuries, injuryNote: o.injuryNote,
       days: o.days, session: o.session, trainAt: o.exactTime || o.timeOfDay, wake: o.wake, sleep: o.sleep,
       equipment: o.equipment, gymName: o.gymName,
       diet: o.diet, cuisines: o.cuisines, avoid: o.avoid, mealsDay: o.mealsDay, cooks: o.cooks,
-      state: o.state, city: o.city, budget: o.budget,
+      state: near ? o.state : '', city: near ? o.city : '', budget: o.budget,
       supps: [...(o.supps || []), ...(o.suppCustom || [])], suppDetail: supp,
       split: Object.keys(st.plan || {}).map(d => d + ' ' + st.plan[d]).join(', '),
       todayFocus: this.focusToday(),

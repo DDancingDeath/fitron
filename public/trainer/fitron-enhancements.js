@@ -16,7 +16,8 @@
     if (!document.querySelector('.skip-link')) {
       const skip = document.createElement('a');
       skip.className = 'skip-link';
-      skip.href = '#fitron-main-content';
+      // the page has <base href="/trainer/">, so a bare #hash would load /trainer/ again
+      skip.href = location.pathname + location.search + '#fitron-main-content';
       skip.textContent = 'Skip to main content';
       document.body.prepend(skip);
     }

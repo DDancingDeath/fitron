@@ -322,7 +322,11 @@ export async function takeCoachMessage(m: TrainerMember, today = todayIso()): Pr
     create: { memberId: m.id, date: fromIso(today), count: 1 },
     update: { count: { increment: 1 } },
   });
-  if (row.count > limit) return { ok: false, reason: "LIMIT", used: limit, limit };
+  if (row.count > limit) {
+    // Turned away, so it doesn't count: an upgrade later today gets its full extra allowance.
+    await db.trainerCoachUsage.updateMany({ where: { memberId: m.id, date: fromIso(today), count: { gt: limit } }, data: { count: limit } });
+    return { ok: false, reason: "LIMIT", used: limit, limit };
+  }
   return { ok: true, used: row.count, limit };
 }
 
@@ -335,15 +339,26 @@ export async function refundCoachMessage(memberId: string, today = todayIso()) {
 
 /** A copy of everything kept for the member (Settings › Request my data). */
 export async function exportTrainer(memberId: string) {
-  const m = await db.trainerMember.findUniqueOrThrow({ where: { id: memberId }, include: { days: { orderBy: { date: "asc" } }, chats: true, payments: true, reviews: true } });
+  const m = await db.trainerMember.findUniqueOrThrow({
+    where: { id: memberId },
+    include: { days: { orderBy: { date: "asc" } }, chats: true, payments: true, reviews: true, sessions: { orderBy: { createdAt: "asc" } } },
+  });
+  const [usage, links] = await Promise.all([
+    db.trainerCoachUsage.findMany({ where: { memberId }, orderBy: { date: "asc" } }),
+    db.trainerLoginToken.findMany({ where: { email: m.email }, orderBy: { createdAt: "asc" } }),
+  ]);
   return {
     exportedAt: new Date().toISOString(),
-    account: memberView(m),
+    account: { ...memberView(m), signupVia: m.signupVia, createdAt: m.createdAt.toISOString(), emailVerifiedAt: m.emailVerifiedAt?.toISOString() ?? null, lastSeenAt: m.lastSeenAt?.toISOString() ?? null },
     profile: m.profile,
     days: m.days.map(dayLog),
     chats: m.chats.map((c) => ({ title: c.title, updatedAt: c.updatedAt, messages: c.messages })),
-    weeklyReviews: m.reviews.map((r) => ({ weekStart: toIso(r.weekStart), workouts: r.workouts, planned: r.planned, consistency: r.consistency, nutrition: r.nutrition, avgWater: r.avgWater, insight: r.insight })),
+    weeklyReviews: m.reviews.map((r) => ({ weekStart: toIso(r.weekStart), workouts: r.workouts, planned: r.planned, consistency: r.consistency, nutrition: r.nutrition, avgWater: r.avgWater, insight: r.insight, focus: r.focus })),
     payments: m.payments.map(paymentView),
+    // Devices signed in (the token itself is never included), sign-in emails, and AI Coach messages per day.
+    signedInDevices: m.sessions.map((x) => ({ signedInAt: x.createdAt.toISOString(), lastSeenAt: x.lastSeenAt.toISOString(), expiresAt: x.expiresAt.toISOString(), ip: x.ip, device: x.userAgent })),
+    signInEmails: links.map((t) => ({ sentAt: t.createdAt.toISOString(), usedAt: t.usedAt?.toISOString() ?? null })),
+    coachMessagesPerDay: usage.map((u) => ({ date: toIso(u.date), messages: u.count })),
   };
 }
 
