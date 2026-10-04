@@ -1,3 +1,4 @@
+import { describeAudit } from "@/lib/domain/audit";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
@@ -23,10 +24,10 @@ export async function getProfile(u: CurrentUser, sessionId: string | null) {
       where: { orgId: u.orgId, userId: u.id },
       orderBy: { id: "desc" },
       take: 10,
-      select: { id: true, action: true, entity: true, createdAt: true },
+      select: { id: true, action: true, entity: true, entityId: true, before: true, after: true, createdAt: true },
     }),
   ]);
-  return { ...me, sessionSince: session?.createdAt ?? null, activity };
+  return { ...me, sessionSince: session?.createdAt ?? null, activity: activity.map((a) => ({ id: a.id, action: a.action, createdAt: a.createdAt, sentence: describeAudit(a) })) };
 }
 
 export async function updateProfile(u: CurrentUser, input: ProfileInput) {

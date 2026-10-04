@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { DownloadSimpleIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
-import { requirePermission } from "@/lib/auth/current";
+import { DownloadSimpleIcon, MicrosoftExcelLogoIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
+import { requirePermission, upgradePath } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { listAudit } from "@/lib/services/accounting";
+import { verifyAuditChain } from "@/lib/services/audit";
 import { istInstant, todayIso } from "@/lib/services/time";
 import { addDays } from "@/lib/domain/dates";
-import { AUDIT_MODULES, entitiesOf, moduleOf, severityOf, type Severity } from "@/lib/domain/audit";
+import { AUDIT_MODULES, deviceLabel, describeAudit, moduleOf, severityOf, type Severity } from "@/lib/domain/audit";
 import { AutoFilter } from "@/components/auto-filter";
 import { Button, Input, LinkButton, SEARCH, Segmented, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
 import { PrintButton } from "@/components/print-button";
@@ -55,13 +56,14 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   const severity = SEVERITIES.includes(s("sev") as Severity) ? (s("sev") as Severity) : undefined;
   const mod = AUDIT_MODULES.includes(s("mod") ?? "") ? s("mod") : undefined;
   const page = Number(s("page") ?? 1) || 1;
-  const [list, all, todays, highInView] = await Promise.all([
-    listAudit(u, { q: s("q"), userId: s("user"), entities: mod && mod !== "Other" ? entitiesOf(mod) : undefined, severity, from, to, page, pageSize: 25 }),
+  const [list, all, todays, highInView, chain] = await Promise.all([
+    listAudit(u, { q: s("q"), userId: s("user"), module: mod, severity, from, to, page, pageSize: 25 }),
     db.auditLog.count({ where: { orgId: u.orgId } }),
     db.auditLog.findMany({ where: { orgId: u.orgId, createdAt: { gte: istInstant(today, "00:00") } }, select: { userId: true } }),
-    severity && severity !== "High" ? Promise.resolve(null) : listAudit(u, { q: s("q"), userId: s("user"), entities: mod && mod !== "Other" ? entitiesOf(mod) : undefined, severity: "High", from, to, pageSize: 1 }),
+    severity && severity !== "High" ? Promise.resolve(null) : listAudit(u, { q: s("q"), userId: s("user"), module: mod, severity: "High", from, to, pageSize: 1 }),
+    verifyAuditChain(u.orgId),
   ]);
-  const rows = mod === "Other" ? list.rows.filter((r) => moduleOf(r.entity) === "Other") : list.rows;
+  const rows = list.rows;
   const pages = Math.max(1, Math.ceil(list.total / list.pageSize));
   const link = (p: Record<string, string | undefined>) => {
     const keep = { range: range === "30" ? undefined : range, from: s("from"), to: s("to"), sev: severity, mod, user: s("user"), q: s("q"), ...p };
@@ -70,9 +72,14 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
   };
   const sel = s("sel") ? await db.auditLog.findFirst({ where: { orgId: u.orgId, id: BigInt(/^\d+$/.test(s("sel")!) ? s("sel")! : "0") } }) : null;
   const selUser = sel?.userId ? list.users.find((x) => x.id === sel.userId) : null;
+  const selBranch = sel?.branchId ? ((await db.branch.findFirst({ where: { orgId: u.orgId, id: sel.branchId }, select: { name: true } }))?.name ?? "Deleted branch") : "All branches";
+  const payCode = sel?.entity === "Payment" && typeof (sel.after as { code?: unknown } | null)?.code === "string" ? (sel.after as { code: string }).code : "";
+  const selSentence = sel ? describeAudit({ action: sel.action, entity: sel.entity, entityId: sel.entityId, before: sel.before, after: sel.after, extra: { branchName: selBranch === "All branches" ? undefined : selBranch } }) : "";
+  const exportQs = new URLSearchParams(Object.entries({ range, from: s("from"), to: s("to"), sev: severity, mod, user: s("user"), q: s("q") }).filter(([, v]) => v) as [string, string][]).toString();
   const kpis: [string, string, string][] = [
     ["Entries today", todays.length.toLocaleString("en-IN"), todays.length ? `${new Set(todays.map((t) => t.userId)).size} ${new Set(todays.map((t) => t.userId)).size === 1 ? "user" : "users"} active` : "No activity yet"],
     ["High-severity in view", highInView ? highInView.total.toLocaleString("en-IN") : "0", "reversals, deletions, unlocks, role changes"],
+    ["Integrity", chain.bad ? `${chain.bad} broken` : "Verified", chain.checked ? `hash chain over ${chain.checked.toLocaleString("en-IN")} entries` : "hash chain starts with the next entry"],
     ["Retention", "7 years", "append-only; nothing can be edited or deleted"],
   ];
 
@@ -87,7 +94,18 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
         </div>
         <div className="flex flex-wrap gap-2 print:hidden">
           <PrintButton />
-          <LinkButton href={`/audit/csv?${new URLSearchParams(Object.entries({ range, from: s("from"), to: s("to"), sev: severity, mod, user: s("user"), q: s("q") }).filter(([, v]) => v) as [string, string][])}`} prefetch={false}>
+          {u.has("exports") ? (
+            <LinkButton href={`/audit/xls?${exportQs}`} prefetch={false}>
+              <MicrosoftExcelLogoIcon size={16} weight="duotone" />
+              Excel
+            </LinkButton>
+          ) : (
+            <LinkButton href={upgradePath(u, "exports")} title="Professional plan">
+              <MicrosoftExcelLogoIcon size={16} weight="duotone" />
+              Excel
+            </LinkButton>
+          )}
+          <LinkButton href={`/audit/csv?${exportQs}`} prefetch={false}>
             <DownloadSimpleIcon size={16} weight="duotone" />
             CSV
           </LinkButton>
@@ -97,7 +115,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
         {kpis.map(([k, v, sub]) => (
           <div key={k}>
             <div className="text-xs tracking-[0.06em] text-muted uppercase">{k}</div>
-            <div className="mt-1 text-[28px] leading-[1.15] font-semibold">{v}</div>
+            <div className={cx("mt-1 text-[28px] leading-[1.15] font-semibold", k === "Integrity" && chain.bad > 0 && "text-alert-700")}>{v}</div>
             <div className="mt-0.5 text-[13px] text-muted">{sub}</div>
           </div>
         ))}
@@ -123,9 +141,10 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
             </>
           )}
           {severity && <input type="hidden" name="sev" value={severity} />}
-          <input type="text" name="q" defaultValue={s("q")} placeholder="Search actions, IDs, records" aria-label="Search" className={SEARCH} />
+          <input type="text" name="q" defaultValue={s("q")} placeholder="Search actions, IDs, users" aria-label="Search" className={SEARCH} />
           <Select name="user" defaultValue={s("user") ?? ""} aria-label="User" className="w-auto!">
             <option value="">All users</option>
+            {list.hasSystem && <option value="system">System</option>}
             {list.users.map((x) => (
               <option key={x.id} value={x.id}>
                 {x.name}
@@ -150,7 +169,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
             <div>
               <div className="text-[11px] tracking-[0.1em] text-muted uppercase">Entry {String(sel.id)}</div>
               <div className="mt-1 text-lg font-semibold">
-                {sel.action} <span className="font-normal text-muted">on {sel.entity}</span>
+                {selSentence}
               </div>
             </div>
             <Link href={link({ page: s("page") })} aria-label="Close" className="grid size-9 place-items-center rounded-md text-accent hover:bg-accent/10">
@@ -160,12 +179,15 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,240px),1fr))] gap-x-6 gap-y-2">
             {(
               [
-                ["When", `${fmtStamp(sel.createdAt)}, ${fmtTime(sel.createdAt)}`],
-                ["User", selUser ? `${selUser.name} (${selUser.role.name})` : "System"],
-                ["Module", moduleOf(sel.entity)],
+                ["Timestamp", `${fmtStamp(sel.createdAt)}, ${fmtTime(sel.createdAt)}`],
+                ["User", selUser ? `${selUser.name} · ${selUser.role.name}` : "System · Automatic"],
+                ["Branch", selBranch],
+                ["Module", moduleOf(sel.entity, sel.action)],
                 ["Severity", severityOf(sel.action, sel.entity)],
-                ["Record", sel.entityId],
-                ["Device", [sel.ip, sel.userAgent?.slice(0, 60)].filter(Boolean).join(" · ") || "—"],
+                ["Device / IP", deviceLabel(sel.userAgent, sel.ip, sel.actorType)],
+                ["Entry hash", sel.hash ?? "— (before hashing was enabled)"],
+                ["Previous hash", sel.prevHash ?? "—"],
+                ["Record", `${sel.entity} ${sel.entityId}`],
                 ...changes(sel.before, sel.after).slice(0, 20),
               ] as [string, string][]
             ).map(([k, v]) => (
@@ -175,9 +197,9 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
               </div>
             ))}
           </div>
-          {LINKS[sel.entity] && (
+          {(LINKS[sel.entity] || payCode) && (
             <div>
-              <LinkButton href={LINKS[sel.entity]!(sel.entityId)}>Open {sel.entity.toLowerCase()}</LinkButton>
+              <LinkButton href={LINKS[sel.entity] ? LINKS[sel.entity]!(sel.entityId) : `/payments?q=${encodeURIComponent(payCode)}`}>{LINKS[sel.entity] ? `Open ${sel.entity.toLowerCase()}` : "Open payments"}</LinkButton>
             </div>
           )}
         </section>
@@ -199,7 +221,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
             </thead>
             <tbody>
               {rows.map((r) => {
-                const sev = severityOf(r.action, r.entity);
+                const sev = r.severity;
                 return (
                   <tr key={r.id} className={cx(TR, sel && String(sel.id) === r.id && "bg-accent-soft")}>
                     <td className={cx(TD, "whitespace-nowrap")}>
@@ -212,16 +234,16 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
                       <div>{r.userName}</div>
                       <div className="text-xs text-muted">{r.roleName}</div>
                     </td>
-                    <td className={cx(TD, "whitespace-nowrap")}>{moduleOf(r.entity)}</td>
+                    <td className={cx(TD, "whitespace-nowrap")}>{r.module}</td>
                     <td className={TD}>
                       <Link href={link({ sel: r.id, page: s("page") })} className="hover:text-accent">
-                        {r.action} <span className="text-muted">· {r.entity}</span>
+                        {r.sentence}
                       </Link>
                     </td>
                     <td className={TD}>
-                      <Tag label={sev === "High" ? "High risk" : sev === "Medium" ? "Medium" : "Low"} />
+                      <Tag label={sev} />
                     </td>
-                    <td className={cx(TD, "text-xs whitespace-nowrap text-muted")}>{r.ip ?? "—"}</td>
+                    <td className={cx(TD, "text-xs whitespace-nowrap text-muted")}>{r.device}</td>
                   </tr>
                 );
               })}
@@ -238,7 +260,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
           {list.page < pages ? <LinkButton href={link({ page: String(list.page + 1) })}>Next</LinkButton> : <Button disabled>Next</Button>}
         </div>
       </div>
-      <p className="m-0 max-w-[720px] text-[13px] leading-relaxed text-muted">Every write to members, money, settings and roles is recorded with who, when and from which device. Nobody, including the Super Admin, can edit or delete an entry.</p>
+      <p className="m-0 max-w-[720px] text-[13px] leading-relaxed text-muted">Every write to members, money, settings and roles is recorded with who, when, from which device and branch. Entries are chained by hash so any tampering shows up in the Integrity check. Kept for 7 years; nobody, including the Super Admin, can edit or delete an entry.</p>
     </div>
   );
 }

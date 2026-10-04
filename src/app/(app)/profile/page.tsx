@@ -82,7 +82,7 @@ export default async function ProfilePage({ searchParams }: PageProps<"/profile"
             {me.activity.map((a) => (
               <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
                 <span>
-                  <span className="font-semibold">{a.action}</span> <span className="text-muted">on {a.entity}</span>
+                  {a.sentence}
                 </span>
                 <span className="text-muted">{when(a.createdAt)}</span>
               </li>

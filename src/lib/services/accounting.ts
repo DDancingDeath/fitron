@@ -7,7 +7,7 @@ import { UserError } from "./errors";
 import { getSetting } from "./settings";
 import { fromIso, istInstant, todayIso } from "./time";
 import type { Prisma } from "@/generated/prisma/client";
-import { HIGH_WORDS, MEDIUM_WORDS, type Severity } from "@/lib/domain/audit";
+import { HIGH_WORDS, MEDIUM_WORDS, deviceLabel, describeAudit, moduleOf, moduleWhere, severityOf, type Severity } from "@/lib/domain/audit";
 import { depreciationIn, disposalsIn } from "@/lib/domain/assets";
 import { assetsFor, toLike } from "./assets";
 
@@ -159,36 +159,84 @@ export async function unlockMonth(u: CurrentUser, month: string) {
   });
 }
 
-export async function listAudit(u: CurrentUser, f: { q?: string; userId?: string; entity?: string; entities?: string[]; severity?: Severity; from?: string; to?: string; page?: number; pageSize?: number }) {
+export async function listAudit(u: CurrentUser, f: { q?: string; userId?: string; module?: string; severity?: Severity; from?: string; to?: string; page?: number; pageSize?: number }) {
   const pageSize = f.pageSize ?? 50;
   const page = Math.max(1, f.page ?? 1);
   const has = (words: string[]) => words.map((w) => ({ action: { contains: w, mode: "insensitive" as const } }));
+  const q = f.q?.trim();
+  let qUsers: string[] = [];
+  if (q) qUsers = (await db.user.findMany({ where: { orgId: u.orgId, name: { contains: q, mode: "insensitive" } }, select: { id: true } })).map((x) => x.id);
+  const jsonHit = (col: "after" | "before") => {
+    const up = q?.toUpperCase() ?? "";
+    return [
+      ...["code", "number", "sku"].map((k) => ({ [col]: { path: [k], string_contains: up } })),
+      ...["name", "invoiceNumber"].map((k) => ({ [col]: { path: [k], string_contains: q! } })),
+      { [col]: { path: ["invoice", "number"], string_contains: up } },
+      { [col]: { path: ["membership", "code"], string_contains: up } },
+    ];
+  };
   const where: Prisma.AuditLogWhereInput = {
     orgId: u.orgId,
-    ...(f.userId ? { userId: f.userId } : {}),
-    ...(f.entity ? { entity: f.entity } : f.entities ? { entity: { in: f.entities } } : {}),
+    ...(f.userId === "system" ? { userId: null } : f.userId ? { userId: f.userId } : {}),
     ...(f.from || f.to ? { createdAt: { ...(f.from ? { gte: istInstant(f.from, "00:00") } : {}), ...(f.to ? { lt: istInstant(addDays(f.to, 1), "00:00") } : {}) } } : {}),
     AND: [
-      ...(f.q ? [{ OR: [{ action: { contains: f.q, mode: "insensitive" as const } }, { entityId: { contains: f.q } }, { entity: { contains: f.q, mode: "insensitive" as const } }] }] : []),
+      ...(u.branch !== "ALL" ? [{ OR: [{ branchId: null }, { branchId: { in: u.branchIds } }] }] : []),
+      ...(f.module ? [moduleWhere(f.module)] : []),
+      ...(q
+        ? [
+            {
+              OR: [
+                { action: { contains: q, mode: "insensitive" as const } },
+                { entity: { contains: q, mode: "insensitive" as const } },
+                { entityId: { contains: q, mode: "insensitive" as const } },
+                ...(qUsers.length ? [{ userId: { in: qUsers } }] : []),
+                ...jsonHit("after"),
+                ...jsonHit("before"),
+              ] as Prisma.AuditLogWhereInput[],
+            },
+          ]
+        : []),
       ...(f.severity === "High" ? [{ OR: has(HIGH_WORDS) }] : []),
       ...(f.severity === "Medium" ? [{ NOT: { OR: has(HIGH_WORDS) } }, { OR: has(MEDIUM_WORDS) }] : []),
       ...(f.severity === "Low" ? [{ NOT: { OR: [...has(HIGH_WORDS), ...has(MEDIUM_WORDS)] } }] : []),
     ],
   };
-  const [rows, total, users] = await Promise.all([
+  const [rows, total, users, branches, anySystem] = await Promise.all([
     db.auditLog.findMany({ where, orderBy: { id: "desc" }, skip: (page - 1) * pageSize, take: pageSize }),
     db.auditLog.count({ where }),
     db.user.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true, role: { select: { name: true } } } }),
+    db.branch.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true } }),
+    db.auditLog.findFirst({ where: { orgId: u.orgId, userId: null }, select: { id: true } }),
   ]);
   const names = new Map(users.map((x) => [x.id, x]));
+  const branchName = new Map(branches.map((b) => [b.id, b.name]));
   return {
-    rows: rows.map((r) => ({ ...r, id: String(r.id), userName: r.userId ? (names.get(r.userId)?.name ?? "Unknown") : "System", roleName: r.userId ? (names.get(r.userId)?.role.name ?? "") : "Automatic" })),
+    rows: rows.map((r) => {
+      const userName = r.userId ? (names.get(r.userId)?.name ?? "Unknown") : "System";
+      const bn = r.branchId ? branchName.get(r.branchId) : undefined;
+      const targetBranch = str(obj(r.after).branchId) ? branchName.get(str(obj(r.after).branchId)) : undefined;
+      return {
+        ...r,
+        id: String(r.id),
+        userName,
+        roleName: r.userId ? (names.get(r.userId)?.role.name ?? "") : "Automatic",
+        branchName: r.branchId ? (bn ?? "Deleted branch") : "All branches",
+        module: moduleOf(r.entity, r.action),
+        severity: severityOf(r.action, r.entity),
+        sentence: describeAudit({ action: r.action, entity: r.entity, entityId: r.entityId, before: r.before, after: r.after, extra: { branchName: targetBranch ?? bn, userName } }),
+        device: deviceLabel(r.userAgent, r.ip, r.actorType),
+      };
+    }),
     total,
     page,
     pageSize,
     users,
+    hasSystem: !!anySystem,
   };
 }
+
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 const METHOD_LIST = ["UPI", "Cash", "Card", "Bank Transfer", "Other"];
 

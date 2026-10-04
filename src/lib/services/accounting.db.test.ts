@@ -7,6 +7,8 @@ import { createExpense, expenseTrend, listExpenses, voidExpense } from "./expens
 import { listAudit, lockMonth, monthPeriod, profitAndLoss, unlockMonth } from "./accounting";
 import { REPORTS } from "./reports";
 import { todayIso } from "./time";
+import { db } from "@/lib/db";
+import { audit } from "./audit";
 
 describe.skipIf(!hasDb)("expenses and accounting (database)", () => {
   let gym: Awaited<ReturnType<typeof makeGym>>;
@@ -81,5 +83,33 @@ describe.skipIf(!hasDb)("expenses and accounting (database)", () => {
     const pl = await profitAndLoss(admin, monthPeriod(lastMonth));
     const r = await REPORTS.expenses!.run(admin, monthPeriod(lastMonth));
     expect(r.totals?.amount).toBe(pl.totalExpenses);
+  });
+
+  it("filters by module, system user, search and branch, with readable rows", async () => {
+    const g = await makeGym();
+    const boss = await g.user("Super Admin");
+    const w = (a: { action: string; entity: string; entityId: string; userId?: string | null; after?: unknown }) => db.$transaction((tx) => audit(tx, { orgId: g.org.id, userId: boss.id, ...a }));
+    await w({ action: "auth.login", entity: "Session", entityId: boss.id, after: { via: "password" } });
+    await w({ action: "staff.role", entity: "User", entityId: "u1", after: { name: "Ravi" } });
+    await w({ action: "payment.create", entity: "Payment", entityId: "p1", after: { code: "PAY-9001", amount: 50000, method: "UPI", invoiceNumber: "INV-9", branchId: g.a.id } });
+    await w({ action: "autopay.charged", entity: "AutopayMandate", entityId: "m1", userId: null, after: { code: "MND-1", amount: 100, branchId: g.b.id } });
+    await w({ action: "ai.proposal.send", entity: "AiProposal", entityId: "x" });
+    const access = await listAudit(boss, { module: "Access", pageSize: 100 });
+    expect(access.rows.map((r) => r.action).sort()).toEqual(["auth.login", "staff.role"]);
+    const other = await listAudit(boss, { module: "Other", pageSize: 100 });
+    expect(other.rows.map((r) => r.action)).toEqual(["ai.proposal.send"]);
+    expect(other.total).toBe(1);
+    const sys = await listAudit(boss, { userId: "system", pageSize: 100 });
+    expect(sys.rows.map((r) => r.action)).toEqual(["autopay.charged"]);
+    expect(sys.hasSystem).toBe(true);
+    const pay = await listAudit(boss, { q: "PAY-", pageSize: 100 });
+    expect(pay.rows.map((r) => r.action)).toEqual(["payment.create"]);
+    expect(pay.rows[0]).toMatchObject({ sentence: "Recorded payment PAY-9001 of ₹500 (UPI) against INV-9", branchName: "A", module: "Payments" });
+    expect(pay.rows[0]!.hash).toBeTruthy();
+    expect((await listAudit(boss, { q: boss.name, pageSize: 100 })).total).toBeGreaterThanOrEqual(4);
+    const onlyA = await listAudit(pick(boss, g.a.id), { pageSize: 100 });
+    expect(onlyA.rows.map((r) => r.action)).not.toContain("autopay.charged");
+    expect(onlyA.rows.map((r) => r.action)).toContain("payment.create");
+    expect(onlyA.rows.map((r) => r.action)).toContain("auth.login");
   });
 });

@@ -4,6 +4,8 @@ import * as z from "zod";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
+import { audit } from "@/lib/services/audit";
+import { getCurrentUser } from "@/lib/auth/current";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, idleSignOut } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
@@ -35,11 +37,14 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
   if (!user.emailVerifiedAt) return { email, unverified: true, message: "Confirm your email first: open the link we sent you." };
 
   await createSession(user.id);
+  await db.$transaction((tx) => audit(tx, { orgId: user.orgId, userId: user.id, action: "auth.login", entity: "Session", entityId: user.id, after: { via: "password" } }));
   await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
   redirect(safeNext(formData.get("next")));
 }
 
 export async function logout() {
+  const me = await getCurrentUser().catch(() => null);
+  if (me) await db.$transaction((tx) => audit(tx, { orgId: me.orgId, userId: me.id, action: "auth.logout", entity: "Session", entityId: me.id }));
   await destroySession();
   redirect("/login");
 }

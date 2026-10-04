@@ -5,6 +5,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
 import { GOOGLE_BACK, GOOGLE_FLOWS, GOOGLE_FLOW_COOKIE, GOOGLE_SIGNUP_COOKIE, exchangeCode, sign, unsign, type GoogleFlow, type GoogleProfile } from "@/lib/integrations/google";
+import { audit } from "@/lib/services/audit";
 import { appUrl } from "@/lib/services/accounts";
 import { signInTrainerWithGoogle } from "@/lib/services/trainer-google";
 
@@ -70,6 +71,8 @@ async function staffIn(userId: string, verifiedAt: Date | null, next: string) {
     await db.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date(), passwordHash: await hashPassword(randomBytes(24).toString("base64url")) } });
   }
   await createSession(userId);
+  const who = await db.user.findUnique({ where: { id: userId }, select: { orgId: true } });
+  if (who) await db.$transaction((tx) => audit(tx, { orgId: who.orgId, userId, action: "auth.login", entity: "Session", entityId: userId, after: { via: "google" } }));
   await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
   return to(next);
 }

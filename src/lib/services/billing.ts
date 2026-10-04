@@ -246,7 +246,7 @@ export async function collectPayment(u: CurrentUser, invoiceId: string, input: P
     const paid = await tx.payment.aggregate({ where: { invoiceId, status: "SUCCESS" }, _sum: { amount: true } });
     if (input.amount > inv.total - (paid._sum.amount ?? 0)) throw new UserError("Someone just collected part of this. Refresh and try again.");
     const payment = await writePayment(tx, u, { branchId: inv.branchId, memberId: inv.memberId, invoiceId, date: input.date, amount: input.amount, method: input.method, txnRef: input.txnRef, notes: input.notes, prefix: p.payment });
-    await audit(tx, { orgId: u.orgId, userId: u.id, action: "payment.create", entity: "Payment", entityId: payment.id, after: payment });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "payment.create", entity: "Payment", entityId: payment.id, after: { ...payment, invoiceNumber: inv.number } });
     return payment;
   });
 }
@@ -256,10 +256,11 @@ export async function reversePayment(u: CurrentUser, paymentId: string, reason: 
   const before = await db.payment.findFirst({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, id: paymentId } });
   if (!before) throw new UserError("Payment not found.");
   if (before.status === "REVERSED") throw new UserError("This payment is already reversed.");
+  const inv = await db.invoice.findUnique({ where: { id: before.invoiceId }, select: { number: true } });
   await db.$transaction(async (tx) => {
     await assertMonthOpen(tx, u, before.branchId, toIso(before.date));
     const after = await tx.payment.update({ where: { id: paymentId }, data: { status: "REVERSED", reversedById: u.id, reversedAt: new Date(), reverseReason: reason } });
-    await audit(tx, { orgId: u.orgId, userId: u.id, action: "payment.reverse", entity: "Payment", entityId: paymentId, before, after });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "payment.reverse", entity: "Payment", entityId: paymentId, before: { ...before, invoiceNumber: inv?.number }, after: { ...after, invoiceNumber: inv?.number } });
   });
 }
 

@@ -504,9 +504,16 @@ model AuditLog {
   after     Json?
   ip        String?
   userAgent String?
+  /// null = org-wide ("All branches")
+  branchId  String?
+  /// sha256 of this entry chained onto prevHash; null on entries written before hashing was enabled
+  hash      String?      @db.VarChar(64)
+  /// hash of the previous hashed entry of this organisation, or "0000"
+  prevHash  String?      @db.VarChar(64)
   createdAt DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId, createdAt])
+  @@index([orgId, id])
   @@index([entity, entityId])
 }
 
