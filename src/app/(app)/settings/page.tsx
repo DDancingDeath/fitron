@@ -33,6 +33,7 @@ import { canOpen } from "@/lib/nav";
 import { providerStatus } from "@/lib/integrations/whatsapp";
 import Link from "next/link";
 import { appUrl } from "@/lib/services/accounts";
+import { HelpTab } from "./help-tab";
 import { PARTNER_SHARE } from "@/lib/domain/pricing";
 
 export const metadata = { title: "Settings · Fitron" };
@@ -57,7 +58,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             privacy: "privacy",
           } as Record<string, string>
         )[section ?? ""];
-  const tab = ["gym", "billing", "reminders", "wa", "int", "branches", "privacy"].includes(asked ?? "") ? asked! : "gym";
+  const tab = ["gym", "billing", "reminders", "wa", "int", "branches", "privacy", "help"].includes(asked ?? "") ? asked! : "gym";
   const [gym, tax, nextInvoice, numbering, branches, wa, autopay] = await Promise.all([
     getGymProfile(u.orgId),
     getTax(u.orgId),
@@ -509,6 +510,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           </Panel>
         </div>
       )}
+      {tab === "help" && <HelpTab u={u} waStatus={waStatus} waMode={wa.mode} />}
       {tab === "branches" && (
         <Panel title="Branches">
           <div className="flex flex-col gap-6">

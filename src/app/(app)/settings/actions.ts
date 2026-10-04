@@ -18,8 +18,12 @@ import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
 import { ensureTrainerCode } from "@/lib/services/trainer-gym";
 import { saveReminderSettings } from "@/lib/services/reminders";
-import { simpleAction } from "@/lib/form-action";
-import type { FormState } from "@/lib/validation/common";
+import { formAction, simpleAction } from "@/lib/form-action";
+import { failed, type FormState } from "@/lib/validation/common";
+import { headers } from "next/headers";
+import { rateLimit } from "@/lib/rate-limit";
+import { ticketInput } from "@/lib/validation/support";
+import { raiseTicket, resolveTicket } from "@/lib/services/support";
 
 const back = (params: Record<string, string>) => redirect(`/settings?${new URLSearchParams(params)}`);
 const firstError = (e: z.ZodError) => e.issues.map((i) => `${String(i.path[0] ?? "")}: ${i.message}`)[0] ?? "Check the form.";
@@ -273,4 +277,33 @@ export async function linkStatusAction(): Promise<LinkStatus> {
   }
   if (st.qr) return { state: "qr", qr: st.qr, text: "" };
   return { state: "waiting", text: st.state === "authenticating" ? "Scanned. Finishing link…" : "Connector is starting WhatsApp…" };
+}
+
+/** Settings › Help & support › Raise a ticket: saved, audited and emailed to support. */
+export async function raiseTicketAction(_: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("settings.manage");
+  if (!rateLimit(`ticket:${u.orgId}`, 10, 60 * 60_000)) return failed(fd, { message: "That's a lot of tickets in an hour. Wait a little and try again." });
+  const h = await headers();
+  const ctx = { userAgent: h.get("user-agent"), ip: h.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null };
+  let number = "";
+  const res = await formAction(fd, ticketInput, async (v) => {
+    number = (await raiseTicket(u, v, ctx)).number;
+  }, "");
+  if (res?.ok) {
+    revalidatePath("/settings");
+    return { ...res, message: `Ticket ${number} raised. We'll reply here and by email.` };
+  }
+  return res;
+}
+
+export async function resolveTicketAction(id: string) {
+  const u = await requirePermission("settings.manage");
+  try {
+    await resolveTicket(u, id);
+  } catch (e) {
+    if (e instanceof UserError) redirect(`/settings?${new URLSearchParams({ tab: "help", error: e.message })}`);
+    throw e;
+  }
+  revalidatePath("/settings");
+  redirect("/settings?tab=help");
 }

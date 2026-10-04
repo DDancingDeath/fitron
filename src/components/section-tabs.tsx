@@ -41,10 +41,10 @@ export const SETTINGS_TABS: Tab[] = [
   { href: "/settings?tab=int", label: "Integrations & AI" },
   { href: "/settings/import", label: "Migrate & import", perm: "import.run" },
   { href: "/settings/backup", label: "Backup" },
-  { href: "/settings/jobs", label: "Daily jobs" },
   { href: "/settings/go-live", label: "Go live" },
   { href: "/settings/billing", label: "Subscription" },
   { href: "/settings?tab=branches", label: "Branches" },
   { href: "/staff?tab=perm", label: "Roles & access", perm: "staff.manage" },
   { href: "/settings?tab=privacy", label: "Privacy & DPDP" },
+  { href: "/settings?tab=help", label: "Help & support" },
 ];

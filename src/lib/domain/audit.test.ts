@@ -2,6 +2,12 @@ import { describe, expect, it } from "vitest";
 import { entitiesOf, moduleOf, severityOf } from "./audit";
 
 describe("audit severity and modules", () => {
+  it("groups support tickets under Settings as low severity", () => {
+    expect(moduleOf("SupportTicket")).toBe("Settings");
+    expect(severityOf("support.ticket.create")).toBe("Low");
+    expect(severityOf("support.ticket.resolve")).toBe("Low");
+  });
+
   it("rates reversals, deletions and unlocks high, edits medium, the rest low", () => {
     expect(severityOf("payment.reverse")).toBe("High");
     expect(severityOf("member.delete")).toBe("High");
