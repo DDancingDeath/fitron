@@ -213,7 +213,7 @@ const BASE: Record<string, Def> = {
     },
   },
   "dep-fy": {
-    title: "Depreciation this financial year",
+    title: "Depreciation this FY",
     group: "Fixed assets",
     perm: "assets.manage",
     usesPeriod: false,

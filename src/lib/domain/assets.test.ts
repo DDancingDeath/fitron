@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assetInfo, depSchedule, depreciationIn, disposalsIn, fyOf, scheduleByFy, type AssetLike } from "./assets";
+import { assetInfo, depSchedule, depreciationIn, disposalsIn, fyOf, scheduleByFy, scheduleView, type AssetLike } from "./assets";
 
 const treadmill: AssetLike = { cost: 12_000_000, salvage: 0, method: "WDV", rate: 15, life: null, purchaseDate: "2026-06-10" };
 
@@ -51,5 +51,27 @@ describe("depreciation", () => {
     expect(fy.map((r) => r.fy)).toEqual([2026, 2027]);
     expect(fy[0]).toMatchObject({ opening: 12_000_000, dep: 1_500_000, closing: 10_500_000 });
     expect(fy[1]!.opening).toBe(10_500_000);
+  });
+});
+
+describe("display helpers", () => {
+  it("monthDep is the last charge, the disposal-month charge, or 0 with no rows", () => {
+    expect(assetInfo(treadmill, "2026-10").monthDep).toBe(150_000);
+    expect(assetInfo({ ...treadmill, disposedOn: "2026-08-15", disposedFor: 1 }, "2026-10").monthDep).toBe(150_000);
+    expect(assetInfo(treadmill, "2026-05").monthDep).toBe(0);
+  });
+  it("scheduleView by year is ascending and matches scheduleByFy", () => {
+    const v = scheduleView(treadmill, "2027-05", "year");
+    expect(v.map((r) => r.period)).toEqual(["FY 2026–27", "FY 2027–28"]);
+    expect(v[0]!.dep).toBe(1_500_000);
+    expect(v.map((r) => r.closing)).toEqual(scheduleByFy(treadmill, "2027-05").map((r) => r.closing));
+  });
+  it("scheduleView by month is newest first, capped at 36, empty when no rows", () => {
+    const m = scheduleView(treadmill, "2026-10", "month");
+    expect(m[0]!.period).toBe("Oct 2026");
+    expect(m[0]!.closing).toBe(assetInfo(treadmill, "2026-10").nbv);
+    const old = { ...treadmill, purchaseDate: "2021-10-01" };
+    expect(scheduleView(old, "2026-10", "month")).toHaveLength(36);
+    expect(scheduleView(treadmill, "2026-05", "month")).toEqual([]);
   });
 });

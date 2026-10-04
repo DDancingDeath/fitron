@@ -54,3 +54,10 @@ describe.skipIf(!hasDb)("report centre (database)", () => {
     expect(x).toContain("<td>500.00</td>");
   });
 });
+
+describe("report titles", () => {
+  it("names the depreciation report", () => {
+    expect(REPORTS["dep-fy"]!.title).toBe("Depreciation this FY");
+    expect(REPORTS["dep-fy"]!.group).toBe("Fixed assets");
+  });
+});

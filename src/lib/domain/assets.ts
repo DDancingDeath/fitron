@@ -94,7 +94,8 @@ export function assetInfo(a: AssetLike, upTo: string) {
   const fy = fyOf(upTo);
   const fyDep = sch.filter((r) => r.fy === fy).reduce((s, r) => s + r.dep, 0);
   const gain = a.disposedOn ? (a.disposedFor ?? 0) - nbv : 0;
-  return { sch, acc, nbv, fyDep, gain };
+  const last = sch[sch.length - 1];
+  return { sch, acc, nbv, fyDep, gain, monthDep: last ? last.dep : 0 };
 }
 
 /** Depreciation charged across the months from `fromYm` to `toYm` inclusive. */
@@ -130,4 +131,15 @@ export function scheduleByFy(a: AssetLike, upTo: string) {
     opening = r.nbv;
   }
   return out;
+}
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Depreciation schedule shaped for display: by financial year (oldest first) or by month (newest first, at most 36). */
+export function scheduleView(a: AssetLike, upTo: string, mode: "year" | "month"): { period: string; dep: number; closing: number }[] {
+  if (mode === "year") return scheduleByFy(a, upTo).map((r) => ({ period: fyLabel(r.fy), dep: r.dep, closing: r.closing }));
+  return depSchedule(a, upTo)
+    .slice(-36)
+    .reverse()
+    .map((r) => ({ period: `${MON[Number(r.ym.slice(5, 7)) - 1]} ${r.ym.slice(0, 4)}`, dep: r.dep, closing: r.nbv }));
 }

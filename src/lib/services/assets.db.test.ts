@@ -44,6 +44,8 @@ describe.skipIf(!hasDb)("fixed assets and purchases (database)", () => {
     expect(e.amount).toBe(4_800_000);
     const got = await getAsset(admin, a.id);
     expect(got!.info.sch[0]!.dep).toBe(60_000);
+    expect(got!.info.monthDep).toBeGreaterThan(0);
+    expect(got!.info.monthDep).toBe(got!.info.sch[got!.info.sch.length - 1]!.dep);
     await removeAsset(admin, a.id, "Duplicate");
     expect((await db.expense.findUniqueOrThrow({ where: { id: a.expenseId! } })).status).toBe("VOID");
   });
@@ -88,6 +90,11 @@ describe.skipIf(!hasDb)("fixed assets and purchases (database)", () => {
     const full = await getPurchase(admin, p.id);
     expect(full!.balance).toBe(total - 100_000);
     expect(full!.expenses.every((e) => e.method === "Credit")).toBe(true);
+    const expLine = full!.lines.find((l) => l.type === "EXPENSE")!;
+    const cat = await db.expenseCategory.findUniqueOrThrow({ where: { id: expLine.category! } });
+    expect(full!.categories.find((c) => c.id === expLine.category)?.name).toBe(cat.name);
+    expect(full!.products.map((x) => x.sku)).toContain("WHEY1");
+    expect(full!.assets.map((x) => x.code)).toContain((await db.asset.findFirstOrThrow({ where: { purchaseId: p.id } })).code);
     expect(full!.expenses.filter((e) => e.capital)).toHaveLength(1);
     expect((await payables(admin)).map((x) => x.id)).toContain(p.id);
 

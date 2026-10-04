@@ -51,11 +51,13 @@ export async function getPurchase(u: CurrentUser, id: string) {
   if (!p) return null;
   const productIds = p.lines.map((l) => l.productId).filter((x): x is string => !!x);
   const assetIds = p.lines.map((l) => l.assetId).filter((x): x is string => !!x);
-  const [products, assets] = await Promise.all([
+  const catIds = [...new Set(p.lines.filter((l) => l.type === "EXPENSE" && l.category).map((l) => l.category as string))];
+  const [products, assets, categories] = await Promise.all([
     db.product.findMany({ where: { id: { in: productIds } }, select: { id: true, name: true, sku: true } }),
     db.asset.findMany({ where: { id: { in: assetIds } }, select: { id: true, code: true, name: true } }),
+    db.expenseCategory.findMany({ where: { id: { in: catIds } }, select: { id: true, name: true } }),
   ]);
-  return { ...p, paid: paidOf(p), balance: p.total - paidOf(p), products, assets };
+  return { ...p, paid: paidOf(p), balance: p.total - paidOf(p), products, assets, categories };
 }
 
 /** Stock the branch can receive against a bill. */
