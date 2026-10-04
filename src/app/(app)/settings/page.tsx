@@ -13,7 +13,7 @@ import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveCookieNotice, saveNumbering, savePrivacyNotice, savePrivacyOfficer, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
+import { makeTrainerCode, saveAi, saveAutopay, saveGym, saveCookieNotice, saveNumbering, savePrivacyNotice, savePrivacyOfficer, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
 import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
 import { reminderSchedule } from "@/lib/services/reminders";
 import { LinkWatcher } from "./link-watcher";
@@ -34,6 +34,7 @@ import { providerStatus } from "@/lib/integrations/whatsapp";
 import Link from "next/link";
 import { appUrl } from "@/lib/services/accounts";
 import { HelpTab } from "./help-tab";
+import { BranchesTab } from "./branches-tab";
 import { PARTNER_SHARE } from "@/lib/domain/pricing";
 
 export const metadata = { title: "Settings · Fitron" };
@@ -127,7 +128,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       </div>
       {typeof sp.saved === "string" && <Notice tone="ok">Saved. Changes are recorded in the audit log.</Notice>}
       {typeof sp.msg === "string" && <Notice tone="ok">{sp.msg}</Notice>}
-      {typeof sp.error === "string" && <Notice tone="alert">{sp.error}</Notice>}
+      {typeof sp.error === "string" && !sp.branch && <Notice tone="alert">{sp.error}</Notice>}
       {tab === "gym" && (
         <div className="grid max-w-[960px] gap-10 lg:grid-cols-2">
           <Panel title="Gym profile" className="lg:col-span-2">
@@ -511,42 +512,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </div>
       )}
       {tab === "help" && <HelpTab u={u} waStatus={waStatus} waMode={wa.mode} />}
-      {tab === "branches" && (
-        <Panel title="Branches">
-          <div className="flex flex-col gap-6">
-            {branches.length >= 3 && (
-              <p className="text-sm text-muted">
-                Your plan includes 3 branches. Each one after that needs a paid slot from{" "}
-                <Link href="/settings/billing" className="text-accent">
-                  Plan &amp; billing
-                </Link>
-                .
-              </p>
-            )}
-            {[...branches, null].map((b) => (
-              <form
-                key={b?.id ?? "new"}
-                action={saveBranchAction.bind(null, b?.id ?? null)}
-                className="grid gap-3 border-b border-line pb-6 last:border-0 last:pb-0 sm:grid-cols-2 lg:grid-cols-[1fr_2fr_1fr_1fr_auto] lg:items-end"
-              >
-                <Field label={b ? "Name" : "New branch name"}>
-                  <Input name="name" defaultValue={b?.name} required />
-                </Field>
-                <Field label="Address">
-                  <Input name="address" defaultValue={b?.address} required />
-                </Field>
-                <Field label="Phone">
-                  <Input name="phone" defaultValue={b?.phone} required />
-                </Field>
-                <Field label="GSTIN">
-                  <Input name="gstin" defaultValue={b?.gstin ?? ""} />
-                </Field>
-                <Button variant={b ? "default" : "primary"}>{b ? "Save" : "Add branch"}</Button>
-              </form>
-            ))}
-          </div>
-        </Panel>
-      )}
+      {tab === "branches" && <BranchesTab u={u} sp={sp} />}
     </div>
   );
 }

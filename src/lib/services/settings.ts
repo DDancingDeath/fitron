@@ -1,5 +1,6 @@
 import "server-only";
-import { claimSlot } from "./saas";
+import { claimSlot, gymPlan } from "./saas";
+import { fromIso, todayIso } from "./time";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import type { Prisma } from "@/generated/prisma/client";
@@ -89,18 +90,91 @@ export async function saveTax(u: CurrentUser, v: TaxInput) {
   });
 }
 
-export async function saveBranch(u: CurrentUser, id: string | null, v: { name: string; address: string; phone: string; gstin?: string }) {
+type BranchValues = { name: string; short?: string; address: string; phone: string; manager?: string; hours?: string; invoicePrefix?: string; gstin?: string };
+
+export async function saveBranch(u: CurrentUser, id: string | null, v: BranchValues) {
+  const data = { name: v.name, short: v.short ?? null, address: v.address, phone: v.phone, manager: v.manager ?? null, hours: v.hours ?? null, invoicePrefix: v.invoicePrefix || null, gstin: v.gstin ?? null };
   await db.$transaction(async (tx) => {
+    const clash = !v.short ? null : await tx.branch.findFirst({ where: { orgId: u.orgId, short: { equals: v.short, mode: "insensitive" }, ...(id ? { id: { not: id } } : {}) }, select: { id: true } });
+    if (clash) throw new UserError("Another branch already uses this short name.", "short");
     if (id) {
       const before = await tx.branch.findFirst({ where: { orgId: u.orgId, id } });
       if (!before) throw new UserError("Branch not found.");
-      const after = await tx.branch.update({ where: { id }, data: { ...v, gstin: v.gstin ?? null } });
+      const after = await tx.branch.update({ where: { id }, data });
       await audit(tx, { orgId: u.orgId, userId: u.id, action: "branch.update", entity: "Branch", entityId: id, before, after });
     } else {
-      const after = await tx.branch.create({ data: { ...v, gstin: v.gstin ?? null, orgId: u.orgId } });
+      const after = await tx.branch.create({ data: { ...data, orgId: u.orgId } });
       await claimSlot(tx, u.orgId, after.id);
       await audit(tx, { orgId: u.orgId, userId: u.id, action: "branch.create", entity: "Branch", entityId: after.id, after });
     }
+  });
+}
+
+/** Closes (read-only, hidden from the switcher) or reopens a branch. Nothing is deleted. */
+export async function setBranchActive(u: CurrentUser, id: string, active: boolean) {
+  await db.$transaction(async (tx) => {
+    const before = await tx.branch.findFirst({ where: { orgId: u.orgId, id } });
+    if (!before) throw new UserError("Branch not found.");
+    if (before.active === active) return;
+    if (!active) {
+      const others = await tx.branch.count({ where: { orgId: u.orgId, active: true, id: { not: id } } });
+      if (!others) throw new UserError("At least one branch must stay active.");
+    } else {
+      const { terms, name: planName } = await gymPlan(u.orgId, todayIso(), tx);
+      const others = await tx.branch.count({ where: { orgId: u.orgId, active: true, id: { not: id } } });
+      if (others >= terms.includedBranches) {
+        const own = await tx.branchSubscription.findFirst({ where: { orgId: u.orgId, kind: "BRANCH", status: "PAID", branchId: id, periodEnd: { gte: fromIso(todayIso()) } }, select: { id: true } });
+        if (!own) {
+          if (!terms.extraBranches) throw new UserError(`The ${planName} plan is for one branch. Move to Enterprise in Settings › Plan & billing to add more.`);
+          const slot = await tx.branchSubscription.findFirst({ where: { orgId: u.orgId, kind: "BRANCH", status: "PAID", branchId: null, periodEnd: { gte: fromIso(todayIso()) } }, orderBy: { periodEnd: "asc" } });
+          const claimed = slot ? await tx.branchSubscription.updateMany({ where: { id: slot.id, branchId: null }, data: { branchId: id } }) : { count: 0 };
+          if (!claimed.count) throw new UserError(`You already use ${terms.includedBranches} branches. Buy an extra branch to reopen this one.`);
+        }
+      }
+    }
+    const after = await tx.branch.update({ where: { id }, data: { active, deactivatedAt: active ? null : new Date() } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: active ? "branch.activate" : "branch.deactivate", entity: "Branch", entityId: id, before: { active: before.active, deactivatedAt: before.deactivatedAt }, after: { active: after.active, deactivatedAt: after.deactivatedAt } });
+  });
+}
+
+/** Rows of each kind that point at a branch; any of them means the branch can only be closed. */
+export async function branchRecordCounts(orgId: string, ids: string[], tx: Tx | typeof db = db) {
+  const where = { branchId: { in: ids } };
+  const by = async (rows: PromiseLike<unknown>) => new Map(((await rows) as { branchId: string | null; _count: number }[]).map((r) => [r.branchId, r._count]));
+  const [members, memberships, invoices, payments, expenses, locks, attendance, leads, slots, products, assets, purchases, mandates, devices, access] = await Promise.all([
+    by(tx.member.groupBy({ by: ["branchId"], where: { orgId, ...where }, _count: true })),
+    by(tx.membership.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.invoice.groupBy({ by: ["branchId"], where: { orgId, ...where }, _count: true })),
+    by(tx.payment.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.expense.groupBy({ by: ["branchId"], where: { orgId, ...where }, _count: true })),
+    by(tx.monthLock.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.attendance.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.lead.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.classSlot.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.product.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.asset.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.purchase.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.autopayMandate.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.device.groupBy({ by: ["branchId"], where, _count: true })),
+    by(tx.accessLog.groupBy({ by: ["branchId"], where, _count: true })),
+  ]);
+  const all = [members, memberships, invoices, payments, expenses, locks, attendance, leads, slots, products, assets, purchases, mandates, devices, access];
+  return new Map(ids.map((id) => [id, { members: members.get(id) ?? 0, invoices: invoices.get(id) ?? 0, expenses: expenses.get(id) ?? 0, total: all.reduce((a, m) => a + (m.get(id) ?? 0), 0) }]));
+}
+
+export async function deleteBranch(u: CurrentUser, id: string, reason: string) {
+  await db.$transaction(async (tx) => {
+    const before = await tx.branch.findFirst({ where: { orgId: u.orgId, id } });
+    if (!before) throw new UserError("Branch not found.");
+    if ((await tx.branch.count({ where: { orgId: u.orgId } })) < 2) throw new UserError("You can’t delete your only branch.");
+    const c = (await branchRecordCounts(u.orgId, [id], tx)).get(id)!;
+    if (c.total > 0) throw new UserError(`${before.name} has records, so it can’t be deleted. Close it instead; its history stays in reports.`);
+    await tx.userBranch.deleteMany({ where: { branchId: id } });
+    await tx.device.updateMany({ where: { branchId: id }, data: { branchId: null } });
+    await tx.branchSubscription.updateMany({ where: { orgId: u.orgId, branchId: id }, data: { branchId: null } });
+    await tx.notification.updateMany({ where: { branchId: id }, data: { branchId: null } });
+    await tx.branch.delete({ where: { id } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "branch.delete", entity: "Branch", entityId: id, before, after: { reason } });
   });
 }
 

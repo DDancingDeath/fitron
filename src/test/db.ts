@@ -28,7 +28,7 @@ export async function makeGym() {
       },
     });
     const perms = new Set<string>(DEFAULT_ROLES[role]);
-    const branches = [a, b].filter((x) => branchIds.includes(x.id)).map((x) => ({ id: x.id, name: x.name }));
+    const branches = [a, b].filter((x) => branchIds.includes(x.id)).map((x) => ({ id: x.id, name: x.name, active: true }));
     return {
       id: u.id,
       name: u.name,

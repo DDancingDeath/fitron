@@ -108,3 +108,22 @@ describe("renewalReminder", () => {
     expect(reminderSubject("Your FITRON plan has ended and the gym is now read-only. Your records are safe.")).toBe("FITRON: your FITRON plan has ended and the gym is now read-only");
   });
 });
+
+describe("closed branches and seats", () => {
+  it("never counts a closed branch toward the included seats", () => {
+    const today = "2026-10-04";
+    const s = standings([{ id: "A" }, { id: "B", active: false }, { id: "C" }, { id: "D" }], new Map(), today, 3);
+    expect(s.get("A")).toEqual({ kind: "INCLUDED" });
+    expect(s.get("B")).toEqual({ kind: "CLOSED" });
+    expect(s.get("C")).toEqual({ kind: "INCLUDED" });
+    expect(s.get("D")).toEqual({ kind: "INCLUDED" });
+  });
+
+  it("gives a reopened branch a seat only when the other open branches leave one", () => {
+    const today = "2026-10-04";
+    const others = [{ id: "A" }, { id: "C" }, { id: "D" }];
+    // Reopening B with three others open: B is the 4th and needs a paid period.
+    expect(standings([...others, { id: "B" }], new Map(), today, 3).get("B")).toMatchObject({ kind: "READ_ONLY" });
+    expect(standings([{ id: "A" }, { id: "B" }], new Map(), today, 3).get("B")).toEqual({ kind: "INCLUDED" });
+  });
+});

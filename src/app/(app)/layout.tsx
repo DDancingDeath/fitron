@@ -101,7 +101,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <MobileNav groups={groups} orgName={gymName} branchName={branchName} logo={logo} />
           <GlobalSearch />
           <div className="flex flex-none items-center gap-1.5 sm:gap-2.5 lg:ml-auto">
-            <BranchSwitcher branches={u.branches} value={u.branch} />
+            <BranchSwitcher branches={u.branches.filter((b) => b.active)} value={u.branch} />
             <ThemeToggle />
             <BellLink unread={counts.notifications ?? 0} />
             <UserMenu

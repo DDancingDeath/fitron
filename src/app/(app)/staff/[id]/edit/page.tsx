@@ -11,11 +11,13 @@ export default async function EditStaff({ params }: PageProps<"/staff/[id]/edit"
   const u = await requirePermission("staff.manage");
   const s = await getStaff(u, (await params).id);
   if (!s) notFound();
-  const [roles, branches] = await Promise.all([listRoles(), db.branch.findMany({ where: { orgId: u.orgId }, select: { id: true, name: true } })]);
+  const [roles, branches] = await Promise.all([listRoles(), db.branch.findMany({ where: { orgId: u.orgId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, active: true } })]);
+  const held = new Set(s.branches.map((b) => b.branchId));
+  const shown = branches.filter((b) => b.active || held.has(b.id));
   return (
     <>
       <PageHeader title={`Edit ${s.name}`} />
-      <StaffForm id={s.id} values={{ ...s, branchIds: s.branches.map((b) => b.branchId) }} roles={roles} branches={branches} />
+      <StaffForm id={s.id} values={{ ...s, branchIds: s.branches.map((b) => b.branchId) }} roles={roles} branches={shown} />
     </>
   );
 }

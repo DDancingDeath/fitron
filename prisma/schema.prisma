@@ -62,6 +62,16 @@ model Branch {
   address     String
   phone       String
   gstin       String?
+  /// Short name for the switcher and dialog titles
+  short       String?
+  /// Opening hours, free text
+  hours       String?
+  manager     String?
+  /// Per-branch invoice prefix; the invoice sequence stays org-wide
+  invoicePrefix String?
+  /// false = closed: hidden from the switcher and from new records, data kept
+  active      Boolean      @default(true)
+  deactivatedAt DateTime?  @db.Timestamptz
   users       UserBranch[]
   members     Member[]
   memberships Membership[]
@@ -78,6 +88,7 @@ model Branch {
   createdAt   DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId])
+  @@index([orgId, active])
 }
 
 // ── Staff and roles ────────────────────────────────────────────────────────

@@ -69,7 +69,7 @@ export async function gymPlan(orgId: string, today = todayIso(), tx: Tx = db): P
 
 /** Every branch of the gym with where it stands on the plan, oldest first. */
 export async function branchStandings(orgId: string, today = todayIso(), tx: Tx = db) {
-  const branches = await tx.branch.findMany({ where: { orgId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, gstin: true } });
+  const branches = await tx.branch.findMany({ where: { orgId }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { id: true, name: true, gstin: true, active: true } });
   const { terms } = await gymPlan(orgId, today, tx);
   const paid = await paidUntil(tx, orgId);
   const s = standings(branches, paid, today, terms.includedBranches);
@@ -77,6 +77,7 @@ export async function branchStandings(orgId: string, today = todayIso(), tx: Tx 
   return { branches: branches.map((b) => ({ ...b, standing: s.get(b.id)! })), freeSlots, terms };
 }
 
+export const CLOSED_MESSAGE = "This branch is closed. Reopen it in Settings › Branches to add records here.";
 export const READ_ONLY_MESSAGE = "This branch is read-only because its extra-branch plan has lapsed. Its records are safe; a Super Admin can renew it in Settings › Plan & billing.";
 export const PLAN_LAPSED_MESSAGE = "Your FITRON plan has ended, so the gym is read-only. Your records are safe; a Super Admin can choose a plan in Settings › Plan & billing.";
 
@@ -87,7 +88,9 @@ export const PLAN_LAPSED_MESSAGE = "Your FITRON plan has ended, so the gym is re
 export async function assertBranchWritable(tx: Tx, orgId: string, branchId: string) {
   const plan = await gymPlan(orgId, todayIso(), tx);
   if (!planWritable(plan.standing) && !plan.checking) throw new UserError(PLAN_LAPSED_MESSAGE);
-  const count = await tx.branch.count({ where: { orgId } });
+  const row = await tx.branch.findFirst({ where: { orgId, id: branchId }, select: { active: true } });
+  if (row && !row.active) throw new UserError(CLOSED_MESSAGE);
+  const count = await tx.branch.count({ where: { orgId, active: true } });
   if (count <= plan.terms.includedBranches) return;
   const { branches } = await branchStandings(orgId, todayIso(), tx);
   if (branches.find((b) => b.id === branchId)?.standing.kind === "READ_ONLY") throw new UserError(READ_ONLY_MESSAGE);
@@ -118,7 +121,7 @@ export async function assertMemberRoom(tx: Tx, orgId: string) {
 
 /** A new branch beyond those included takes a paid, unused slot. Call inside the transaction that creates it. */
 export async function claimSlot(tx: Prisma.TransactionClient, orgId: string, branchId: string) {
-  const existing = await tx.branch.count({ where: { orgId, id: { not: branchId } } });
+  const existing = await tx.branch.count({ where: { orgId, active: true, id: { not: branchId } } });
   const { terms, name } = await gymPlan(orgId, todayIso(), tx);
   if (existing < terms.includedBranches) return;
   if (!terms.extraBranches) throw new UserError(`The ${name} plan is for one branch. Move to Enterprise in Settings › Plan & billing to add more.`);
@@ -159,7 +162,7 @@ export async function startPayment(u: CurrentUser, what: PaymentFor, cycle: Cycl
     const p = findPlan(what.plan);
     if (!p || p.product !== "GYM_ACCOUNTING") throw new UserError("Pick a Gym Accounting plan.");
     if (plan.terms.custom) throw new UserError("Your gym is on a plan FITRON set up for you, so there's nothing to pay here. Write to hello@fitron.in to change it.");
-    const branches = await db.branch.count({ where: { orgId: u.orgId } });
+    const branches = await db.branch.count({ where: { orgId: u.orgId, active: true } });
     if (!p.multiBranch && branches > 1) throw new UserError(`You have ${branches} branches, and ${p.name} is for one branch. Stay on Enterprise, or write to hello@fitron.in.`);
     price = planPrice(p.key, cycle);
   } else {
@@ -398,6 +401,7 @@ export async function billingReminders(orgId: string, today: string): Promise<Re
   if (r) await deliverReminder(orgId, cfg, r.text, null, n);
   for (const b of branches) {
     const s: Standing = b.standing;
+    if (s.kind === "CLOSED") continue;
     let text = "";
     if (s.kind === "PAID" && [cfg.remindDays, 1].includes(daysBetween(s.until, today))) text = `${b.name}'s extra-branch plan ends in ${daysBetween(s.until, today) === 1 ? "1 day" : `${daysBetween(s.until, today)} days`} (${longDate(s.until)}). Renew to keep it running.`;
     if (s.kind === "GRACE") text = `${b.name}'s extra-branch plan has ended. It becomes read-only on ${longDate(s.readOnlyFrom)} unless renewed.`;

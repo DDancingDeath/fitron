@@ -80,8 +80,12 @@ export const numberingInput = z.object({ memberPrefix: prefix, invoicePrefix: pr
 
 export const branchInput = z.object({
   name: z.string().trim().min(2, { error: "Enter a name." }).max(80),
+  short: z.string().trim().min(1, { error: "Give the branch a short name, e.g. Main or City Centre." }).max(30),
   address: z.string().trim().min(3, { error: "Enter the address." }).max(300),
   phone: indianPhone,
+  manager: opt(80),
+  hours: z.string().trim().min(1, { error: "Enter opening hours." }).max(40),
+  invoicePrefix: z.preprocess(blank, z.string().trim().max(10).regex(/^[A-Za-z0-9/-]*$/, { error: "Letters, numbers, - and / only." }).transform((s) => s.toUpperCase()).optional()),
   gstin,
 });
 

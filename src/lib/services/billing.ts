@@ -47,12 +47,14 @@ export async function writeInvoice(
   const tax = a.tax;
   const t = invoiceTotals(a.lines);
   const n = await nextNumber(tx, u.orgId, "invoice");
+  const br = await tx.branch.findFirst({ where: { orgId: u.orgId, id: a.branchId }, select: { invoicePrefix: true } });
+  const prefix = br?.invoicePrefix || a.prefix;
   return tx.invoice.create({
     data: {
       orgId: u.orgId,
       branchId: a.branchId,
       memberId: a.memberId,
-      number: `${a.prefix}${n}`,
+      number: `${prefix}${n}`,
       date: fromIso(a.date),
       dueDate: fromIso(a.dueDate),
       ...t,

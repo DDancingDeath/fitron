@@ -11,11 +11,13 @@ export function StaffForm({
   values,
   roles,
   branches,
+  defaultRole,
 }: {
   id?: string;
   values?: Values;
   roles: { id: string; name: string }[];
-  branches: { id: string; name: string }[];
+  branches: { id: string; name: string; active?: boolean }[];
+  defaultRole?: string;
 }) {
   const [state, action, pending] = useActionState(saveStaff.bind(null, id ?? null), undefined);
   const e = state?.errors ?? {};
@@ -31,7 +33,7 @@ export function StaffForm({
             <Input name="name" defaultValue={pick("name", values?.name)} required />
           </Field>
           <Field label="Role" error={e.roleId}>
-            <Select name="roleId" defaultValue={pick("roleId", values?.roleId ?? "")} required>
+            <Select name="roleId" defaultValue={pick("roleId", values?.roleId ?? defaultRole ?? "")} required>
               <option value="" disabled>
                 Choose
               </option>
@@ -59,8 +61,18 @@ export function StaffForm({
             <div className="flex flex-wrap gap-4">
               {branches.map((b) => (
                 <label key={b.id} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="branchIds" value={b.id} defaultChecked={sentBranches ? sentBranches.includes(b.id) : (values?.branchIds.includes(b.id) ?? branches.length === 1)} className="size-4" />
-                  {b.name}
+                  {b.active === false ? (
+                    <>
+                      <input type="checkbox" checked disabled className="size-4" />
+                      <input type="hidden" name="branchIds" value={b.id} />
+                      {b.name} (closed)
+                    </>
+                  ) : (
+                    <>
+                      <input type="checkbox" name="branchIds" value={b.id} defaultChecked={sentBranches ? sentBranches.includes(b.id) : (values?.branchIds.includes(b.id) ?? branches.length === 1)} className="size-4" />
+                      {b.name}
+                    </>
+                  )}
                 </label>
               ))}
             </div>
