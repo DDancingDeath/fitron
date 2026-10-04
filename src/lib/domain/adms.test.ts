@@ -30,6 +30,8 @@ describe("ADMS protocol", () => {
       { cmdNo: 4, ret: "-1002", cmd: "ENROLL_FP" },
     ]);
     expect(cmd.addUser("1046", "Asha\tVerma=x")).toContain("Name=Asha Verma x\t");
+    expect(cmd.addUser("1001", "Asha", "0044123")).toContain("Card=0044123\tGrp=1");
+    expect(cmd.addUser("1001", "Asha")).toContain("Card=\tGrp=1");
     expect(cmd.openDoor(5)).toBe("CONTROL DEVICE 01010500");
   });
 });

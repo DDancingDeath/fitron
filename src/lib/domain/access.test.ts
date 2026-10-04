@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_ACCESS, entryBlock } from "./access";
+import { DEFAULT_ACCESS, entryBlock, passbackBlock } from "./access";
 
 const today = "2026-09-28";
 const ok = { suspended: false, latestEnd: "2026-10-10", outstanding: 0 };
@@ -26,5 +26,14 @@ describe("entryBlock", () => {
     expect(entryBlock(ok, hours, today, "05:30")).toBeNull();
     expect(entryBlock(ok, hours, today, "22:01")).toBe("Outside gym hours");
     expect(entryBlock(ok, DEFAULT_ACCESS, today, "03:00")).toBeNull();
+  });
+});
+
+describe("passbackBlock", () => {
+  it("is on by default", () => expect(DEFAULT_ACCESS.antiPassback).toBe(true));
+  it("refuses a second entry while inside", () => expect(passbackBlock(DEFAULT_ACCESS, "06:10")).toBe("Already inside since 06:10 · no second entry without an exit"));
+  it("allows it when the rule is off or nobody is inside", () => {
+    expect(passbackBlock({ ...DEFAULT_ACCESS, antiPassback: false }, "06:10")).toBeNull();
+    expect(passbackBlock(DEFAULT_ACCESS, null)).toBeNull();
   });
 });

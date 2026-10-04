@@ -74,7 +74,7 @@ export function parseAcks(body: string) {
 const clean = (s: string) => s.replace(/[\t\r\n=]/g, " ").slice(0, 24);
 
 export const cmd = {
-  addUser: (pin: string, name: string) => `DATA UPDATE USERINFO PIN=${pin}\tName=${clean(name)}\tPri=0\tPasswd=\tCard=\tGrp=1\tTZ=0000000100000000\tVerify=0`,
+  addUser: (pin: string, name: string, card = "") => `DATA UPDATE USERINFO PIN=${pin}\tName=${clean(name)}\tPri=0\tPasswd=\tCard=${card.replace(/\D/g, "")}\tGrp=1\tTZ=0000000100000000\tVerify=0`,
   deleteUser: (pin: string) => `DATA DELETE USERINFO PIN=${pin}`,
   restoreTemplate: (t: { type: string; line: string }) => (t.type === "FP" && /^PIN=/.test(t.line) ? `DATA UPDATE FINGERTMP ${t.line}` : `DATA UPDATE BIODATA ${t.line}`),
   enrollFinger: (pin: string, finger = 6) => `ENROLL_FP PIN=${pin}\tFID=${finger}\tRETRY=3\tOVERWRITE=1`,

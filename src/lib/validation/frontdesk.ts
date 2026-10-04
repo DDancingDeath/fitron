@@ -134,4 +134,5 @@ export const accessInput = z.object({
   duesLimit: z.preprocess((v) => (v === "" || v == null ? "0" : v), rupees),
   hoursFrom: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
   hoursTo: z.preprocess((v) => v ?? "", z.union([z.literal(""), time])),
+  antiPassback: z.preprocess((v) => v === "on", z.boolean()),
 });

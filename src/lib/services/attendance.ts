@@ -24,7 +24,7 @@ export async function findForCheckIn(u: CurrentUser, q: string) {
     where: {
       ...memberScope(u),
       walkIn: false,
-      OR: [{ code: { equals: t, mode: "insensitive" } }, ...(digits.length >= 4 ? [{ phone: { contains: digits.slice(-10) } }] : []), { name: { contains: t, mode: "insensitive" } }],
+      OR: [{ code: { equals: t, mode: "insensitive" } }, ...(digits.length >= 4 ? [{ cardNo: digits }] : []), ...(digits.length >= 4 ? [{ phone: { contains: digits.slice(-10) } }] : []), { name: { contains: t, mode: "insensitive" } }],
     },
     take: 8,
     orderBy: { name: "asc" },

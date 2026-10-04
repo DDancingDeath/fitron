@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatWorkoutDays, parseMeals, parseWorkoutDays, progressInput } from "./frontdesk";
+import { accessInput, formatWorkoutDays, parseMeals, parseWorkoutDays, progressInput } from "./frontdesk";
 
 describe("workout text", () => {
   it("parses days and exercises, and round-trips", () => {
@@ -22,4 +22,13 @@ describe("meals and progress", () => {
     expect(progressInput.safeParse({ date: "2026-09-28", weightKg: "", bodyFat: "", waistCm: "" }).success).toBe(false);
     expect(progressInput.safeParse({ date: "2026-09-28", weightKg: "72.5" }).data?.weightKg).toBe(72.5);
   });
+});
+
+describe("accessInput", () => {
+  const base = { graceDays: "2", duesLimit: "0" };
+  it("reads the anti-passback checkbox", () => {
+    expect(accessInput.parse({ ...base, antiPassback: "on" }).antiPassback).toBe(true);
+    expect(accessInput.parse(base).antiPassback).toBe(false);
+  });
+  it("rejects grace days over 60", () => expect(accessInput.safeParse({ ...base, graceDays: "61" }).success).toBe(false));
 });

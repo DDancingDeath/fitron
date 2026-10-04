@@ -686,7 +686,7 @@ function Biometric({
   ok,
   err,
 }: {
-  m: { id: string; devicePin: string | null; biometricConsentAt: Date | null };
+  m: { id: string; devicePin: string | null; cardNo: string | null; biometricConsentAt: Date | null };
   bio: Awaited<ReturnType<typeof memberBiometrics>>;
   devices: { id: string; name: string | null; serial: string }[];
   canSettings: boolean;
@@ -700,6 +700,7 @@ function Biometric({
       {err && <Notice tone="alert">{err}</Notice>}
       <p className="m-0">
         {m.devicePin ? `Device PIN ${m.devicePin}` : "Not on any device yet"}
+        {m.cardNo ? ` · RFID card ${m.cardNo}` : ""}
         {bio.fingerprints || bio.faces ? ` · ${bio.fingerprints} fingerprint${bio.fingerprints === 1 ? "" : "s"}, ${bio.faces} face${bio.faces === 1 ? "" : "s"} stored (encrypted)` : ""}
         {bio.devices.length ? ` · on ${bio.devices.map((d) => `${d.device.name ?? d.device.serial}${d.allowed ? "" : " (removed, plan not active)"}`).join(", ")}` : ""}
       </p>
@@ -741,7 +742,7 @@ function Biometric({
           </div>
         </form>
       )}
-      {(m.devicePin || m.biometricConsentAt) && (
+      {(m.devicePin || m.biometricConsentAt || m.cardNo) && (
         <form action={eraseBiometric.bind(null, m.id)}>
           <ConfirmButton variant="danger" confirm="Delete this member's fingerprints and face data here and on every device?">
             Delete biometric data

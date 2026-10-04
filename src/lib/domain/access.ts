@@ -12,9 +12,11 @@ export type AccessRules = {
   /** Opening hours as "HH:MM" (IST); empty means open all hours. */
   hoursFrom?: string;
   hoursTo?: string;
+  /** No second entry without an exit. */
+  antiPassback: boolean;
 };
 
-export const DEFAULT_ACCESS: AccessRules = { blockSuspended: true, blockExpired: true, graceDays: 0, blockDues: false, duesLimit: 0, hoursFrom: "", hoursTo: "" };
+export const DEFAULT_ACCESS: AccessRules = { blockSuspended: true, blockExpired: true, graceDays: 0, blockDues: false, duesLimit: 0, hoursFrom: "", hoursTo: "", antiPassback: true };
 
 const inr = (p: number) => `₹${(p / 100).toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 
@@ -29,4 +31,9 @@ export function entryBlock(m: { suspended: boolean; latestEnd: string | null; ou
   if (rules.blockDues && m.outstanding > rules.duesLimit) return `${inr(m.outstanding)} outstanding`;
   if (now && rules.hoursFrom && rules.hoursTo && (now < rules.hoursFrom || now > rules.hoursTo)) return "Outside gym hours";
   return null;
+}
+
+/** Anti-passback: why a second entry is refused while the member is still inside (insideSince = IST "HH:MM" of the open check-in). */
+export function passbackBlock(rules: AccessRules, insideSince: string | null): string | null {
+  return rules.antiPassback && insideSince ? `Already inside since ${insideSince} · no second entry without an exit` : null;
 }

@@ -233,6 +233,8 @@ model Member {
   riskReasons        String[]          @default([])
   /// User PIN on biometric devices, given at enrolment.
   devicePin          String?
+  /// RFID card number pushed to door devices as USERINFO Card=
+  cardNo             String?
   biometricConsentAt DateTime?         @db.Timestamptz
   memberships        Membership[]
   attendance         Attendance[]
@@ -255,6 +257,7 @@ model Member {
   // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
   @@unique([orgId, code])
   @@unique([orgId, devicePin])
+  @@unique([orgId, cardNo])
   @@index([orgId, phone])
   @@index([branchId])
   @@index([name])
