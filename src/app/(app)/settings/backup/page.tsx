@@ -3,9 +3,9 @@ import { ClockCounterClockwiseIcon, DatabaseIcon } from "@phosphor-icons/react/d
 import { requirePermission } from "@/lib/auth/current";
 import { backupStatus, lastAutoFailure, listBackups } from "@/lib/services/backup";
 import { ageText, sizeText, summarise } from "@/lib/domain/backup";
-import { Badge, Button, Card, Empty, Field, Input, LinkButton, Notice, PageHeader, TABLE, TD, TH, TR } from "@/components/ui";
+import { Badge, Button, Card, Empty, Field, Input, LinkButton, Notice, TABLE, TD, TH, TR } from "@/components/ui";
 import { Dialog, DialogButtons } from "@/components/dialog";
-import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
+import { SettingsShell } from "@/components/section-tabs";
 import { fmtDate, fmtStamp, fmtTime } from "@/lib/format";
 import { backupNow, restoreFromFile, restoreFromServer } from "./actions";
 
@@ -34,9 +34,7 @@ export default async function BackupPage({ searchParams }: PageProps<"/settings/
   const now = new Date();
 
   return (
-    <>
-      <PageHeader title="Backup" subtitle="A complete copy of your gym's data — every branch — kept in the app's private storage and downloadable." />
-      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/backup" />
+    <SettingsShell u={u} current="/settings/backup">
       <div className="flex max-w-[720px] flex-col gap-[18px]">
         {typeof sp.saved === "string" && (
           <Notice tone="ok">
@@ -54,7 +52,7 @@ export default async function BackupPage({ searchParams }: PageProps<"/settings/
           </Notice>
         )}
 
-        <div>
+        <div className="flex flex-col gap-[18px]">
           <Row k="Automatic backup" v="Daily with the morning jobs, kept 30 days" />
           <Row k="Last automatic backup" v={status.lastAutoAt ? stamp(status.lastAutoAt) : "Not yet — it runs with the daily jobs"} />
           <Row k="Last manual backup" v={status.lastManualAt ? `${stamp(status.lastManualAt)} by ${status.lastManualBy}` : "Never"} />
@@ -154,6 +152,6 @@ export default async function BackupPage({ searchParams }: PageProps<"/settings/
           </form>
         </Dialog>
       )}
-    </>
+    </SettingsShell>
   );
 }

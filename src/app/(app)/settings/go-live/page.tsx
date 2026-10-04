@@ -2,7 +2,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { goLiveChecklist, installationInfo } from "@/lib/services/go-live";
 import { getIdleMinutes } from "@/lib/services/settings";
 import { Button, Field, Input, LinkButton, Notice } from "@/components/ui";
-import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
+import { SettingsShell } from "@/components/section-tabs";
 import { Dialog } from "@/components/dialog";
 import { CheckCircleIcon, CircleIcon, WarningCircleIcon } from "@phosphor-icons/react/dist/ssr";
 import Link from "next/link";
@@ -20,29 +20,22 @@ export default async function GoLivePage({ searchParams }: PageProps<"/settings/
   const clearing = sp.clear === "1" && list.items.some((i) => i.key === "demo" && !i.ok);
 
   return (
-    <div className="flex flex-col gap-7 pt-4">
-      <div>
-        <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{u.role}</div>
-        <h1 className="mt-1 text-[28px] lg:text-[40px]">Settings</h1>
-      </div>
-      <div className="-mb-7">
-        <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/go-live" />
-      </div>
+    <SettingsShell u={u} current="/settings/go-live">
       {sp.saved === "security" && <Notice tone="ok">Saved. Changes are recorded in the audit log.</Notice>}
       {error && !clearing && <Notice tone="alert">{error}</Notice>}
 
       <div className="flex max-w-[900px] flex-col gap-[26px]">
-        <div>
+        <div className="flex flex-col gap-2">
           <h2 className="text-[22px] font-semibold">Go-live checklist</h2>
-          <p className="mt-1 text-[15px] text-muted">Everything a gym needs in place before running on Fitron for real. Items marked with a warning are recommended; the rest are required.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <div className="h-2 w-full max-w-[280px] overflow-hidden rounded-full bg-fg/10" role="progressbar" aria-valuenow={list.pct} aria-valuemin={0} aria-valuemax={100}>
+          <p className="max-w-[680px] text-[15px] leading-[1.6] text-muted">Everything a gym needs in place before running on Fitron for real. Items marked with a warning are recommended; the rest are required.</p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-3.5">
+            <div className="h-2 max-w-[360px] flex-[1_1_220px] overflow-hidden rounded-full bg-fg/10" role="progressbar" aria-valuenow={list.pct} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-accent" style={{ width: `${list.pct}%` }} />
             </div>
             <strong className="text-sm">
               {list.done} of {list.total} done
             </strong>
-            <span className="text-sm text-muted">{list.summary}</span>
+            <span className="text-[13px] text-muted">{list.summary}</span>
           </div>
         </div>
 
@@ -50,7 +43,7 @@ export default async function GoLivePage({ searchParams }: PageProps<"/settings/
           {list.items.map((i) => (
             <li key={i.key} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3.5 border-b border-line-soft py-[13px] max-sm:grid-cols-[auto_1fr] max-sm:gap-y-2" data-check={i.key} data-ok={i.ok ? "1" : "0"}>
               <span className="flex" aria-label={i.ok ? "Done" : i.recommended ? "Recommended" : "Required"}>
-                {i.ok ? <CheckCircleIcon size={24} weight="fill" color="#2e9e63" /> : i.recommended ? <WarningCircleIcon size={24} weight="fill" className="text-accent" /> : <CircleIcon size={24} className="text-alert" />}
+                {i.ok ? <CheckCircleIcon size={24} weight="duotone" color="#2e9e63" /> : i.recommended ? <WarningCircleIcon size={24} weight="duotone" className="text-accent-700" /> : <CircleIcon size={24} weight="duotone" className="text-alert-700" />}
               </span>
               <div className="min-w-0">
                 <div className="text-[15.5px] font-semibold">{i.label}</div>
@@ -127,6 +120,6 @@ export default async function GoLivePage({ searchParams }: PageProps<"/settings/
           </form>
         </Dialog>
       )}
-    </div>
+    </SettingsShell>
   );
 }

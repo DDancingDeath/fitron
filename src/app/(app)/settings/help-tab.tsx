@@ -25,9 +25,9 @@ export async function HelpTab({ u, waStatus, waMode }: { u: CurrentUser; waStatu
       <section className="flex flex-col gap-3">
         <div>
           <h3 className="text-lg">Contact Fitron support</h3>
-          <p className="mt-1 text-[13px] text-muted">{SUPPORT.hours} · replies within 4 working hours</p>
+          <p className="text-[13px] text-muted">{SUPPORT.hours} · replies within 4 working hours</p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr))]">
           {contacts.map((c) => {
             const Icon = ICON[c.key];
             return (

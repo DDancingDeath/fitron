@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import type { CurrentUser } from "@/lib/auth/current";
 import type { Permission } from "@/lib/auth/permissions";
@@ -6,22 +7,38 @@ import { cx } from "./ui";
 type Tab = { href: string; label: string; perm?: Permission };
 
 /** Underlined tabs across the top of a section, as in the prototype's Accounting and Settings. */
-export function SectionTabs({ u, tabs, current, className = "mb-6" }: { u: CurrentUser; tabs: Tab[]; current: string; className?: string }) {
+export function SectionTabs({ u, tabs, current, className = "mb-6", ruled }: { u: CurrentUser; tabs: Tab[]; current: string; className?: string; ruled?: boolean }) {
   const shown = tabs.filter((t) => !t.perm || u.can(t.perm));
   if (shown.length < 2) return null;
   return (
-    <nav className={cx("flex flex-wrap gap-1", className)}>
+    <nav className={cx("flex flex-wrap", ruled ? "gap-0.5 border-b border-line" : "gap-1", className)}>
       {shown.map((t) => (
         <Link
           key={t.href}
           href={t.href}
           aria-current={t.href === current ? "page" : undefined}
-          className={cx("border-b-2 px-3 py-2 text-[15px]", t.href === current ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}
+          className={cx("border-b-2 px-3 py-2 text-[15px]", ruled && "flex-none leading-[normal] whitespace-nowrap", t.href === current ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}
         >
           {t.label}
         </Link>
       ))}
     </nav>
+  );
+}
+
+/** The prototype's Settings frame: "Super Admin" kicker, 40px title, ruled tabs, then the tab's content. */
+export function SettingsShell({ u, current, children }: { u: CurrentUser; current: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-7 pt-4">
+      <div>
+        <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{u.role}</div>
+        <h1 className="mt-1 text-[28px] lg:text-[40px]">Settings</h1>
+      </div>
+      <div className="-mb-7">
+        <SectionTabs u={u} tabs={SETTINGS_TABS} current={current} ruled />
+      </div>
+      {children}
+    </div>
   );
 }
 

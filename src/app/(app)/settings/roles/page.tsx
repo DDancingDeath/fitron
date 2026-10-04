@@ -8,7 +8,7 @@ import { initials } from "@/lib/format";
 import { Button, Field, Input, LinkButton, Notice } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { Tag } from "@/components/tag";
-import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
+import { SettingsShell } from "@/components/section-tabs";
 import { changeRole } from "./actions";
 import { RolePicker } from "./role-picker";
 
@@ -31,19 +31,12 @@ export default async function RolesPage({ searchParams }: PageProps<"/settings/r
   const dialog = target && pickRole && target.role.id !== pickRole.id && target.id !== u.id ? { target, role: pickRole } : null;
   const error = str("error");
   return (
-    <div className="flex flex-col gap-7 pt-4">
-      <div>
-        <div className="text-[11px] tracking-[0.1em] text-muted uppercase">{u.role}</div>
-        <h1 className="mt-1 text-[28px] lg:text-[40px]">Settings</h1>
-      </div>
-      <div className="-mb-7">
-        <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/roles" />
-      </div>
+    <SettingsShell u={u} current="/settings/roles">
       {str("saved") === "role" && <Notice tone="ok">{str("name")} is now {str("role")}.</Notice>}
       {error && !dialog && <Notice tone="alert">{error}</Notice>}
       <div className="flex max-w-[860px] flex-col gap-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <p className="m-0 max-w-[540px] text-sm">Choose what each person can do. Changing a role asks for your password, and every change is saved in the audit log.</p>
+          <p className="m-0 max-w-[540px] text-sm text-neutral-800">Choose what each person can do. Changing a role asks for your password, and every change is saved in the audit log.</p>
           <LinkButton variant="primary" href="/staff/new?role=Receptionist">
             <UserPlusIcon size={16} /> Give access to someone
           </LinkButton>
@@ -51,7 +44,7 @@ export default async function RolesPage({ searchParams }: PageProps<"/settings/r
         <div>
           {staff.map((s) => (
             <div key={s.id} className="flex flex-wrap items-center gap-3 border-b border-line py-3">
-              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-accent-soft text-[13px] font-semibold text-accent-strong">{initials(s.name)}</span>
+              <span className="grid size-9 shrink-0 place-items-center rounded-full bg-surface text-xs font-semibold">{initials(s.name)}</span>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 text-sm font-semibold">
                   {s.name}
@@ -110,6 +103,6 @@ export default async function RolesPage({ searchParams }: PageProps<"/settings/r
           </form>
         </Dialog>
       )}
-    </div>
+    </SettingsShell>
   );
 }

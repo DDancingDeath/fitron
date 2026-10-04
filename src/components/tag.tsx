@@ -20,8 +20,9 @@ const STYLE_OF: Record<string, number> = {
   "PAYMENT PENDING": 4, UNPAID: 4, "DUE TODAY": 4, "Medium risk": 4, New: 4,
 };
 
-export function Tag({ label, children, className }: { label: string; children?: ReactNode; className?: string }) {
-  const i = STYLE_OF[label];
+/** `style` forces one of the five styles (0-4) or "neutral" where the prototype colours by something other than the label. */
+export function Tag({ label, children, className, style }: { label: string; children?: ReactNode; className?: string; style?: 0 | 1 | 2 | 3 | 4 | "neutral" }) {
+  const i = style === "neutral" ? undefined : (style ?? STYLE_OF[label]);
   return (
     <span className={cx("inline-flex items-center rounded-[1.5px] border px-2.5 py-[3px] text-[11px] tracking-[0.02em] whitespace-nowrap", i === undefined ? NEUTRAL : STYLES[i], className)}>
       {children ?? label}

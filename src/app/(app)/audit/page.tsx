@@ -241,7 +241,7 @@ export default async function AuditPage({ searchParams }: PageProps<"/audit">) {
                       </Link>
                     </td>
                     <td className={TD}>
-                      <Tag label={sev} />
+                      <Tag label={sev} style={sev === "High" ? 3 : sev === "Medium" ? 0 : "neutral"} />
                     </td>
                     <td className={cx(TD, "text-xs whitespace-nowrap text-muted")}>{r.device}</td>
                   </tr>

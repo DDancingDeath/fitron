@@ -124,14 +124,14 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <h1 className="mt-1 text-[28px] lg:text-[40px]">Settings</h1>
       </div>
       <div className="-mb-7">
-        <SectionTabs u={u} tabs={SETTINGS_TABS} current={tab === "gym" ? "/settings" : `/settings?tab=${tab}`} />
+        <SectionTabs u={u} tabs={SETTINGS_TABS} ruled current={tab === "gym" ? "/settings" : `/settings?tab=${tab}`} />
       </div>
       {typeof sp.saved === "string" && <Notice tone="ok">Saved. Changes are recorded in the audit log.</Notice>}
       {typeof sp.msg === "string" && <Notice tone="ok">{sp.msg}</Notice>}
       {typeof sp.error === "string" && !sp.branch && <Notice tone="alert">{sp.error}</Notice>}
       {tab === "gym" && (
         <div className="grid max-w-[960px] gap-10 lg:grid-cols-2">
-          <Panel title="Gym profile" className="lg:col-span-2">
+          <Panel className="lg:col-span-2">
             <form action={saveGym} className="flex flex-col gap-[18px]">
               <div className="grid max-w-[900px] gap-x-6 gap-y-[18px] sm:grid-cols-2 lg:grid-cols-3">
                 <Field label="Gym name">
@@ -141,7 +141,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   <Input name="tagline" defaultValue={gym.tagline ?? ""} placeholder="Built Stronger" maxLength={80} />
                 </Field>
                 <Field label="Address">
-                  <Textarea name="address" defaultValue={gym.address ?? ""} rows={2} className="min-h-0! py-2" maxLength={300} />
+                  <Textarea name="address" defaultValue={gym.address ?? ""} rows={1} className="h-9 min-h-0! resize-y py-[7px]" maxLength={300} />
                 </Field>
                 <Field label="State">
                   <Input name="state" defaultValue={gym.state ?? ""} placeholder="Jharkhand" maxLength={60} />
@@ -214,7 +214,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       )}
       {tab === "billing" && (
         <div className="max-w-[720px]">
-          <Panel title="Billing & GST">
+          <Panel>
             <TaxForm tax={tax} invoicePrefix={numbering?.invoicePrefix ?? "INV-"} nextNumber={nextInvoice} />
           </Panel>
         </div>
@@ -229,7 +229,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 {EXPIRY_CHIPS.map((d) => (
                   <label key={d}>
                     <input type="checkbox" name="expiryDays" value={d} defaultChecked={reminders.settings.expiryDays.includes(d)} className="peer sr-only" />
-                    <span className="inline-block cursor-pointer rounded-md border border-line px-3 py-[7px] text-[13px] peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:ring-2">
+                    <span className="inline-block cursor-pointer rounded-md border border-line px-3 py-[7px] text-[13px] leading-[normal] peer-checked:border-accent peer-checked:bg-accent peer-checked:text-accent-ink peer-focus-visible:ring-2">
                       {expiryChipLabel(d)}
                     </span>
                   </label>
@@ -281,7 +281,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </div>
       )}
       {tab === "wa" && (
-        <div className="flex max-w-[760px] flex-col gap-5">
+        <div className="flex max-w-[760px] flex-col gap-7">
           {!u.has("whatsapp") && <Notice>Automatic WhatsApp messages are on the Professional plan.</Notice>}
           <LinkedCard wa={wa} cloud={wa.mode === "cloud" && waStatus.ok ? { number: waStatus.number ?? "", name: waStatus.name ?? "" } : null} canUse={u.has("whatsapp")} />
           <p className="m-0 text-[13px] text-muted">
@@ -290,9 +290,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               change them from Edit rule on any template
             </Link>
           </p>
-          <Panel title="WhatsApp" id="whatsapp">
+          <Panel id="whatsapp">
             <form action={saveWhatsApp} className="flex flex-col gap-3 text-sm">
-              <Field label="Sending mode">
+              <Field label="Sending mode" className="max-w-[420px]">
                 <Select name="mode" key={wa.mode} defaultValue={wa.mode}>
                   <option value="demo">Demo: log only, send nothing</option>
                   <option value="cloud">WhatsApp Cloud API (official)</option>
@@ -333,11 +333,11 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </div>
       )}
       {tab === "int" && integrations && (
-        <div className="flex max-w-[900px] flex-col gap-10">
-          <Panel title="UPI autopay" id="autopay">
+        <div className="flex max-w-[900px] flex-col gap-6">
+          <Panel title="UPI autopay" id="autopay" small>
             <form action={saveAutopay} className="flex flex-col gap-[18px] text-sm">
-              <div className="grid gap-x-6 gap-y-[18px] sm:grid-cols-2">
-                <Field label="Mode" className="sm:col-span-2 sm:max-w-[520px]">
+              <div className="grid gap-x-6 gap-y-[18px] [grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr))]">
+                <Field label="Mode" className="col-span-full max-w-[520px]">
                   <Select name="mode" key={autopay.mode} defaultValue={autopay.mode}>
                     <option value="demo">Demo — simulated inside Fitron</option>
                     <option value="live">Live — Razorpay UPI Autopay</option>
@@ -372,16 +372,16 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 {autopayStatusText(autopay, autopay.mode)}
               </span>
             </div>
-            <p className="text-xs text-muted">
+            <p className="max-w-[720px] text-[13px] leading-[1.6] text-muted">
               Live mode uses your own Razorpay account: set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET on the server and add /api/webhooks/razorpay as a webhook in the Razorpay dashboard. Members approve once in any UPI
               app; Razorpay sends the NPCI pre-debit notice, charges on the renewal date and retries; Fitron records each renewal automatically.
             </p>
           </Panel>
-          <Panel title="Check-in devices" id="devices">
+          <Panel title="Check-in devices" id="devices" small>
             <div className="flex flex-col text-sm">
               {integrations.devices.length === 0 && <p className="m-0 mb-2 text-muted">No biometric or QR device yet — front-desk check-in works without one.</p>}
               {[...integrations.devices, ...integrations.posters].map((d) => (
-                <div key={d.id} className="flex items-center justify-between gap-3 border-b border-line py-[9px]">
+                <div key={d.id} className="flex items-center justify-between gap-3 border-b border-fg/8 py-[7px]">
                   <span>{d.name}</span>
                   <span className="text-right text-muted">{d.status}</span>
                 </div>
@@ -395,7 +395,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               </div>
             )}
           </Panel>
-          <Panel title="Fitron AI" id="ai">
+          <Panel title="Fitron AI" id="ai" small>
             {!u.has("ai") && (
               <Notice>
                 Fitron AI is on the Professional plan.{" "}
@@ -404,7 +404,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 </Link>
               </Notice>
             )}
-            <form action={saveAi} className="flex flex-col gap-3.5 text-[15px]">
+            <form action={saveAi} className="flex flex-col gap-2.5 text-[15px]">
               <label className="flex items-center gap-2.5">
                 <input type="checkbox" name="enabled" defaultChecked={integrations.ai.enabled} disabled={!u.has("ai")} className="size-[18px] accent-accent" />
                 Enable Fitron AI assistant
@@ -420,7 +420,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 </label>
                 <p className="m-0 mt-1 pl-7 text-xs text-muted">Drafts a win-back message for staff to confirm. Automatic sending is set per template in WhatsApp › Templates.</p>
               </div>
-              <p className="m-0 text-sm text-muted">Fitron AI reads data only for the branch and role you are signed in with. It never sends a message or records money without a staff member confirming.</p>
+              <p className="m-0 text-[13px] text-muted">Fitron AI reads data only for the branch and role you are signed in with. It never sends a message or records money without a staff member confirming.</p>
               {u.has("ai") && (
                 <div>
                   <Button variant="primary">Save</Button>
@@ -436,7 +436,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           <Panel title="Grievance Officer">
             <p className="m-0 text-[13px] text-muted">Members contact this person about their data. Shown in the privacy notice and member messages.</p>
             <form action={savePrivacyOfficer} className="flex flex-col gap-[18px]">
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))]">
                 <Field label="Grievance Officer name">
                   <Input name="officer" defaultValue={privacy.settings.officer ?? ""} placeholder="Full name" maxLength={120} />
                 </Field>
@@ -570,10 +570,10 @@ function LinkedCard({ wa, cloud, canUse }: { wa: Awaited<ReturnType<typeof getWa
 }
 
 /** One settings section: a heading over its form, as in the prototype. */
-function Panel({ title, id, className, children }: { title: string; id?: string; className?: string; children: React.ReactNode }) {
+function Panel({ title, id, className, small, children }: { title?: string; id?: string; className?: string; small?: boolean; children: React.ReactNode }) {
   return (
     <section id={id} className={`flex scroll-mt-20 flex-col gap-3 ${className ?? ""}`}>
-      <h3 className="text-xl">{title}</h3>
+      {title && <h3 className={small ? "text-lg" : "text-xl"}>{title}</h3>}
       {children}
     </section>
   );
