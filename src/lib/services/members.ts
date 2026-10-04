@@ -226,7 +226,7 @@ export async function listDeleted(u: CurrentUser) {
     where: { orgId: u.orgId, branchId: { in: u.branchIds }, walkIn: false, deletedAt: { not: null } },
     orderBy: { deletedAt: "desc" },
     take: 50,
-    select: { id: true, code: true, name: true, deletedAt: true },
+    select: { id: true, code: true, name: true, deletedAt: true, erasedAt: true },
   });
   const logs = await db.auditLog.findMany({
     where: { orgId: u.orgId, entity: "Member", action: "member.delete", entityId: { in: gone.map((m) => m.id) } },
@@ -244,6 +244,7 @@ export async function listDeleted(u: CurrentUser) {
 export async function restoreMember(u: CurrentUser, id: string) {
   const before = await db.member.findFirst({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, id, deletedAt: { not: null } } });
   if (!before) throw new UserError("Member not found.");
+  if (before.erasedAt) throw new UserError("This member's personal data was erased and can't be restored.");
   const clash = await db.member.findFirst({ where: { orgId: u.orgId, phone: before.phone, deletedAt: null, walkIn: false }, select: { code: true, name: true } });
   if (clash) throw new UserError(`${before.phone} now belongs to ${clash.name} (${clash.code}). Change one of the numbers first.`);
   await db.$transaction(async (tx) => {

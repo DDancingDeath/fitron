@@ -22,7 +22,7 @@ const MODULES: [string, string[]][] = [
   ["POS", ["Product"]],
   ["Leads", ["Lead"]],
   ["Staff & devices", ["User", "Role", "Device"]],
-  ["Settings", ["Setting", "Branch", "MembershipPlan", "Offer", "WhatsAppTemplate", "Backup"]],
+  ["Settings", ["Setting", "Branch", "MembershipPlan", "Offer", "WhatsAppTemplate", "Backup", "SupportTicket"]],
 ];
 
 /** The prototype's module for a record type. */

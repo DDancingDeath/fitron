@@ -1,5 +1,6 @@
 import * as z from "zod";
-import { indianPhone } from "./common";
+import { indianPhone, optionalPhone } from "./common";
+import { NOTICE_KEYS, type NoticeKey } from "@/lib/domain/privacy";
 import { EXPIRY_CHIPS } from "@/lib/domain/reminders";
 
 const blank = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
@@ -132,11 +133,23 @@ export const aiInput = z.object({
 });
 export type AiInput = z.infer<typeof aiInput>;
 
-/** Settings › Privacy & DPDP: the grievance officer (required under DPDP) and the retention period. */
-export const privacyInput = z.object({
-  officer: z.string().trim().min(2, { error: "Enter the grievance officer's name." }).max(80),
-  email: z.email({ error: "Enter a valid grievance email." }).trim().toLowerCase(),
-  phone: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), indianPhone.optional()),
-  retainMonths: z.coerce.number().int().min(1, { error: "Keep data for at least 1 month." }).max(120, { error: "At most 120 months." }),
+/** Settings › Privacy & DPDP › Grievance Officer. All optional so a gym can save as it goes; Go live checks name and email. */
+export const privacyOfficerInput = z.object({
+  officer: z.preprocess(blank, z.string().trim().max(120, { error: "Name: at most 120 characters." }).optional()),
+  email: z.preprocess(blank, z.email({ error: "Enter a valid grievance email." }).trim().toLowerCase().max(120).optional()),
+  phone: optionalPhone,
+  retainMonths: z.preprocess(blank, z.coerce.number().int({ error: "Months must be a whole number." }).min(0, { error: "Months: 0 to 120." }).max(120, { error: "Months: 0 to 120." }).default(24)),
 });
-export type PrivacyInput = z.infer<typeof privacyInput>;
+export type PrivacyOfficerInput = z.infer<typeof privacyOfficerInput>;
+
+/** The nine notice sections (every textarea posts), plus the Reset to template button. */
+export const privacyNoticeInput = z.object({
+  ...Object.fromEntries(NOTICE_KEYS.map((k) => [`n_${k}`, z.string().trim().max(2000, { error: "Each section: at most 2,000 characters." })])),
+  reset: z.string().optional(),
+} as Record<`n_${NoticeKey}`, z.ZodString> & { reset: z.ZodOptional<z.ZodString> });
+export type PrivacyNoticeInput = z.infer<typeof privacyNoticeInput>;
+
+export const cookieNoticeInput = z.object({
+  cookieNotice: z.string().trim().min(10, { error: "Cookie notice: write at least a sentence." }).max(1000, { error: "Cookie notice: at most 1,000 characters." }),
+});
+export type CookieNoticeInput = z.infer<typeof cookieNoticeInput>;

@@ -2,7 +2,7 @@
 
 import { defaultRule, toColumns } from "./wa-rules";
 
-export const VARS = ["member_name", "member_id", "plan_name", "start_date", "expiry_date", "amount", "pending_amount", "invoice_number", "gym_name", "link", "class_name", "class_time"] as const;
+export const VARS = ["member_name", "member_id", "plan_name", "start_date", "expiry_date", "amount", "pending_amount", "invoice_number", "gym_name", "link", "class_name", "class_time", "grievance_officer", "grievance_email", "grievance_phone"] as const;
 export type TemplateVars = Partial<Record<(typeof VARS)[number], string>>;
 
 /** Reminder templates are skipped if the same one went to the member inside the de-dup window (rule 5). */

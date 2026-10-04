@@ -115,4 +115,15 @@ describe.skipIf(!hasDb)("members (database)", () => {
     expect(sums.get(sold.id)).toMatchObject({ planName: "Starter", planStart: today });
     expect(sums.get(bare.id)).toMatchObject({ planName: null, planStart: null });
   });
+
+  it("lists an erased member as deleted with the erasure date", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ name: "Erased Devi", phone: "9876500099" }));
+    const erasedAt = new Date();
+    await db.member.update({ where: { id: m.id }, data: { name: "Erased member", phone: "", deletedAt: erasedAt, erasedAt } });
+    const row = (await listDeleted(admin)).find((d) => d.id === m.id);
+    expect(row?.erasedAt?.getTime()).toBe(erasedAt.getTime());
+    expect(row?.name).toBe("Erased member");
+    await expect(restoreMember(admin, m.id)).rejects.toThrow(/can't be restored/);
+  });
 });

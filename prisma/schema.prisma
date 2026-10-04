@@ -26,6 +26,7 @@ model Organization {
   settings          Setting[]
   sequences         Sequence[]
   auditLogs         AuditLog[]
+  supportTickets    SupportTicket[]
   leads             Lead[]
   classSlots        ClassSlot[]
   products          Product[]
@@ -227,6 +228,8 @@ model Member {
   createdAt          DateTime          @default(now()) @db.Timestamptz
   updatedAt          DateTime          @updatedAt @db.Timestamptz
   deletedAt          DateTime?         @db.Timestamptz
+  /// Personal data stripped (DPDP erasure); set with deletedAt. Restore is refused.
+  erasedAt           DateTime?         @db.Timestamptz
 
   // Phone is unique among non-deleted members (rule 9). Enforced by a partial
   // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
@@ -1378,4 +1381,51 @@ model TrainerCoachUsage {
   count    Int      @default(0)
 
   @@id([memberId, date])
+}
+
+// ── Help & support ─────────────────────────────────────────────────────────
+model SupportTicket {
+  id           String               @id @default(cuid())
+  orgId        String
+  org          Organization         @relation(fields: [orgId], references: [id])
+  /// TKT-1001, gap-free per gym from Sequence "ticket"
+  number       String
+  /// Who raised it
+  userId       String
+  branchId     String?
+  /// One of src/lib/domain/support.ts TOPICS
+  topic        String
+  /// Normal | Urgent
+  priority     String
+  subject      String
+  message      String
+  /// Open | Resolved
+  status       String               @default("Open")
+  appVersion   String
+  /// Browser summary from the user agent, e.g. "Chrome · Desktop"
+  browser      String
+  ip           String?
+  /// Set when the ticket was emailed to support (SMTP configured and the send succeeded)
+  emailedAt    DateTime?            @db.Timestamptz
+  resolvedAt   DateTime?            @db.Timestamptz
+  resolvedById String?
+  createdAt    DateTime             @default(now()) @db.Timestamptz
+  replies      SupportTicketReply[]
+
+  @@unique([orgId, number])
+  @@index([orgId, createdAt])
+}
+
+model SupportTicketReply {
+  id        String        @id @default(cuid())
+  ticketId  String
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  /// "Fitron Support" or the staff member's name
+  by        String
+  /// AUTO | SUPPORT | GYM
+  kind      String
+  text      String
+  createdAt DateTime      @default(now()) @db.Timestamptz
+
+  @@index([ticketId, createdAt])
 }

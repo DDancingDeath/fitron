@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current";
 import { JOBS, recentRuns, runDailyJobs } from "@/lib/services/jobs";
@@ -26,14 +27,22 @@ export default async function JobsPage() {
     <>
       <PageHeader
         title="Daily jobs"
-        subtitle="Reminders, birthday wishes, autopay and housekeeping, once a day."
+        subtitle={
+          <>
+            Reminders, birthday wishes, autopay and housekeeping, once a day.
+            <br />
+            <Link href="/settings?tab=help" className="text-accent">
+              ← Back to Help &amp; support
+            </Link>
+          </>
+        }
         actions={
           <form action={runNow}>
             <Button variant="primary">{ranToday.length ? "Run anything left for today" : "Run today's jobs now"}</Button>
           </form>
         }
       />
-      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/jobs" />
+      <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings?tab=help" />
       <div className="mb-4">
         <Notice>
           On the server, a scheduler calls <code>/api/jobs/daily</code> each morning at about 6:30 with the <code>CRON_SECRET</code>. Each job runs once a day however many times it is called, and a failed job is retried on the next call. Messages held by quiet hours or a rule&apos;s Send at time go out when <code>/api/jobs/dispatch</code> is called (every 15 minutes), or when the WhatsApp page is opened.

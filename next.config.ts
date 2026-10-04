@@ -1,6 +1,12 @@
 import type { NextConfig } from "next";
+import pkg from "./package.json";
 
 const nextConfig: NextConfig = {
+  // Shown in Settings › Help & support › System details.
+  env: {
+    APP_VERSION: pkg.version,
+    APP_COMMIT: (process.env.VERCEL_GIT_COMMIT_SHA || process.env.RENDER_GIT_COMMIT || process.env.SOURCE_VERSION || process.env.GIT_COMMIT || "").slice(0, 7),
+  },
   experimental: {
     // Data import sends up to 5,000 CSV rows, member documents up to 10 MB, and backup files
     // (Settings › Backup › Restore from file) up to 60 MB, to server actions.

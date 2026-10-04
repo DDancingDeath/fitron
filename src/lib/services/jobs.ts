@@ -10,6 +10,7 @@ import { computeRisk, dailyBrief } from "./insights";
 import { getAiSettings } from "./ai-settings";
 import { systemUser } from "@/lib/auth/system";
 import { syncDevices } from "./biometric";
+import { runRetention } from "./privacy";
 import { billingReminders } from "./saas";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
 import { dispatchScheduled, runRules } from "./wa-automation";
@@ -111,6 +112,11 @@ export const JOBS: Job[] = [
     name: "devices.sync",
     label: "Load members onto door devices, remove expired ones",
     run: (orgId, today) => syncDevices(orgId, today),
+  },
+  {
+    name: "privacy.retention",
+    label: "Erase personal data of members whose retention period is over",
+    run: async (orgId, today, now) => runRetention(await systemUser(orgId), today, now),
   },
   {
     name: "billing.branches",
