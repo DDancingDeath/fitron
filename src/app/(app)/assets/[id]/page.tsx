@@ -4,7 +4,9 @@ import { requirePermission } from "@/lib/auth/current";
 import { getAsset, toLike } from "@/lib/services/assets";
 import { scheduleView } from "@/lib/domain/assets";
 import { monthLabel } from "@/lib/domain/periods";
-import { Badge, Card, LinkButton, PageHeader, Segmented, TABLE, TD, TH } from "@/components/ui";
+import { XIcon } from "@phosphor-icons/react/dist/ssr";
+import { Badge, LinkButton, ListHeader, Segmented, TABLE, TD, TH } from "@/components/ui";
+import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, fmtStamp, formatInr } from "@/lib/format";
 import { todayIso, toIso } from "@/lib/services/time";
 import { DisposeForm, UndoDisposal } from "../asset-forms";
@@ -30,21 +32,32 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
   const mode = (await searchParams).schedule === "month" ? "month" : "year";
   const rows = scheduleView(toLike(a), todayIso().slice(0, 7), mode);
   const meta = [a.category, `Bought ${fmtDate(a.purchaseDate)}`, a.vendor, a.serial ? `Serial ${a.serial}` : "", a.billNo ? `Bill ${a.billNo}` : "", a.expense?.method, a.expense ? `Cash book ${a.expense.code}` : ""].filter(Boolean).join(" · ");
+  const branchLabel = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
+  const h3 = "m-0 text-xl";
   return (
-    <>
-      <PageHeader
-        title={`${a.name}${a.qty > 1 ? ` ×${a.qty}` : ""}`}
-        subtitle={
-          <span className="flex flex-wrap items-center gap-2">
-            <Badge tone={ASSET_TONE[a.status]}>{ASSET_STATUS[a.status]}</Badge>
-            {a.code} · {meta}
-          </span>
-        }
-        actions={inUse ? <LinkButton href={`/assets/${a.id}/edit`}>Edit</LinkButton> : <UndoDisposal id={a.id} />}
-      />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card title="Details">
-          <div className="mb-3 grid max-w-[460px] grid-cols-[1fr_auto] gap-x-6 gap-y-1.5 text-[15px]">
+    <div className="flex flex-col gap-7">
+      <ListHeader kicker={branchLabel} title="Accounting" />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current="/assets" />
+      <section className="grid gap-x-14 gap-y-10 pt-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))]">
+        <div className="flex min-w-0 flex-col gap-3.5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="m-0 text-2xl">{`${a.name}${a.qty > 1 ? ` ×${a.qty}` : ""}`}</h3>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+                <Badge tone={ASSET_TONE[a.status]}>{ASSET_STATUS[a.status]}</Badge>
+                <span>
+                  {a.code} · {meta}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {inUse ? <LinkButton href={`/assets/${a.id}/edit`}>Edit</LinkButton> : <UndoDisposal id={a.id} />}
+              <LinkButton variant="ghost" href="/assets" aria-label="Close" className="px-2!">
+                <XIcon size={18} weight="duotone" />
+              </LinkButton>
+            </div>
+          </div>
+          <div className="grid max-w-[460px] grid-cols-[1fr_auto] gap-x-6 gap-y-1.5 text-[15px]">
             <span>Purchase cost</span>
             <span className="text-right">{formatInr(a.cost)}</span>
             <span>Salvage value</span>
@@ -59,12 +72,12 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
             <span className="border-t border-fg pt-2 text-right font-semibold">{formatInr(a.info.nbv)}</span>
           </div>
           {!inUse && (
-            <p className="mb-2 text-sm text-alert">
+            <div className="text-sm text-alert">
               {ASSET_STATUS[a.status]} on {fmtDate(a.disposedOn)}
               {a.status === "SOLD" ? ` for ${formatInr(a.disposedFor ?? 0)}` : ""} · {a.info.gain >= 0 ? "gain" : "loss"} {formatInr(Math.abs(a.info.gain))}
-            </p>
+            </div>
           )}
-          {(a.notes || a.disposeNote) && <p className="mb-2 text-sm whitespace-pre-line text-muted">{a.notes || a.disposeNote}</p>}
+          {(a.notes || a.disposeNote) && <div className="text-sm whitespace-pre-line text-muted">{a.notes || a.disposeNote}</div>}
           <dl className="divide-y divide-line text-sm">
             <Row label="Purchased" value={fmtDate(a.purchaseDate)} />
             {a.accDepCarried > 0 && <Row label="Depreciation before Fitron" value={`${formatInr(a.accDepCarried)} (continues from ${monthLabel(a.depFrom ?? toIso(a.purchaseDate).slice(0, 7))})`} />}
@@ -88,10 +101,11 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
             {u.branchIds.length > 1 && <Row label="Branch" value={a.branch.name} />}
             <Row label="Added" value={fmtStamp(a.createdAt)} />
           </dl>
-        </Card>
-        <div className="flex flex-col gap-6">
+        </div>
+        <div className="flex min-w-0 flex-col gap-10">
           {!inUse && (
-            <Card title={a.status === "SOLD" ? "Sold" : "Scrapped"}>
+            <div className="flex flex-col gap-3.5">
+              <h3 className={h3}>{a.status === "SOLD" ? "Sold" : "Scrapped"}</h3>
               <dl className="divide-y divide-line text-sm">
                 <Row label="Date" value={fmtDate(a.disposedOn)} />
                 {a.status === "SOLD" && <Row label="Received" value={`${formatInr(a.disposedFor ?? 0)}${a.disposeMethod ? ` · ${a.disposeMethod}` : ""}`} />}
@@ -99,11 +113,11 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
                 <Row label={a.info.gain >= 0 ? "Gain on sale" : "Loss on disposal"} value={<span className={a.info.gain >= 0 ? "text-ok" : "text-alert"}>{formatInr(Math.abs(a.info.gain))}</span>} />
                 <Row label="Note" value={a.disposeNote} />
               </dl>
-            </Card>
+            </div>
           )}
-          <Card
-            title="Depreciation schedule"
-            action={
+          <div className="flex flex-col gap-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h3 className={h3}>Depreciation schedule</h3>
               <Segmented
                 current={mode}
                 options={[
@@ -111,8 +125,7 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
                   { key: "month", label: "By month", href: `/assets/${a.id}?schedule=month` },
                 ]}
               />
-            }
-          >
+            </div>
             {rows.length === 0 ? (
               <p className="text-sm text-muted">Depreciation starts in the purchase month.</p>
             ) : (
@@ -135,14 +148,15 @@ export default async function AssetPage({ params, searchParams }: PageProps<"/as
                 </tbody>
               </table>
             )}
-          </Card>
+          </div>
           {inUse && (
-            <Card title="Sold or scrapped?" id="dispose">
+            <div id="dispose" className="flex flex-col gap-3.5">
+              <h3 className={h3}>Sold or scrapped?</h3>
               <DisposeForm id={a.id} today={todayIso()} minDate={toIso(a.purchaseDate)} />
-            </Card>
+            </div>
           )}
         </div>
-      </div>
-    </>
+      </section>
+    </div>
   );
 }

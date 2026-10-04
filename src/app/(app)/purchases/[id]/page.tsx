@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
 import { getPurchase } from "@/lib/services/purchases";
-import { Badge, Card, PageHeader, TABLE, TD, TH } from "@/components/ui";
+import { XIcon } from "@phosphor-icons/react/dist/ssr";
+import { Badge, LinkButton, ListHeader, TABLE, TD, TH } from "@/components/ui";
+import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, fmtStamp, formatInr } from "@/lib/format";
 import { todayIso, toIso } from "@/lib/services/time";
 import { CancelPurchase, PayVendorForm } from "../purchase-forms";
@@ -29,24 +31,35 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
     if (l.type === "EXPENSE") return <span>{p.categories.find((y) => y.id === l.category)?.name ?? l.category}</span>;
     return null;
   };
+  const branchLabel = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
+  const h3 = "m-0 text-xl";
   return (
-    <>
-      <PageHeader
-        title={`${p.vendor} · ${p.code}`}
-        subtitle={
-          <span className="flex flex-wrap items-center gap-2">
-            {!active ? <Badge>Cancelled</Badge> : p.balance > 0 ? <Badge tone="alert">{formatInr(p.balance)} due</Badge> : <Badge tone="ok">Paid</Badge>}
-            {fmtDate(p.date)}
-            {p.billNo ? ` · bill ${p.billNo}` : ""} · {formatInr(p.total)} incl. GST
-            {u.branchIds.length > 1 ? ` · ${p.branch.name}` : ""}
-          </span>
-        }
-      />
-      {!active && <p className="mb-4 text-sm text-alert">Cancelled: {p.cancelReason}</p>}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card title="Lines" className="lg:col-span-2">
+    <div className="flex flex-col gap-7">
+      <ListHeader kicker={branchLabel} title="Accounting" />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current="/purchases" />
+      <section className="grid gap-x-14 gap-y-8 pt-2 [grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr))]">
+        <div className="flex min-w-0 flex-col gap-3">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="m-0 text-[22px]">
+                {p.code} · {p.vendor}
+              </h3>
+              <div className="mt-1 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+                {!active ? <Badge>Cancelled</Badge> : p.balance > 0 ? <Badge tone="alert">{formatInr(p.balance)} due</Badge> : <Badge tone="ok">Paid</Badge>}
+                <span>
+                  {fmtDate(p.date)}
+                  {p.billNo ? ` · Bill ${p.billNo}` : ""} · {formatInr(p.total)} incl. GST
+                  {u.branchIds.length > 1 ? ` · ${p.branch.name}` : ""}
+                </span>
+              </div>
+            </div>
+            <LinkButton variant="ghost" href="/purchases" aria-label="Close" className="px-2!">
+              <XIcon size={18} weight="duotone" />
+            </LinkButton>
+          </div>
+          {!active && <p className="text-sm text-alert">Cancelled: {p.cancelReason}</p>}
           <div className="overflow-x-auto">
-            <table className={`${TABLE} min-w-[560px]`}>
+            <table className={`${TABLE} min-w-[460px]`}>
               <thead>
                 <tr>
                   <th className={TH}>Type</th>
@@ -65,53 +78,48 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
                       {l.qty > 1 ? ` ×${l.qty}` : ""}
                     </td>
                     <td className={`${TD} text-xs text-muted`}>{link(l)}</td>
-                    <td className={`${TD} text-right`}>
+                    <td className={`${TD} text-right whitespace-nowrap`}>
                       {formatInr(l.rate)}
                       {Number(l.gstPct) > 0 ? ` + ${Number(l.gstPct)}% GST` : ""}
                     </td>
-                    <td className={`${TD} text-right`}>{formatInr(l.amount)}</td>
+                    <td className={`${TD} text-right whitespace-nowrap`}>{formatInr(l.amount)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div className="mt-3 flex max-w-[560px] justify-between text-base font-semibold">
+          <div className="flex max-w-[560px] justify-between text-base font-semibold">
             <span>Bill total</span>
             <span className="tabular-nums">{formatInr(p.total)}</span>
           </div>
-          {p.notes && <p className="mt-3 text-sm text-muted">{p.notes}</p>}
-        </Card>
-        <div className="flex flex-col gap-6">
-          <Card title="Payments">
-            {p.payments.length === 0 ? (
-              <p className="text-sm text-muted">Nothing paid yet.</p>
-            ) : (
-              <ul className="divide-y divide-line text-sm">
-                {p.payments.map((x) => (
-                  <li key={x.id} className="flex justify-between gap-2 py-2">
-                    <span>
-                      {fmtDate(x.date)} · {x.method}
-                      <span className="block text-xs text-muted">
-                        {x.code}
-                        {x.reference ? ` · ${x.reference}` : ""}
-                      </span>
-                    </span>
-                    <span className="tabular-nums">{formatInr(x.amount)}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <p className="mt-2 flex justify-between border-t border-line pt-2 text-sm font-semibold">
-              <span>Balance</span>
-              <span className="tabular-nums">{formatInr(p.balance)}</span>
-            </p>
-          </Card>
-          {active && p.balance > 0 && (
-            <Card title="Pay the supplier" id="pay">
-              <PayVendorForm id={p.id} balance={p.balance} today={todayIso()} billDate={toIso(p.date)} />
-            </Card>
+          {p.notes && <div className="text-sm text-muted">{p.notes}</div>}
+        </div>
+        <div className="flex min-w-0 flex-col gap-2.5">
+          <h3 className={h3}>Payments</h3>
+          {p.payments.length === 0 ? (
+            <div className="text-sm text-muted">Nothing paid yet.</div>
+          ) : (
+            p.payments.map((x) => (
+              <div key={x.id} className="flex justify-between gap-2 text-[15px]">
+                <span>
+                  {fmtDate(x.date)} · {x.method} · {formatInr(x.amount)}
+                  <span className="block text-xs text-muted">
+                    {x.code}
+                    {x.reference ? ` · ${x.reference}` : ""}
+                  </span>
+                </span>
+              </div>
+            ))
           )}
-          <Card title="Posted to">
+          <div className="text-[15px] font-semibold">Balance: {formatInr(p.balance)}</div>
+          {active && p.balance > 0 && (
+            <div id="pay" className="mt-5 flex flex-col gap-2.5">
+              <h3 className={h3}>Pay the supplier</h3>
+              <PayVendorForm id={p.id} balance={p.balance} today={todayIso()} billDate={toIso(p.date)} />
+            </div>
+          )}
+          <div className="mt-5 flex flex-col gap-2.5">
+            <h3 className={h3}>Posted to</h3>
             <ul className="divide-y divide-line text-sm">
               {p.expenses.map((x) => (
                 <li key={x.id} className="flex justify-between gap-2 py-1.5">
@@ -122,15 +130,16 @@ export default async function PurchasePage({ params }: PageProps<"/purchases/[id
                 </li>
               ))}
             </ul>
-            <p className="mt-2 text-xs text-muted">Recorded {fmtStamp(p.createdAt)}.</p>
-          </Card>
+            <p className="text-xs text-muted">Recorded {fmtStamp(p.createdAt)}.</p>
+          </div>
           {active && (
-            <Card title="Wrong bill or goods returned?">
+            <div className="mt-5 flex flex-col gap-2.5">
+              <h3 className={h3}>Wrong bill or goods returned?</h3>
               <CancelPurchase id={p.id} />
-            </Card>
+            </div>
           )}
         </div>
-      </div>
-    </>
+      </section>
+    </div>
   );
 }

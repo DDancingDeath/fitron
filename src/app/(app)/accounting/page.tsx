@@ -50,7 +50,7 @@ export default async function AccountingPage({ searchParams }: PageProps<"/accou
   return (
     <div className="flex flex-col gap-7">
       <ListHeader kicker={branchLabel} title="Accounting" />
-      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current={current} />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current={current} />
       {s("msg") && <Notice tone="ok">{s("msg")}</Notice>}
       {s("error") && <Notice tone="alert">{s("error")}</Notice>}
       {tab === "pl" && <ProfitLoss u={u} s={s} branchLabel={branchLabel} />}

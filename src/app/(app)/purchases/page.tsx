@@ -56,7 +56,7 @@ export default async function PurchasesPage({ searchParams }: PageProps<"/purcha
   return (
     <div className="flex flex-col gap-7">
       <ListHeader kicker={branchLabel} title="Accounting" />
-      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/purchases" />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current="/purchases" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <AutoFilter>

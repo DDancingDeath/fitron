@@ -6,11 +6,11 @@ import { cx } from "./ui";
 type Tab = { href: string; label: string; perm?: Permission };
 
 /** Underlined tabs across the top of a section, as in the prototype's Accounting and Settings. */
-export function SectionTabs({ u, tabs, current }: { u: CurrentUser; tabs: Tab[]; current: string }) {
+export function SectionTabs({ u, tabs, current, className = "mb-6" }: { u: CurrentUser; tabs: Tab[]; current: string; className?: string }) {
   const shown = tabs.filter((t) => !t.perm || u.can(t.perm));
   if (shown.length < 2) return null;
   return (
-    <nav className="mb-6 flex flex-wrap gap-1">
+    <nav className={cx("flex flex-wrap gap-1", className)}>
       {shown.map((t) => (
         <Link
           key={t.href}
