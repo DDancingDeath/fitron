@@ -36,7 +36,7 @@ export function QuickActions({ keys }: { keys: QuickKey[] }) {
   if (!keys.length) return null;
   const main = keys.slice(0, 3);
   const more = keys.slice(3);
-  const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+  const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
   return (
     <div className="flex flex-wrap gap-2 rounded-lg border border-line bg-surface p-2.5">
       {main.map((k, i) => {

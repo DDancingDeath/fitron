@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CheckIcon, CurrencyInrIcon, MinusIcon, PencilSimpleIcon, ShieldCheckIcon, UserMinusIcon, UserPlusIcon } from "@phosphor-icons/react/dist/ssr";
+import { CheckCircleIcon, CurrencyInrIcon, MinusIcon, PencilSimpleIcon, ShieldCheckIcon, UserMinusIcon, UserPlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { requireUser, upgradePath } from "@/lib/auth/current";
 import { listRoles, listStaff } from "@/lib/services/staff";
 import { payrollOverview } from "@/lib/services/payroll";
-import { Button, Empty, LinkButton, Notice, Select, Stat, TABLE, TD, TH, TR, cx } from "@/components/ui";
+import { Button, Empty, LinkButton, Notice, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
 import { Dialog } from "@/components/dialog";
 import { AutoFilter } from "@/components/auto-filter";
 import { Tag } from "@/components/tag";
@@ -140,11 +140,20 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
               </Select>
             </AutoFilter>
           </div>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(160px,1fr))] gap-3">
-            <Stat label="Monthly payroll" value={formatRupees(overview.stats.payroll)} />
-            <Stat label={`Paid for ${fmtMonthShort(month)}`} value={formatRupees(overview.stats.paid)} />
-            <Stat label="Still to pay" value={`${overview.stats.due} people`} />
-            <Stat label="Advances outstanding" value={formatRupees(overview.stats.advances)} />
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3">
+            {(
+              [
+                ["Monthly payroll", formatRupees(overview.stats.payroll)],
+                [`Paid for ${fmtMonthShort(month)}`, formatRupees(overview.stats.paid)],
+                ["Still to pay", `${overview.stats.due} people`],
+                ["Advances outstanding", formatRupees(overview.stats.advances)],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label} className="rounded-lg bg-surface px-4 py-3.5">
+                <div className="text-xs text-muted">{label}</div>
+                <div className="text-[22px] font-semibold">{value}</div>
+              </div>
+            ))}
           </div>
           {overview.rows.length === 0 ? (
             <Empty>No staff to pay yet. Add your team from the Team tab.</Empty>
@@ -166,16 +175,16 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
                     <tr key={r.id} className={TR}>
                       <td className={TD}>
                         <div className="flex items-center gap-2.5">
-                          <span className="grid size-[30px] flex-none place-items-center rounded-full bg-accent-soft text-xs font-semibold text-accent">{initials(r.name)}</span>
+                          <span className="grid size-[30px] flex-none place-items-center rounded-full bg-bg text-[11px] font-semibold">{initials(r.name)}</span>
                           <div>
                             <div>{r.name}</div>
-                            {r.advanceOutstanding > 0 && <div className="text-xs text-muted">{formatRupees(r.advanceOutstanding)} advance</div>}
+                            {r.advanceOutstanding > 0 && <div className="text-[11px] text-alert">{formatRupees(r.advanceOutstanding)} advance</div>}
                           </div>
                         </div>
                       </td>
                       <td className={TD}>{r.role.name}</td>
                       <td className={cx(TD, "text-right")}>{r.salary > 0 ? formatRupees(r.salary) : "—"}</td>
-                      <td className={TD}>{r.paid ? <Tag label="Paid">Paid {fmtDate(r.paid.date)}</Tag> : <Tag label="Due">Due</Tag>}</td>
+                      <td className={TD}>{r.paid ? <Tag label="Paid on">Paid {fmtDate(r.paid.date)}</Tag> : <Tag label="Pending">Due</Tag>}</td>
                       <td className={cx(TD, "text-right")}>{r.paid ? formatRupees(r.paid.net) : "—"}</td>
                       <td className={cx(TD, "text-right")}>
                         <div className="flex justify-end gap-1.5">
@@ -202,7 +211,7 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
             <div>
               <div className="mb-1 text-sm font-semibold">Recent salary payments</div>
               {overview.history.map((h) => (
-                <div key={h.id} className="flex items-start justify-between gap-3 border-b border-line-soft py-2.5">
+                <div key={h.id} className="flex items-start justify-between gap-3 border-b border-line-soft py-2">
                   <div>
                     <div className="text-sm">
                       {fmtDate(h.date)} · {h.user.name} · {h.month ? monthLabel(h.month) : ""}
@@ -256,8 +265,8 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
                     {roles.map((r) => {
                       const has = r.permissions.some((p) => p.permission.key === k);
                       return (
-                        <td key={r.id} className={cx(TD, "text-center", has ? "text-accent" : "text-fg/30")}>
-                          {has ? <CheckIcon size={17} weight="bold" className="inline" aria-label="Yes" /> : <MinusIcon size={17} className="inline" aria-label="No" />}
+                        <td key={r.id} className={cx(TD, "text-center", has ? "text-accent" : "text-neutral-400")}>
+                          {has ? <CheckCircleIcon size={17} weight="duotone" className="inline" aria-label="Yes" /> : <MinusIcon size={17} className="inline" aria-label="No" />}
                         </td>
                       );
                     })}

@@ -18,8 +18,8 @@ const TABS = [
   ["assign", "Member assignments"],
 ] as const;
 
-const card = "flex flex-col gap-2 rounded-lg border border-line bg-surface p-[18px]";
-const kicker = "text-[11px] tracking-[0.08em] text-muted uppercase";
+const card = "flex flex-col gap-2 rounded-md bg-surface p-[15px]";
+const kicker = "text-[10px] tracking-[0.1em] text-accent uppercase";
 
 export default async function ProgramsPage({ searchParams }: PageProps<"/programs">) {
   const u = await requirePermission("programs.manage");
@@ -60,7 +60,7 @@ export default async function ProgramsPage({ searchParams }: PageProps<"/program
                 </div>
                 {!w.active && <Tag label="Retired" />}
               </div>
-              <div className="text-xl font-semibold">{w.name}</div>
+              <div className="text-xl leading-[1.2] font-semibold">{w.name}</div>
               {w.days.map((d) => (
                 <div key={d.name}>
                   <div className="mt-1 text-[13px] font-semibold">{d.name}</div>
@@ -72,7 +72,7 @@ export default async function ProgramsPage({ searchParams }: PageProps<"/program
                   ))}
                 </div>
               ))}
-              <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-[13px] text-muted">
+              <div className="mt-auto flex items-center justify-between gap-2 text-[11px] text-fg/50">
                 <span>
                   {w._count.members} member{w._count.members === 1 ? "" : "s"} assigned
                 </span>
@@ -101,14 +101,14 @@ export default async function ProgramsPage({ searchParams }: PageProps<"/program
                 </div>
                 {!d.active && <Tag label="Retired" />}
               </div>
-              <div className="text-xl font-semibold">{d.name}</div>
+              <div className="text-xl leading-[1.2] font-semibold">{d.name}</div>
               {d.meals.map((m) => (
                 <div key={m.name} className="grid grid-cols-[96px_minmax(0,1fr)] gap-2.5 py-[3px] text-[13px]">
                   <span className="text-muted">{m.name}</span>
                   <span>{m.food}</span>
                 </div>
               ))}
-              <div className="mt-auto flex items-center justify-between gap-2 pt-2 text-[13px] text-muted">
+              <div className="mt-auto flex items-center justify-between gap-2 text-[11px] text-fg/50">
                 <span>
                   {d._count.members} member{d._count.members === 1 ? "" : "s"} assigned
                 </span>

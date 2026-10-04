@@ -40,7 +40,7 @@ export default async function AssetsPage({ searchParams }: PageProps<"/assets">)
   return (
     <div className="flex flex-col gap-7">
       <ListHeader kicker={branchLabel} title="Accounting" />
-      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current="/assets" />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current="/assets" />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex flex-wrap overflow-hidden rounded-md border border-line">
           {FILTERS.map(([k, label]) => (

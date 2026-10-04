@@ -17,7 +17,7 @@ export const metadata = { title: "Classes · Fitron" };
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const WD = WEEKDAYS.map((d) => d.slice(0, 3));
 const ghost = "inline-flex min-h-[34px] items-center gap-1.5 rounded-md px-1.5 text-[13px] font-semibold text-accent hover:bg-accent/10";
-const secondary = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
+const secondary = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
 
 /** Fill colour as in the prototype: gold, deeper gold from 70%, pink when full. */
 const toneOf = (n: number, cap: number) => (n >= cap ? 2 : cap && n / cap >= 0.7 ? 1 : 0);
@@ -101,7 +101,7 @@ export default async function ClassesPage({ searchParams }: PageProps<"/classes"
                 <Link
                   key={k}
                   href={href({ view: k === "list" ? "list" : undefined, msg: undefined })}
-                  className={cx("px-3.5 py-[7px] text-[13px]", (k === "list") === list ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}
+                  className={cx("px-3.5 py-[7px] text-[13px] leading-[normal]", (k === "list") === list ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}
                 >
                   {label}
                 </Link>
@@ -274,7 +274,7 @@ export default async function ClassesPage({ searchParams }: PageProps<"/classes"
                   </span>
                 )}
               </div>
-              <div className="h-2 rounded bg-fg/15">
+              <div className="h-2 rounded bg-neutral-300">
                 <div className={cx("h-full rounded", sel.held >= sel.slot.capacity ? "bg-alert-700" : "bg-accent")} style={{ width: pct(sel.held, sel.slot.capacity) }} />
               </div>
             </div>

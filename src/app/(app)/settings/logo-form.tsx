@@ -97,7 +97,7 @@ export function LogoForm({ logoSrc, hasLogo }: { logoSrc: string | null; hasLogo
       <div className="flex flex-wrap items-center gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element -- private, session-checked image */}
         <img src={logoSrc ?? DEFAULT_LOGO} alt="Gym logo" width={160} height={56} className="h-14 w-40 rounded-lg border border-line bg-surface object-cover" />
-        <label className="inline-flex min-h-[38px] cursor-pointer items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold whitespace-nowrap hover:bg-fg/7">
+        <label className="inline-flex py-2.5 leading-[1.2] cursor-pointer items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold whitespace-nowrap hover:bg-fg/7">
           <UploadSimpleIcon size={16} weight="duotone" />
           Change logo
           <input type="file" name="logo" accept="image/png,image/jpeg,image/svg+xml" className="sr-only" disabled={pending} onChange={(e) => pick(e.currentTarget)} />

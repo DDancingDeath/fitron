@@ -19,7 +19,7 @@ export function AskAi() {
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="fixed right-5 bottom-5 z-40 inline-flex items-center gap-2 rounded-[22px] bg-accent py-[11px] pr-[18px] pl-2.5 text-sm font-semibold whitespace-nowrap text-accent-ink shadow-lg hover:bg-accent-hover print:hidden"
+          className="fixed right-5 bottom-4 z-40 max-lg:bottom-[84px] inline-flex items-center gap-2 rounded-[22px] bg-accent py-[11px] pr-[18px] pl-2.5 text-sm font-semibold whitespace-nowrap text-accent-ink shadow-lg hover:bg-accent-hover print:hidden"
         >
           <Image src="/fitron-mark.png" alt="" width={26} height={26} className="-my-1 rounded-full" />
           Ask Fitron AI

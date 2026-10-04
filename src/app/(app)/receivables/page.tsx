@@ -37,7 +37,7 @@ export default async function ReceivablesPage({ searchParams }: PageProps<"/rece
       </div>
       {canWa && (
         <form action={remindAllOverdueAction.bind(null, here)} className="self-start">
-          <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover">
+          <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover">
             <WhatsappLogoIcon weight="duotone" />
             Remind all overdue
           </button>
@@ -100,7 +100,7 @@ export default async function ReceivablesPage({ searchParams }: PageProps<"/rece
                       </form>
                     )}
                     {u.can("payments.collect") && (
-                      <Link href={`/invoices/${r.id}#collect`} className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                      <Link href={`/invoices/${r.id}#collect`} className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                         Collect
                       </Link>
                     )}

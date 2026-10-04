@@ -145,7 +145,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                   <div className="flex items-center gap-2.5">
                     <Initials name={l.name} size="size-9 text-[13px]" />
                     <Link href={`/leads/${l.id}`} className="min-w-0 flex-1">
-                      <div className="truncate text-[15px] leading-tight font-semibold">{l.name}</div>
+                      <div className="truncate text-[15px] leading-[1.2] font-semibold">{l.name}</div>
                       <div className="mt-0.5 text-xs text-muted">{l.phone}</div>
                     </Link>
                     <span className="text-[11px] whitespace-nowrap text-faint" title="Time in this stage">
@@ -156,7 +156,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                     <Chip>{l.source}</Chip>
                     <Chip gold>Wants {l.interest}</Chip>
                   </div>
-                  {l.notes && <div className="line-clamp-2 text-[13px] leading-snug text-neutral-800">{l.notes}</div>}
+                  {l.notes && <div className="line-clamp-2 text-[13px] leading-[1.45] text-neutral-800">{l.notes}</div>}
                   <div className="flex flex-col gap-1">
                     {i.trial && (
                       <div className="inline-flex items-center gap-1.5 text-xs text-accent-strong">
@@ -166,8 +166,8 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                     )}
                     <FollowUp i={i} />
                   </div>
-                  <div className="flex items-center justify-end gap-1.5 border-t border-line pt-1.5">
-                    <LeadActions id={l.id} stage={l.stage as LeadStage} phone={l.phone} message={i.message} />
+                  <div className="flex items-center gap-1.5 border-t border-line pt-1.5">
+                    <LeadActions id={l.id} stage={l.stage as LeadStage} phone={l.phone} message={i.message} card />
                   </div>
                 </div>
               );
@@ -243,7 +243,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                           <div className="flex items-center gap-2.5">
                             <Initials name={l.name} size="size-[34px] text-[12.5px]" />
                             <Link href={`/leads/${l.id}`} className="min-w-0 hover:text-accent">
-                              <div className="truncate leading-tight font-semibold">{l.name}</div>
+                              <div className="truncate leading-[1.2] font-semibold">{l.name}</div>
                               <div className="mt-0.5 text-xs text-muted">{l.phone}</div>
                             </Link>
                           </div>
@@ -252,7 +252,7 @@ export default async function LeadsPage({ searchParams }: PageProps<"/leads">) {
                           <div className="text-[13px] whitespace-nowrap">{l.source}</div>
                           <div className="text-xs whitespace-nowrap text-accent-strong">Wants {l.interest}</div>
                         </td>
-                        <td className={cx(cell, "max-w-[320px] text-[13px] leading-snug text-neutral-800")}>
+                        <td className={cx(cell, "max-w-[320px] text-[13px] leading-[1.45] text-neutral-800")}>
                           <div className="line-clamp-3">{l.notes}</div>
                           {i.trial && (
                             <div className="mt-0.5 inline-flex items-center gap-1 text-xs whitespace-nowrap text-accent-strong">

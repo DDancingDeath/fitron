@@ -50,7 +50,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                 Purchase bill
               </LinkButton>
             )}
-            <a href={csv} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+            <a href={csv} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
               <DownloadSimpleIcon size={16} weight="duotone" />
               Export CSV
             </a>
@@ -104,7 +104,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
           <div className="flex h-[180px] items-end gap-1.5">
             {trend.map((m) => (
               <div key={m.month} title={`${monthLabel(m.month)}: ${formatRupees(m.amount)}`} className="flex h-full min-w-0 flex-1 flex-col justify-end gap-1.5">
-                <div className={cx(m.month === month ? "bg-accent" : "bg-fg/45")} style={{ height: `${Math.round((m.amount / maxMonth) * 100)}%` }} />
+                <div className={"bg-fg/45"} style={{ height: `${Math.round((m.amount / maxMonth) * 100)}%` }} />
                 <div className="truncate text-center text-[10px] text-muted">{fmtMonthShort(m.month)}</div>
               </div>
             ))}
@@ -160,8 +160,8 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
       </div>
 
       {s("do") === "add" && (
-        <Dialog kicker="Accounts" title="Add expense" close={here} note="Expenses are voided with a reason, never deleted. Equipment you'll use for years belongs in Fixed assets.">
-          <ExpenseForm categories={cats} today={today} />
+        <Dialog kicker="Accounts" title="Add expense" close={here} width={640} form>
+          <ExpenseForm categories={cats} today={today} close={here} />
         </Dialog>
       )}
     </div>

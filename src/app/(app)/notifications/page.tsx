@@ -108,7 +108,7 @@ export default async function NotificationsPage() {
         title="Notifications"
         actions={
           <form action={readAll}>
-            <button className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Mark all read</button>
+            <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Mark all read</button>
           </form>
         }
       />
@@ -126,7 +126,7 @@ export default async function NotificationsPage() {
               {n.unread && <span className="mt-2 size-2 flex-none rounded-full bg-alert" />}
             </>
           );
-          const cls = "flex w-full items-start gap-3.5 border-b border-fg/8 py-3 text-left";
+          const cls = "flex w-full items-start gap-3.5 border-b border-fg/8 py-3 text-left leading-[normal]";
           return n.formId ? (
             <form key={n.key} action={open.bind(null, n.formId)}>
               <button className={cls}>{body}</button>

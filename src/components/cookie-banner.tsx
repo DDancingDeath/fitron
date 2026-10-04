@@ -36,18 +36,18 @@ export function CookieBanner() {
   }, []);
   if (!open) return null;
   return (
-    <div role="dialog" aria-label="Cookie choice" className="fixed inset-x-4 bottom-4 z-[130] mx-auto flex max-w-[560px] flex-col gap-3 rounded-lg border border-accent/60 bg-[#15130f] p-4 text-[13px] text-[#f3ede0] shadow-lg">
+    <div role="dialog" aria-label="Cookie choice" className="fixed inset-x-4 bottom-4 z-[130] mx-auto flex max-w-[560px] flex-col gap-3 rounded-2xl border border-[rgba(207,169,79,0.35)] bg-[#15130f] px-5 py-[18px] text-sm leading-[1.6] text-[#f3ede0] shadow-lg">
       <div className="flex items-start gap-2.5">
-        <CookieIcon size={22} weight="duotone" className="mt-0.5 shrink-0 text-accent" />
-        <p className="m-0">
+        <CookieIcon size={24} weight="duotone" className="shrink-0 text-[#cfa94f]" />
+        <p className="m-0 flex-1">
           We use essential storage to keep you signed in and save your work. With your permission we also use analytics to improve Fitron. See the Privacy and Cookie notice in{" "}
-          <Link href="/settings?tab=privacy#cookie-policy" className="text-accent underline">
+          <Link href="/settings?tab=privacy#cookie-policy" className="text-[#f3ede0] no-underline">
             Settings
           </Link>
           .
         </p>
       </div>
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-wrap justify-end gap-2">
         <Button type="button" variant="ghost" onClick={() => setConsent("essential")}>
           Essential only
         </Button>

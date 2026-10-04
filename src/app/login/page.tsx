@@ -1,12 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Logo } from "@/components/logo";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current";
 import { LoginForm } from "./login-form";
 import { CreateAccountForm } from "./create-account-form";
 import { Notice } from "@/components/ui";
 import { safeNext } from "@/lib/auth/next";
+import { CookieBanner } from "@/components/cookie-banner";
 import { GoogleButton, googleMessage } from "@/components/google-button";
 import { DEFAULT_PLAN, findPlan, lowestGymPrice } from "@/lib/domain/pricing";
 import { formatInr } from "@/lib/format";
@@ -35,16 +35,16 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
     ["UPI", "autopay and reminders"],
   ];
   return (
-    <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="hidden flex-col justify-between gap-10 bg-[#0e0d0a] bg-[radial-gradient(ellipse_at_top_left,rgba(207,169,79,0.18),transparent_60%)] p-10 text-[#f3ede0] lg:flex">
+    <main className="grid min-h-screen grid-cols-[repeat(auto-fit,minmax(min(100%,380px),1fr))]">
+      <section className="flex flex-col justify-between gap-10 bg-[#0e0d0a] bg-[radial-gradient(ellipse_at_top_left,rgba(207,169,79,0.18),transparent_60%)] p-10 text-[#f3ede0]">
         <div className="flex items-center justify-between gap-3">
-          <a href="/#top"><Image src="/fitron-logo.png" alt="FITRON" width={599} height={218} className="block h-auto w-full max-w-[340px]" priority /></a>
+          <a href="/#top" className="block w-[min(100%,340px)]"><Image src="/fitron-logo.png" alt="FITRON" width={599} height={218} className="block h-auto w-full" priority /></a>
           <a href="/#products" className="text-[13px] text-[#cfa94f]">For gyms ↗</a>
         </div>
         <div className="max-w-[440px]">
-          <p className="mb-4 text-xs font-semibold tracking-[0.14em] text-[#cfa94f] uppercase">Fitron Gym Accounting Solution</p>
-          <h1 className="text-[40px] leading-[1.08] font-semibold">Run your gym on FITRON.</h1>
-          <p className="mt-4 text-base text-[#f3ede0]/70">
+          <p className="mb-3 text-xs tracking-[0.14em] text-[#cfa94f] uppercase">Fitron Gym Accounting Solution</p>
+          <h1 className="mb-3.5 text-[40px] leading-[1.08] font-semibold">Run your gym on FITRON.</h1>
+          <p className="m-0 text-[15px] text-[#f3ede0]/72">
             Members, payments, WhatsApp reminders, accounting and an AI coach under your brand. One console for the front desk and the owner.
           </p>
         </div>
@@ -56,7 +56,6 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
       </section>
       <section className="flex items-center justify-center px-6 py-10">
         <div className="flex w-full max-w-[400px] flex-col gap-[18px]">
-          <div className="lg:hidden"><a href="/"><Logo /></a></div>
           <nav className="inline-flex gap-[2px] self-start rounded-md bg-surface p-[3px]" aria-label="Sign in or create account">
             <Link href={inHref} aria-current={up ? undefined : "page"} className={`${tab} ${up ? "text-fg" : "bg-accent text-accent-ink"}`}>Sign in</Link>
             <Link href={upHref} aria-current={up ? "page" : undefined} className={`${tab} ${up ? "bg-accent text-accent-ink" : "text-fg"}`}>Create account</Link>
@@ -67,7 +66,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
             <>
               <div>
                 <h2 className="text-[28px] font-semibold">Sign in to Fitron</h2>
-                <p className="mt-1 text-sm text-muted">Use your staff email or Google account.</p>
+                <p className="m-0 text-sm text-neutral-700">Use your staff email or Google account.</p>
               </div>
               {typeof q.idle === "string" && /^\d+$/.test(q.idle) && <Notice tone="alert">You were signed out after {q.idle} minutes of inactivity.</Notice>}
               {q.reset && <Notice tone="ok">Password changed. Sign in with your new password.</Notice>}
@@ -77,9 +76,10 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
               <LoginForm next={next} />
             </>
           )}
-          <p className="text-xs text-muted">New to FITRON? <a href="/#pricing" className="text-accent underline">See plans and pricing</a></p>
+          <p className="text-xs text-neutral-700">New to FITRON? <a href="/#pricing" className="text-accent underline">See plans and pricing</a></p>
         </div>
       </section>
+      <CookieBanner />
     </main>
   );
 }

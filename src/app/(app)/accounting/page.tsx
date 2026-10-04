@@ -36,7 +36,7 @@ const REVENUE: Record<string, string> = {
 };
 const REV_ORDER = ["Membership revenue", "Renewal revenue", "Personal training", "Registration fees", "Product sales", "Other revenue", "Gain on sale of assets"];
 const LEDGER_LABEL: Record<LedgerKind | "cash", string> = { income: "Income", expense: "Expense", payment: "Payment", receivable: "Receivable", cash: "Cash & bank book" };
-const btn2 = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
+const btn2 = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
 const seg = (on: boolean) => cx("px-3 py-[7px] text-[13px]", on ? "bg-accent text-accent-ink" : "hover:bg-fg/7");
 
 export default async function AccountingPage({ searchParams }: PageProps<"/accounting">) {
@@ -50,7 +50,7 @@ export default async function AccountingPage({ searchParams }: PageProps<"/accou
   return (
     <div className="flex flex-col gap-7">
       <ListHeader kicker={branchLabel} title="Accounting" />
-      <SectionTabs u={u} tabs={ACCOUNTING_TABS} current={current} />
+      <SectionTabs u={u} className="mb-0" tabs={ACCOUNTING_TABS} current={current} />
       {s("msg") && <Notice tone="ok">{s("msg")}</Notice>}
       {s("error") && <Notice tone="alert">{s("error")}</Notice>}
       {tab === "pl" && <ProfitLoss u={u} s={s} branchLabel={branchLabel} />}

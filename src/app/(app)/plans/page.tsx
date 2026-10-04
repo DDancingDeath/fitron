@@ -15,7 +15,7 @@ import { changePlanStatus, removePlan, toggleOffer } from "./actions";
 
 export const metadata = { title: "Plans & offers · Fitron" };
 
-const ghost = "inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
+const ghost = "inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
 
 export default async function PlansPage({ searchParams }: PageProps<"/plans">) {
   const u = await requirePermission("plans.manage");
@@ -149,9 +149,20 @@ export default async function PlansPage({ searchParams }: PageProps<"/plans">) {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="m-0 text-sm text-muted">No offer codes yet. Create one for festivals, referrals or students.</p>
-        )}
+        ) : null}
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-[20px]">Offer codes</h3>
+          {offers.map((o) => {
+            const st = offerState({ ...o, validTill: toIso(o.validTill) }, today);
+            return (
+              <div key={o.id} className="flex items-center justify-between gap-3 border-b border-line py-2.5">
+                <span className="font-semibold tracking-[0.06em]">{o.code}</span>
+                <Tag label={st}>{st}</Tag>
+              </div>
+            );
+          })}
+          {!offers.length && <p className="m-0 text-sm text-muted">No offer codes yet. Create one for festivals, referrals or students.</p>}
+        </section>
       </section>
     </div>
   );

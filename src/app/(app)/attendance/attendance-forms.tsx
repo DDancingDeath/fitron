@@ -11,7 +11,7 @@ type Block = Extract<DeskResult, { blocked: string }>;
 type Done = Extract<DeskResult, { ok: true }>;
 type Device = { name: string; online: boolean; sync: string };
 
-const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap disabled:opacity-45";
+const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap disabled:opacity-45";
 const primary = `${btn} border-transparent bg-accent text-accent-ink hover:bg-accent-hover`;
 const secondary = `${btn} border-line hover:bg-fg/7`;
 const ghost = `${btn} border-transparent px-1.5 text-accent hover:bg-accent/10`;
@@ -93,7 +93,7 @@ export function CheckInDesk({ rulesText, qr, qrText, gymName, branchName, device
             ["Biometric", "Biometric"],
           ] as const
         ).map(([k, l]) => (
-          <button key={k} type="button" onClick={() => setMode(k)} className={cx("px-3.5 py-[7px] text-[13px]", mode === k ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}>
+          <button key={k} type="button" onClick={() => setMode(k)} className={cx("px-3.5 py-[7px] text-[13px] leading-[normal]", mode === k ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}>
             {l}
           </button>
         ))}
@@ -142,7 +142,7 @@ export function CheckInDesk({ rulesText, qr, qrText, gymName, branchName, device
             <div id="qr-poster" className="rounded-[10px] bg-white p-3">
               {/* eslint-disable-next-line @next/next/no-img-element -- generated data URL */}
               <img src={qr} alt="Check-in QR code" width={150} height={150} />
-              <div className="mt-1.5 text-center text-[11px] leading-tight font-semibold text-[#444]">
+              <div className="mt-1.5 text-center text-[11px] font-semibold text-[#444]">
                 {gymName}
                 <br />
                 Scan to check in
@@ -150,7 +150,7 @@ export function CheckInDesk({ rulesText, qr, qrText, gymName, branchName, device
             </div>
             <div className="flex min-w-0 flex-col gap-2.5">
               <div className="text-base font-semibold">Front-desk QR poster</div>
-              <div className="text-[13.5px] leading-relaxed text-muted">
+              <div className="text-[13.5px] leading-[1.55] text-muted">
                 Members scan this with their phone camera; it opens their Fitron check-in page for {branchName}. Print it and keep it at the entrance.
               </div>
               <div className="text-xs break-all text-faint">{qrText}</div>
@@ -187,7 +187,7 @@ export function CheckInDesk({ rulesText, qr, qrText, gymName, branchName, device
             </div>
           ))}
           {devices.length === 0 && <div className="text-sm text-muted">No door devices at this branch yet.</div>}
-          <div className="text-[13px] leading-relaxed text-muted">Face, fingerprint and card punches from these devices are checked against the access rules and appear in the list below automatically. Check-out happens on the second punch.</div>
+          <div className="text-[13px] leading-[1.55] text-muted">Face, fingerprint and card punches from these devices are checked against the access rules and appear in the list below automatically. Check-out happens on the second punch.</div>
           <div>
             <Link href="/settings/devices" className={secondary}>
               <FingerprintIcon weight="duotone" />

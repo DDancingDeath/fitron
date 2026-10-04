@@ -3,6 +3,7 @@ import { requireUser, upgradePath } from "@/lib/auth/current";
 import { NAV } from "@/lib/nav";
 import { NavLinks } from "@/components/nav-links";
 import { MobileNav } from "@/components/mobile-nav";
+import { MobileTabBar } from "@/components/mobile-tabbar";
 import { BranchSwitcher } from "@/components/branch-switcher";
 import { UserMenu } from "@/components/user-menu";
 import { photoUrl } from "@/components/avatar";
@@ -15,6 +16,7 @@ import { navCounts } from "@/lib/services/shell";
 import { getGymProfile, getIdleMinutes } from "@/lib/services/settings";
 import { IdleSignout } from "@/components/idle-signout";
 import { CookieBanner } from "@/components/cookie-banner";
+import { ProductTour } from "@/components/product-tour";
 import { getSubscriptionSettings } from "@/lib/services/subscription";
 import { getAiSettings } from "@/lib/services/ai-settings";
 import { gymLogoUrl } from "@/components/gym-logo";
@@ -98,7 +100,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex flex-wrap items-center gap-3 border-b border-line-soft bg-bg px-4 py-3 lg:px-10">
-          <MobileNav groups={groups} orgName={gymName} branchName={branchName} logo={logo} />
+          <MobileNav groups={groups} orgName={gymName} branchName={branchName} logo={logo} branches={u.branches.filter((b) => b.active)} branch={u.branch} />
           <GlobalSearch />
           <div className="flex flex-none items-center gap-1.5 sm:gap-2.5 lg:ml-auto">
             <BranchSwitcher branches={u.branches.filter((b) => b.active)} value={u.branch} />
@@ -112,15 +114,22 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
                 branch: u.branch === "ALL" ? "All branches" : (u.branches.find((b) => b.id === u.branch)?.name ?? ""),
                 photo: photoUrl(u.id, u.photoKey),
                 canSettings: canPay,
+                plan: s.kind === "PAID" ? "Active" : s.kind === "TRIAL" ? "Free trial" : "Locked",
               }}
             />
           </div>
         </header>
         {banner && <TrialBanner alert={banner.alert} cta={canPay ? banner.cta : undefined}>{banner.body}</TrialBanner>}
-        <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 lg:px-10">{children}</main>
+        <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 max-lg:pb-24 lg:px-10">{children}</main>
       </div>
+      <MobileTabBar canMembers={u.can("members.view")} canAdd={u.can("members.create")} canCollect={u.can("payments.collect")} home={groups[0]?.items[0]?.href ?? "/dashboard"} homeLabel={groups[0]?.items[0]?.href === "/dashboard" ? "Home" : (groups[0]?.items[0]?.label ?? "Home")} />
       {u.can("ai.use") && ai.enabled && <AskAi />}
       <IdleSignout minutes={idleMinutes} />
+      <ProductTour
+        firstName={u.name.split(" ")[0]}
+        email={u.email}
+        sections={Object.fromEntries(groups.flatMap((g) => g.items.filter((i) => !i.locked).map((i) => [i.icon, i.href])))}
+      />
       <CookieBanner />
     </div>
   );

@@ -82,10 +82,10 @@ const TABS = [
 type TabKey = (typeof TABS)[number][0];
 
 const TYPE_LABEL: Record<string, string> = { NEW: "New", RENEWAL: "Renewal", AUTOPAY: "Autopay", IMPORT: "Imported" };
-const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border text-sm font-semibold whitespace-nowrap";
 const BTN = {
-  primary: `${btn} border-transparent bg-accent text-accent-ink hover:bg-accent-hover`,
-  secondary: `${btn} border-line hover:bg-fg/7`,
+  primary: `${btn} px-[18px] border-transparent bg-accent text-accent-ink hover:bg-accent-hover`,
+  secondary: `${btn} px-[18px] border-line hover:bg-fg/7`,
   ghost: `${btn} border-transparent px-1.5 text-accent hover:bg-accent/10`,
 };
 
@@ -244,7 +244,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="m-0 text-[28px] lg:text-[38px]">{m.name}</h1>
-            {freeze ? <Tag label="Paused">FROZEN</Tag> : <MemberStatus status={m.status} />}
+            {freeze ? <Tag label="Paused">FROZEN</Tag> : <MemberStatus status={m.status} className="text-xs!" />}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-[18px] text-sm text-muted">
             <span>{m.code}</span>
@@ -296,7 +296,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
           .filter(([k]) => k !== "documents" || docs)
           .filter(([k]) => k !== "whatsapp" || canWa)
           .map(([k, label]) => (
-            <Link key={k} href={k === "overview" ? here : `${here}?tab=${k}`} className={cx("border-b-2 px-3 py-2 text-sm", tab === k ? "border-accent text-accent" : "border-transparent text-fg")}>
+            <Link key={k} href={k === "overview" ? here : `${here}?tab=${k}`} className={cx("border-b-2 px-3 py-2 text-sm", tab === k ? "border-accent text-fg" : "border-transparent text-muted")}>
               {label}
             </Link>
           ))}
@@ -698,7 +698,13 @@ function Documents({ memberId, docs, ok, err }: { memberId: string; docs: Awaite
     <div className="flex flex-col gap-4">
       {ok && <Notice tone="ok">{ok}</Notice>}
       {err && <Notice tone="alert">{err}</Notice>}
-      <p className="m-0 text-sm text-muted">Stored privately against this member. Access is logged.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="m-0 text-sm text-muted">Stored privately against this member. Access is logged.</p>
+        <a href="#upload" className={BTN.primary}>
+          <UploadSimpleIcon size={16} weight="duotone" />
+          Upload document
+        </a>
+      </div>
       <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
         {live.map((d) => {
           const I = d.mime === "application/pdf" ? FilePdfIcon : FileImageIcon;

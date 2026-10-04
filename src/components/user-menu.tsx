@@ -3,24 +3,37 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { logout } from "@/app/login/actions";
-import { ClockCounterClockwiseIcon, CrownSimpleIcon, GearSixIcon, LockKeyIcon, SignOutIcon, UserCircleIcon, type Icon } from "@phosphor-icons/react";
+import { ChatCircleDotsIcon, ClockCounterClockwiseIcon, CompassIcon, CrownSimpleIcon, GearSixIcon, LockKeyIcon, MoonIcon, SignOutIcon, SunIcon, UserCircleIcon, type Icon } from "@phosphor-icons/react";
+import { flipTheme } from "./theme-toggle";
+import { TOUR_EVENT } from "./product-tour";
 import { Avatar } from "./avatar";
 
-type MenuUser = { name: string; email: string; role: string; branch: string; photo: string | null; canSettings: boolean };
+type MenuUser = { name: string; email: string; role: string; branch: string; photo: string | null; canSettings: boolean; plan: string };
 
 const item = "flex w-full items-center gap-2.5 rounded-md px-2.5 py-[9px] text-left text-sm hover:bg-accent-soft";
 
-function Item({ href, icon: I, label, onClick }: { href: string; icon: Icon; label: string; onClick: () => void }) {
+function Item({ href, icon: I, label, onClick, badge }: { href: string; icon: Icon; label: string; onClick: () => void; badge?: string }) {
   return (
     <Link role="menuitem" href={href} onClick={onClick} className={item}>
       <I size={18} weight="duotone" className="text-accent" />
-      {label}
+      <span className="flex-1">{label}</span>
+      {badge && <span className="rounded-[10px] bg-accent-200 px-[7px] py-px text-[11px] text-accent">{badge}</span>}
     </Link>
+  );
+}
+
+function Action({ icon: I, label, onClick }: { icon: Icon; label: string; onClick: () => void }) {
+  return (
+    <button type="button" role="menuitem" onClick={onClick} className={item}>
+      <I size={18} weight="duotone" className="text-accent" />
+      {label}
+    </button>
   );
 }
 
 export function UserMenu({ user }: { user: MenuUser }) {
   const [open, setOpen] = useState(false);
+  const [dark, setDark] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,7 +53,10 @@ export function UserMenu({ user }: { user: MenuUser }) {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setDark(document.documentElement.dataset.theme !== "light");
+          setOpen((o) => !o);
+        }}
         className="block rounded-full"
         title={user.name}
         aria-haspopup="menu"
@@ -65,12 +81,25 @@ export function UserMenu({ user }: { user: MenuUser }) {
           <div className="my-1 h-px bg-line" />
           <Item href="/profile" icon={UserCircleIcon} label="My profile" onClick={close} />
           <Item href="/profile?tab=password" icon={LockKeyIcon} label="Change password" onClick={close} />
-          {user.canSettings && (
-            <>
-              <Item href="/settings/billing" icon={CrownSimpleIcon} label="Plan & billing" onClick={close} />
-              <Item href="/settings" icon={GearSixIcon} label="Settings" onClick={close} />
-            </>
-          )}
+          {user.canSettings && <Item href="/settings/billing" icon={CrownSimpleIcon} label="Plan & billing" onClick={close} badge={user.plan} />}
+          {user.canSettings && <Item href="/settings?tab=help" icon={ChatCircleDotsIcon} label="Contact Fitron support" onClick={close} />}
+          <Action
+            icon={CompassIcon}
+            label="Product tour"
+            onClick={() => {
+              close();
+              window.dispatchEvent(new Event(TOUR_EVENT));
+            }}
+          />
+          <Action
+            icon={dark ? SunIcon : MoonIcon}
+            label={dark ? "Light mode" : "Dark mode"}
+            onClick={() => {
+              flipTheme();
+              setDark((d) => !d);
+            }}
+          />
+          {user.canSettings && <Item href="/settings" icon={GearSixIcon} label="Settings" onClick={close} />}
           <Item href="/profile#activity" icon={ClockCounterClockwiseIcon} label="My activity" onClick={close} />
           <div className="my-1 h-px bg-line" />
           <form action={logout}>

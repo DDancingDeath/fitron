@@ -5,6 +5,9 @@ import "./globals.css";
 const sourceSerif = Source_Serif_4({
   variable: "--font-source-serif",
   subsets: ["latin"],
+  // The prototype stack: Source Serif 4, then the system UI font.
+  fallback: ["system-ui", "sans-serif"],
+  adjustFontFallback: false,
 });
 
 export const metadata: Metadata = {

@@ -52,7 +52,7 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
         actions={
           canWa && (
             <form action={remindRenewalsAction.bind(null, ids, here)}>
-              <button disabled={!rows.length} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
+              <button disabled={!rows.length} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
                 <WhatsappLogoIcon size={17} weight="duotone" />
                 Remind all ({rows.length})
               </button>
@@ -63,7 +63,7 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
       {msg && <Notice tone="ok">{msg}</Notice>}
       <div className="grid auto-cols-[minmax(104px,1fr)] grid-flow-col gap-2.5 overflow-x-auto">
         {BUCKETS.map(([k, label, test]) => (
-          <Link key={k} href={`/renewals?w=${k}`} className={cx("rounded-md px-3.5 py-3 text-left", k === cur[0] ? "bg-accent text-accent-ink" : "bg-surface text-fg hover:bg-surface-2")}>
+          <Link key={k} href={`/renewals?w=${k}`} className={cx("rounded-md px-3.5 py-3 text-left leading-[normal]", k === cur[0] ? "bg-accent text-accent-ink" : "bg-surface text-fg hover:bg-surface-2")}>
             <div className="text-xs">{label}</div>
             <div className="text-[26px] font-semibold">{withDays.filter((m) => test(m.days)).length}</div>
           </Link>
@@ -111,10 +111,10 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
                     <span className="inline-flex items-center gap-1">
                       {canWa && (
                         <form action={remindRenewalAction.bind(null, m.id, here)}>
-                          <button className="inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">Remind</button>
+                          <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">Remind</button>
                         </form>
                       )}
-                      <Link href={`/members/${m.id}/sell`} className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                      <Link href={`/members/${m.id}/sell`} className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                         Renew
                       </Link>
                     </span>

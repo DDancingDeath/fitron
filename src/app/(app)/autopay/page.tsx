@@ -98,14 +98,14 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
           <>
             {!live && (
               <form action={runDueAction}>
-                <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                   <PlayIcon size={16} weight="duotone" />
                   Run today’s debits
                 </button>
               </form>
             )}
             <form action={syncAction.bind(null, fq)}>
-              <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+              <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                 <ArrowsClockwiseIcon size={16} weight="duotone" />
                 Sync with Razorpay
               </button>
@@ -278,7 +278,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
       {!rows.length && <div className="text-sm text-muted">No mandates match this filter.</div>}
 
       {newOpen && tax && (
-        <Dialog kicker="UPI autopay" title="New mandate" close={href(f)} note="The member gets the approval link on WhatsApp. Each cycle debits the plan price with GST and renews the membership.">
+        <Dialog kicker="UPI autopay" title="New mandate" close={href(f)} form note="The member gets the approval link on WhatsApp. Each cycle debits the plan price with GST and renews the membership.">
           <MandateForm
             members={members}
             plans={plans.map((p) => ({ id: p.id, label: `${p.name} · ${formatRupees(invoiceTotals([{ qty: 1, rate: p.price, discount: p.discount, taxRate: tax.enabled && p.gstApplicable ? tax.rate : 0 }]).total)} ${cycle(p.months).toLowerCase()}` }))}
