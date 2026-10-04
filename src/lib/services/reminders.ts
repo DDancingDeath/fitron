@@ -4,21 +4,40 @@ import type { CurrentUser } from "@/lib/auth/current";
 import { daysBetween } from "@/lib/domain/dates";
 import { memberScope, summarize } from "./members";
 import { listReceivables } from "./billing";
-import { sendTemplate } from "./whatsapp";
+import { listTemplates, sendTemplate, setAutoSend } from "./whatsapp";
 import { UserError } from "./errors";
 import { getAccessRules } from "./attendance";
 import { putSetting } from "./settings";
 import { todayIso } from "./time";
 import type { ReminderInput } from "@/lib/validation/settings";
 
+/** The expiry template behind each pill on Settings › Reminders. */
+const EXPIRY_TEMPLATE: Record<number, string> = { 15: "exp15", 7: "exp7", 3: "exp3", 1: "exp1", 0: "expired" };
+
 /**
- * Settings › Reminders. The schedule goes to Setting "reminders"; the grace period is the door rule
- * in Setting "access" (one value, edited here and under Check-in devices) and is only rewritten when
- * it changes. Each write is its own audited setting.update.
+ * Which reminder days and birthday wishes are on, read from the templates' Auto-send switches and
+ * rules (the one source the rule engine uses): days before expiry of the expiry templates that are
+ * on, 0 for the on-the-day message.
+ */
+export async function reminderSchedule(orgId: string) {
+  const templates = await listTemplates(orgId);
+  const expiryDays = templates
+    .filter((t) => t.autoSend && (t.ruleWhen === "before_expiry" || (t.ruleWhen === "after_expiry" && t.ruleDays === 0)))
+    .map((t) => (t.ruleWhen === "after_expiry" ? 0 : t.ruleDays));
+  return { expiryDays: [...new Set(expiryDays)].sort((a, b) => b - a), birthdays: templates.some((t) => t.key === "birthday" && t.autoSend) };
+}
+
+/**
+ * Settings › Reminders. The schedule goes to Setting "reminders"; the expiry pills and birthday
+ * wishes also switch the matching templates' Auto-send (what the rule engine reads); the grace period
+ * is the door rule in Setting "access" (one value, edited here and under Check-in devices) and is
+ * only rewritten when it changes. Each write is its own audited row.
  */
 export async function saveReminderSettings(u: CurrentUser, v: ReminderInput) {
   const { graceDays, ...reminders } = v;
   await putSetting(u, "reminders", reminders);
+  for (const [day, key] of Object.entries(EXPIRY_TEMPLATE)) await setAutoSend(u, key, reminders.expiryDays.includes(Number(day)));
+  await setAutoSend(u, "birthday", reminders.birthdays);
   if (graceDays !== (await getAccessRules(u.orgId)).graceDays) await putSetting(u, "access", { graceDays });
 }
 

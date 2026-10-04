@@ -8,8 +8,15 @@ import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp } from "./actions";
+import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, unlinkAction } from "./actions";
 import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
+import { reminderSchedule } from "@/lib/services/reminders";
+import { LinkWatcher } from "./link-watcher";
+import { Dialog } from "@/components/dialog";
+import { ConfirmButton } from "@/components/confirm-button";
+import { PaperPlaneTiltIcon, QrCodeIcon, WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
+import { fmtClock, fmtShort, fmtTime } from "@/lib/format";
+import { providerReady } from "@/lib/integrations/whatsapp";
 import { getAccessRules } from "@/lib/services/attendance";
 import { JOBS, recentRuns } from "@/lib/services/jobs";
 import { todayIso } from "@/lib/services/time";
@@ -62,7 +69,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
   const reminders =
     tab === "reminders"
       ? await (async () => {
-          const [settings, access, templates, runs] = await Promise.all([getReminderSettings(u.orgId), getAccessRules(u.orgId), listTemplates(u.orgId), recentRuns(u.orgId)]);
+          const [stored, schedule, access, templates, runs] = await Promise.all([getReminderSettings(u.orgId), reminderSchedule(u.orgId), getAccessRules(u.orgId), listTemplates(u.orgId), recentRuns(u.orgId)]);
+          // The expiry days and birthday wishes are the templates' Auto-send switches, which the rule engine reads.
+          const settings = { ...stored, ...schedule };
           const today = todayIso();
           return {
             settings,
@@ -88,6 +97,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         <SectionTabs u={u} tabs={SETTINGS_TABS} current={tab === "gym" ? "/settings" : `/settings?tab=${tab}`} />
       </div>
       {typeof sp.saved === "string" && <Notice tone="ok">Saved. Changes are recorded in the audit log.</Notice>}
+      {typeof sp.msg === "string" && <Notice tone="ok">{sp.msg}</Notice>}
       {typeof sp.error === "string" && <Notice tone="alert">{sp.error}</Notice>}
       {tab === "gym" && (
         <div className="grid max-w-[960px] gap-10 lg:grid-cols-2">
@@ -241,21 +251,25 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </div>
       )}
       {tab === "wa" && (
-        <div className="max-w-[720px]">
+        <div className="flex max-w-[760px] flex-col gap-5">
+          {!u.has("whatsapp") && <Notice>Automatic WhatsApp messages are on the Professional plan.</Notice>}
+          <LinkedCard wa={wa} cloud={wa.mode === "cloud" && waStatus.ok ? { number: waStatus.number ?? "", name: waStatus.name ?? "" } : null} canUse={u.has("whatsapp")} />
+          <p className="m-0 text-[13px] text-muted">
+            Quiet hours {fmtClock(wa.quietFrom)} – {fmtClock(wa.quietTo)} ·{" "}
+            <Link href="/whatsapp" className="underline">
+              change them from Edit rule on any template
+            </Link>
+          </p>
           <Panel title="WhatsApp" id="whatsapp">
             <form action={saveWhatsApp} className="flex flex-col gap-3 text-sm">
               <Field label="How messages are sent">
-                <Select name="mode" defaultValue={wa.mode}>
+                <Select name="mode" key={wa.mode} defaultValue={wa.mode}>
                   <option value="demo">Demo: log only, send nothing</option>
                   <option value="cloud">WhatsApp Cloud API (official)</option>
                   <option value="connector">Linked gym phone (connector)</option>
                 </Select>
               </Field>
               <p className={waStatus.ok ? "text-ok" : "text-alert"}>{waStatus.text}</p>
-              {waStatus.qr && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={waStatus.qr} alt="WhatsApp link QR code" className="size-48 rounded bg-white p-2" />
-              )}
               <p className="text-xs text-muted">
                 Reminder days, cadence and birthday wishes are under{" "}
                 <Link href="/settings?tab=reminders" className="underline">
@@ -271,6 +285,21 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               </div>
             </form>
           </Panel>
+          {sp.link === "1" && u.has("whatsapp") && (
+            <Dialog kicker="WhatsApp" title="Link WhatsApp" close="/settings?tab=wa" width={600}>
+              <LinkWatcher envMessage={providerReady("connector")} />
+              <div className="flex flex-wrap justify-end gap-2.5">
+                <form action={simulateLinkAction}>
+                  <Button variant="ghost" title="For demos without a connector">
+                    Simulate instead
+                  </Button>
+                </form>
+                <LinkButton href="/settings?tab=wa" scroll={false}>
+                  Cancel
+                </LinkButton>
+              </div>
+            </Dialog>
+          )}
         </div>
       )}
       {tab === "int" && (
@@ -341,6 +370,58 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </Panel>
       )}
     </div>
+  );
+}
+
+/** The prototype's "Linked WhatsApp" card: the paired number with Send test / Unlink, or a Link WhatsApp button. */
+function LinkedCard({ wa, cloud, canUse }: { wa: Awaited<ReturnType<typeof getWaSettings>>; cloud: { number: string; name: string } | null; canUse: boolean }) {
+  const linked = wa.linked;
+  const at = linked?.at ? new Date(linked.at) : null;
+  return (
+    <section className="flex max-w-[760px] flex-col gap-2.5 rounded-lg bg-surface px-5 py-[18px]">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5">
+          <WhatsappLogoIcon size={28} weight="duotone" className="text-accent" />
+          <div>
+            <div className="font-semibold">Linked WhatsApp</div>
+            {linked || cloud ? (
+              <div className="text-[13px]">
+                {linked ? `+91 ${linked.number}` : cloud!.number} · <span className="text-accent">Connected</span>
+                <span className="block text-xs text-muted">{linked ? `${linked.device} · linked ${at && !Number.isNaN(at.getTime()) ? `${fmtShort(at)}, ${fmtTime(at)}` : "—"}` : `WhatsApp Cloud API · ${cloud!.name}`}</span>
+              </div>
+            ) : (
+              <div className="text-[13px] text-muted">Not linked · no API key needed, just scan a QR code</div>
+            )}
+          </div>
+        </div>
+        {linked || cloud ? (
+          <div className="flex gap-1">
+            <form action={sendTestAction}>
+              <Button disabled={!canUse}>
+                <PaperPlaneTiltIcon size={16} weight="duotone" />
+                Send test
+              </Button>
+            </form>
+            {linked && (
+              <form action={unlinkAction}>
+                <ConfirmButton variant="ghost" className="text-alert hover:bg-alert-soft" confirm="Unlink WhatsApp? Automatic sending stops. Messages are logged until you link again." disabled={!canUse}>
+                  Unlink
+                </ConfirmButton>
+              </form>
+            )}
+          </div>
+        ) : (
+          <LinkButton href={canUse ? "/settings?tab=wa&link=1" : "/settings/billing?upgrade=whatsapp"} variant="primary" scroll={false}>
+            <QrCodeIcon size={16} weight="duotone" />
+            Link WhatsApp
+          </LinkButton>
+        )}
+      </div>
+      <div className="text-[13px] leading-relaxed">
+        Works like WhatsApp Web: the Fitron connector (a small app on the gym computer or our server) stays linked to your WhatsApp and sends reminders, invoices and renewals by itself at the scheduled time. It sends one message every 8 to 15 seconds, up to 250 a day, to keep your number safe.
+      </div>
+      <div className="text-xs leading-relaxed text-alert">This is unofficial automation of WhatsApp. WhatsApp can restrict numbers that send too many messages to people who haven&apos;t saved your number. Use it for your own members only, never cold broadcasts, and keep a backup number.</div>
+    </section>
   );
 }
 

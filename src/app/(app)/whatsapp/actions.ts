@@ -2,13 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import * as z from "zod";
-import { requirePermission } from "@/lib/auth/current";
+import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { formAction, simpleAction } from "@/lib/form-action";
 import type { FormState } from "@/lib/validation/common";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getWaSettings, listTemplates, refreshQueued, sendCampaign, sendTemplate, updateTemplate } from "@/lib/services/whatsapp";
-import { runAutomationNow } from "@/lib/services/wa-automation";
+import { editRule, getWaSettings, refreshQueued, sendCampaign, sendTemplate, setAutoSend, updateTemplate } from "@/lib/services/whatsapp";
+import { runAutomationNow, runOne, type RunResult } from "@/lib/services/wa-automation";
+import { fmtTime } from "@/lib/format";
 import { audienceIds, type Audience } from "@/lib/services/audience";
 import { UserError } from "@/lib/services/errors";
 
@@ -67,21 +68,74 @@ export async function refreshAction() {
   revalidatePath("/whatsapp");
 }
 
+/** Automation is a Super Admin's call (settings.manage) on a plan with WhatsApp. */
+async function automationUser() {
+  await requirePermission("settings.manage");
+  return requireFeature("whatsapp");
+}
+
 /** The Auto-send checkbox on a template card. */
 export async function toggleAutoSendAction(key: string, on: boolean) {
-  const u = await requirePermission("settings.manage");
-  const t = (await listTemplates(u.orgId)).find((x) => x.key === key);
-  if (!t) return;
-  await updateTemplate(u, key, { body: t.body, metaTemplateName: t.metaTemplateName ?? undefined, language: t.language, autoSend: on });
+  const u = await automationUser();
+  await setAutoSend(u, key, on).catch((e) => {
+    if (!(e instanceof UserError)) throw e;
+  });
   revalidatePath("/whatsapp");
 }
 
-/** "Send N due now" in Today's automation. */
+/** The prototype's toast after a run: "2 automated messages sent · 1 skipped by rules". */
+const runSummary = (r: RunResult) =>
+  `${r.sent} automated message${r.sent === 1 ? "" : "s"} sent${r.skipped ? ` · ${r.skipped} skipped by rules` : ""}${r.held ? ` · ${r.held} held until ${fmtTime(r.heldUntil)}` : ""}`;
+
+/** "Send N due now" in Today's automation. Inside quiet hours nothing goes out and the page says why. */
 export async function runAutomationAction() {
-  const u = await requirePermission("settings.manage");
-  const sent = await runAutomationNow(u);
+  const u = await automationUser();
+  let r: RunResult;
+  try {
+    r = await runAutomationNow(u);
+  } catch (e) {
+    if (e instanceof UserError) redirect(`/whatsapp?err=${encodeURIComponent(e.message)}`);
+    throw e;
+  }
   revalidatePath("/whatsapp");
-  redirect(`/whatsapp?msg=${encodeURIComponent(`${sent} reminder${sent === 1 ? "" : "s"} sent.`)}`);
+  redirect(`/whatsapp?msg=${encodeURIComponent(runSummary(r))}`);
+}
+
+const ruleInput = z.object({
+  when: z.string(),
+  days: z.string().optional(),
+  time: z.string().optional(),
+  planId: z.string().optional(),
+  gender: z.string().optional(),
+  minDue: z.preprocess((v) => (v === "" || v == null ? 0 : v), z.coerce.number().min(0, { error: "Enter a balance of ₹0 or more." }).max(10_000_000)),
+  maxPerWeek: z.string().optional(),
+  quietFrom: z.string().optional(),
+  quietTo: z.string().optional(),
+  excludeAutopay: z.preprocess((v) => v === "on", z.boolean()),
+});
+
+/** "Save rule" in the Edit rule dialog. */
+export async function saveRuleAction(key: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await automationUser();
+  const r = await formAction(fd, ruleInput, (d) => editRule(u, key, { ...d, minDue: Math.round(d.minDue * 100) }), "Automation rule saved");
+  if (!r?.ok) return r;
+  revalidatePath("/whatsapp");
+  revalidatePath("/whatsapp/templates");
+  redirect(`/whatsapp?msg=${encodeURIComponent("Automation rule saved")}`);
+}
+
+/** "Send to N now" in Preview & run. */
+export async function runRuleAction(key: string) {
+  const u = await automationUser();
+  let r: RunResult;
+  try {
+    r = await runOne(u, key);
+  } catch (e) {
+    if (e instanceof UserError) redirect(`/whatsapp?preview=${encodeURIComponent(key)}&err=${encodeURIComponent(e.message)}`);
+    throw e;
+  }
+  revalidatePath("/whatsapp");
+  redirect(`/whatsapp?msg=${encodeURIComponent(runSummary(r))}`);
 }
 
 /** "Retry" on a failed message in the log: sends the same text to the member again. */

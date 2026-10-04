@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import { systemUser } from "@/lib/auth/system";
 import type { Prisma } from "@/generated/prisma/client";
-import { DEFAULT_TEMPLATES, placeholders, REMINDER_KEYS, render, rupeesText, waNumber, type TemplateVars } from "@/lib/domain/whatsapp";
+import { DEFAULT_TEMPLATES, defaultTemplateRows, placeholders, REMINDER_KEYS, render, rupeesText, waNumber, type TemplateVars } from "@/lib/domain/whatsapp";
 import { DEFAULT_REMINDERS, type ReminderSettings } from "@/lib/domain/reminders";
+import { fromColumns, holdUntil, toColumns, validateRule, type Rule, type RuleInput } from "@/lib/domain/wa-rules";
 import { connectorResults, sendWhatsApp, type WaMode } from "@/lib/integrations/whatsapp";
 import { fmtDate } from "@/lib/format";
 import { audit } from "./audit";
@@ -13,7 +14,7 @@ import { UserError } from "./errors";
 import { invoicePdf } from "./invoice-pdf";
 import { summarize } from "./members";
 import { notify } from "./notifications";
-import { getSetting } from "./settings";
+import { getSetting, putSettingIn } from "./settings";
 import { getTax } from "./tax";
 import { todayIso } from "./time";
 
@@ -28,19 +29,36 @@ export async function getReminderSettings(orgId: string): Promise<ReminderSettin
   return { ...DEFAULT_REMINDERS, ...inherited, ...(row ?? {}) };
 }
 
-export type WaSettings = { mode: WaMode } & ReminderSettings;
-export const DEFAULT_WA: WaSettings = { mode: "demo", ...DEFAULT_REMINDERS };
-export const getWaSettings = async (orgId: string): Promise<WaSettings> => ({
-  mode: (await getSetting<{ mode?: WaMode }>(orgId, "whatsapp"))?.mode ?? "demo",
-  ...(await getReminderSettings(orgId)),
-});
+/** The gym's WhatsApp number paired through the connector (or "Simulate instead" for demos). */
+export type WaLinked = { number: string; device: string; at: string };
+/**
+ * Setting "whatsapp": how messages go out, the linked device and quiet hours. Reminder days and
+ * birthday wishes are the templates' own rules; the repeat windows come from Settings › Reminders.
+ */
+export type WaSettings = { mode: WaMode; quietFrom: string; quietTo: string; linked: WaLinked | null } & Pick<ReminderSettings, "dedupDays" | "dueEveryDays">;
+export const DEFAULT_WA: WaSettings = { mode: "demo", quietFrom: "21:00", quietTo: "08:00", linked: null, dedupDays: DEFAULT_REMINDERS.dedupDays, dueEveryDays: DEFAULT_REMINDERS.dueEveryDays };
+const clock = (v: unknown, fallback: string) => (typeof v === "string" && /^\d{2}:\d{2}$/.test(v) ? v : fallback);
+export async function getWaSettings(orgId: string): Promise<WaSettings> {
+  const [row, reminders] = await Promise.all([getSetting<Partial<WaSettings>>(orgId, "whatsapp"), getReminderSettings(orgId)]);
+  const linked = row?.linked && typeof row.linked === "object" && typeof row.linked.number === "string" ? { number: row.linked.number, device: String(row.linked.device ?? ""), at: String(row.linked.at ?? "") } : null;
+  return { mode: row?.mode ?? "demo", quietFrom: clock(row?.quietFrom, DEFAULT_WA.quietFrom), quietTo: clock(row?.quietTo, DEFAULT_WA.quietTo), linked, dedupDays: reminders.dedupDays, dueEveryDays: reminders.dueEveryDays };
+}
+
+/** Links (or unlinks) the gym's WhatsApp and switches the sending mode with it. */
+export async function setLinked(u: CurrentUser, linked: WaLinked | null, mode: WaMode) {
+  await db.$transaction(async (tx) => {
+    await putSettingIn(tx, u, "whatsapp", { linked, mode });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: linked ? "whatsapp.link" : "whatsapp.unlink", entity: "Setting", entityId: "whatsapp", after: linked });
+  });
+}
 
 /** The gym's templates, creating the defaults the first time. */
 export async function listTemplates(orgId: string) {
   const have = await db.whatsAppTemplate.findMany({ where: { orgId } });
   const missing = DEFAULT_TEMPLATES.filter((t) => !have.some((h) => h.key === t.key));
   if (missing.length) {
-    await db.whatsAppTemplate.createMany({ data: missing.map((t) => ({ ...t, orgId })), skipDuplicates: true });
+    const rows = defaultTemplateRows();
+    await db.whatsAppTemplate.createMany({ data: missing.map((t) => ({ ...rows.find((r) => r.key === t.key)!, orgId })), skipDuplicates: true });
     return db.whatsAppTemplate.findMany({ where: { orgId } }).then(order);
   }
   return order(have);
@@ -55,6 +73,39 @@ export async function updateTemplate(u: CurrentUser, key: string, t: { body: str
     const after = await tx.whatsAppTemplate.update({ where: { id: before.id }, data: { body: t.body, metaTemplateName: t.metaTemplateName ?? null, language: t.language, autoSend: t.autoSend } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "whatsapp.template", entity: "WhatsAppTemplate", entityId: key, before, after });
   });
+}
+
+/** The Auto-send switch on a template (template card, Settings › Reminders). Audited like any template change. */
+export async function setAutoSend(u: CurrentUser, key: string, on: boolean) {
+  const t = (await listTemplates(u.orgId)).find((x) => x.key === key);
+  if (!t) throw new UserError("Template not found.");
+  if (t.autoSend === on) return;
+  await updateTemplate(u, key, { body: t.body, metaTemplateName: t.metaTemplateName ?? undefined, language: t.language, autoSend: on });
+}
+
+/** The automation rule behind a template row. */
+export const templateRule = (t: { ruleWhen: string; ruleDays: number; ruleTime: string; rulePlanId: string | null; ruleGender: string | null; ruleMinDue: number; ruleMaxPerWeek: number; ruleExcludeAutopay: boolean }): Rule => fromColumns(t);
+
+/**
+ * "Edit rule" on a template card: the trigger, timing and filters the automation uses, and, when
+ * they changed, the gym's quiet hours. Messages already held for the template keep their time.
+ */
+export async function editRule(u: CurrentUser, key: string, input: RuleInput & { quietFrom?: string; quietTo?: string }) {
+  const rule = validateRule(input);
+  if (rule.planId && !(await db.membershipPlan.findFirst({ where: { id: rule.planId, orgId: u.orgId }, select: { id: true } }))) throw new UserError("Pick a plan from the list.", "planId");
+  await listTemplates(u.orgId);
+  const t = await db.whatsAppTemplate.findUnique({ where: { orgId_key: { orgId: u.orgId, key } } });
+  if (!t) throw new UserError("Template not found.");
+  const settings = await getWaSettings(u.orgId);
+  const quietFrom = clock(input.quietFrom, settings.quietFrom);
+  const quietTo = clock(input.quietTo, settings.quietTo);
+  await db.$transaction(async (tx) => {
+    const columns = toColumns(rule);
+    await tx.whatsAppTemplate.update({ where: { id: t.id }, data: columns });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "whatsapp.rule", entity: "WhatsAppTemplate", entityId: key, before: toColumns(templateRule(t)), after: columns });
+    if (quietFrom !== settings.quietFrom || quietTo !== settings.quietTo) await putSettingIn(tx, u, "whatsapp", { quietFrom, quietTo });
+  });
+  return rule;
 }
 
 /** Everything a template can mention about a member right now. */
@@ -101,12 +152,13 @@ export type SendOpts = {
   force?: boolean;
 };
 
+const FAILED_NUMBER = "No valid WhatsApp number on the member's profile.";
+
 /**
- * Renders and sends one template to one member, and records the result. Never throws for
- * provider problems: a failure is stored with its error and raises an alert (rule 6).
- * Returns null when nothing was sent (auto-send off, duplicate reminder, no WhatsApp number).
+ * Renders a template for a member and records the message as Queued (or Scheduled, to go out at
+ * `holdUntil`). Returns null when nothing should be sent: auto-send off, duplicate reminder, walk-in.
  */
-export async function sendTemplate(o: SendOpts) {
+export async function prepareMessage(o: SendOpts & { holdUntil?: Date | null }) {
   const settings = await getWaSettings(o.orgId);
   const tpl = (await listTemplates(o.orgId)).find((t) => t.key === o.key);
   if (!tpl) throw new UserError("Template not found.");
@@ -120,27 +172,91 @@ export async function sendTemplate(o: SendOpts) {
   }
   const to = waNumber(member.whatsapp ?? member.phone);
   const vars = await memberVars(o.orgId, o.memberId, o.vars);
-  const source = o.body ?? tpl.body;
-  const body = render(source, vars);
-  const pdf = o.invoiceId ? await invoicePdf(await systemUser(o.orgId), o.invoiceId) : null;
-
-  const msg = await db.whatsAppMessage.create({
-    data: { orgId: o.orgId, memberId: o.memberId, templateKey: o.key, toNumber: to ?? member.phone, body, attachment: pdf ? `invoice:${o.invoiceId}` : null, provider: settings.mode, status: "Queued", sentById: o.userId ?? null },
+  const body = render(o.body ?? tpl.body, vars);
+  const held = o.holdUntil ?? null;
+  return db.whatsAppMessage.create({
+    data: {
+      orgId: o.orgId,
+      memberId: o.memberId,
+      templateKey: o.key,
+      toNumber: to ?? member.phone,
+      body,
+      attachment: o.invoiceId ? `invoice:${o.invoiceId}` : null,
+      provider: settings.mode,
+      status: held ? "Scheduled" : "Queued",
+      scheduledFor: held,
+      sentById: o.userId ?? null,
+    },
   });
+}
+
+/**
+ * Sends a prepared message through the provider and records the result. Never throws for provider
+ * problems: a failure is stored with its error and raises an alert (rule 6).
+ */
+export async function deliverMessage(id: string) {
+  const msg = await db.whatsAppMessage.findUniqueOrThrow({ where: { id }, include: { member: true } });
+  const settings = await getWaSettings(msg.orgId);
+  const tpl = (await listTemplates(msg.orgId)).find((t) => t.key === msg.templateKey);
+  const to = waNumber(msg.toNumber);
+  const invoiceId = msg.attachment?.startsWith("invoice:") ? msg.attachment.slice(8) : null;
+  const pdf = invoiceId ? await invoicePdf(await systemUser(msg.orgId), invoiceId) : null;
+  // A Cloud API template only when the text is the template's own (not a custom message).
+  let template: { name: string; language: string; params: string[] } | undefined;
+  if (settings.mode === "cloud" && tpl?.metaTemplateName && msg.memberId) {
+    const vars = await memberVars(msg.orgId, msg.memberId);
+    if (render(tpl.body, vars) === msg.body) template = { name: tpl.metaTemplateName, language: tpl.language, params: placeholders(tpl.body).map((k) => vars[k as keyof TemplateVars] ?? "") };
+  }
   const result = to
-    ? await sendWhatsApp(settings.mode, {
-        localId: msg.id,
-        to,
-        body,
-        template: settings.mode === "cloud" && tpl.metaTemplateName && !o.body ? { name: tpl.metaTemplateName, language: tpl.language, params: placeholders(tpl.body).map((k) => vars[k as keyof TemplateVars] ?? "") } : undefined,
-        pdf: pdf ? { bytes: pdf.bytes, filename: pdf.filename } : undefined,
-      })
-    : { status: "Failed" as const, error: "No valid WhatsApp number on the member's profile." };
-  const saved = await db.whatsAppMessage.update({ where: { id: msg.id }, data: { status: result.status, providerMessageId: result.providerMessageId ?? null, error: result.error ?? null } });
+    ? await sendWhatsApp(settings.mode, { localId: msg.id, to, body: msg.body, template, pdf: pdf ? { bytes: pdf.bytes, filename: pdf.filename } : undefined })
+    : { status: "Failed" as const, error: FAILED_NUMBER };
+  const saved = await db.whatsAppMessage.update({
+    where: { id: msg.id },
+    data: { status: result.status, provider: settings.mode, providerMessageId: result.providerMessageId ?? null, error: result.error ?? null },
+  });
   if (result.status === "Failed") {
-    await db.$transaction((tx) => notify(tx, { orgId: o.orgId, branchId: member.branchId, type: "WA_FAILED", text: `WhatsApp "${tpl.name}" to ${member.name} failed: ${result.error}`, link: `/whatsapp?status=Failed` }));
+    const who = msg.member?.name ?? msg.toNumber;
+    await db.$transaction((tx) => notify(tx, { orgId: msg.orgId, branchId: msg.member?.branchId, type: "WA_FAILED", text: `WhatsApp "${tpl?.name ?? msg.templateKey}" to ${who} failed: ${result.error}`, link: `/whatsapp?status=Failed` }));
   }
   return saved;
+}
+
+/**
+ * Renders and sends one template to one member straight away, and records the result.
+ * Returns null when nothing was sent (auto-send off, duplicate reminder, walk-in).
+ */
+export async function sendTemplate(o: SendOpts) {
+  const msg = await prepareMessage(o);
+  return msg ? deliverMessage(msg.id) : null;
+}
+
+/**
+ * The rule engine's send: goes out now when the rule's send time has passed and it isn't quiet
+ * hours, else is recorded as Scheduled and sent by the dispatcher when the hold ends.
+ */
+export async function queueTemplate(o: SendOpts & { now: Date; today: string; rule: Rule; settings: WaSettings }) {
+  const until = holdUntil(o.now, o.today, o.rule.time, o.settings.quietFrom, o.settings.quietTo);
+  const msg = await prepareMessage({ ...o, holdUntil: until });
+  if (!msg) return null;
+  return until ? msg : deliverMessage(msg.id);
+}
+
+export const TEST_BODY = "Fitron test message. Your WhatsApp connector is working.";
+
+/** "Send test" under Settings › WhatsApp: one message to the gym's own number through the current mode. */
+export async function sendTest(u: CurrentUser) {
+  const gym = await getSetting<{ phone?: string }>(u.orgId, "gym");
+  const branch = gym?.phone ? null : await db.branch.findFirst({ where: { orgId: u.orgId, id: { in: u.branchIds } }, orderBy: { createdAt: "asc" }, select: { phone: true } });
+  const to = waNumber(gym?.phone || branch?.phone);
+  if (!to) throw new UserError("Add the gym phone in Gym profile first.");
+  const settings = await getWaSettings(u.orgId);
+  const msg = await db.whatsAppMessage.create({ data: { orgId: u.orgId, memberId: null, templateKey: "test", toNumber: to, body: TEST_BODY, provider: settings.mode, status: "Queued", sentById: u.id } });
+  const result = await sendWhatsApp(settings.mode, { localId: msg.id, to, body: TEST_BODY });
+  return db.$transaction(async (tx) => {
+    const saved = await tx.whatsAppMessage.update({ where: { id: msg.id }, data: { status: result.status, providerMessageId: result.providerMessageId ?? null, error: result.error ?? null } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "whatsapp.test", entity: "WhatsAppMessage", entityId: msg.id, after: { status: saved.status, error: saved.error } });
+    return saved;
+  });
 }
 
 /**
@@ -195,7 +311,7 @@ export async function listMessages(u: CurrentUser, f: { status?: string; key?: s
 export async function applyDeliveryStatus(providerMessageId: string, status: string, at: Date, error?: string) {
   const msg = await db.whatsAppMessage.findFirst({ where: { providerMessageId } });
   if (!msg) return;
-  const rank = { Logged: 0, Queued: 1, Sent: 2, Delivered: 3, Read: 4, Failed: 5 } as Record<string, number>;
+  const rank = { Scheduled: 0, Logged: 0, Queued: 1, Sent: 2, Delivered: 3, Read: 4, Failed: 5 } as Record<string, number>;
   const next = { sent: "Sent", delivered: "Delivered", read: "Read", failed: "Failed" }[status];
   if (!next || (rank[next] ?? 0) <= (rank[msg.status] ?? 0)) return;
   await db.whatsAppMessage.update({

@@ -21,7 +21,7 @@ import { db } from "@/lib/db";
 import { listNotifications, markAllRead, openNotification } from "@/lib/services/notifications";
 import { listMembers, memberScope } from "@/lib/services/members";
 import { todayIso } from "@/lib/services/time";
-import { getWaSettings } from "@/lib/services/whatsapp";
+import { reminderSchedule } from "@/lib/services/reminders";
 import { daysBetween } from "@/lib/domain/dates";
 import { ListHeader, cx } from "@/components/ui";
 import { fmtDate, fmtShort, fmtTime } from "@/lib/format";
@@ -88,7 +88,7 @@ export default async function NotificationsPage() {
       }
     }
     const md = today.slice(5);
-    const wishes = (await getWaSettings(u.orgId)).birthdays;
+    const wishes = (await reminderSchedule(u.orgId)).birthdays;
     const birthdays = await db.member.findMany({ where: { ...memberScope(u), walkIn: false, dob: { not: null } }, select: { id: true, name: true, dob: true } });
     for (const b of birthdays.filter((x) => x.dob!.toISOString().slice(5, 10) === md))
       rows.push({ key: `bd-${b.id}`, type: "Birthday", icon: CakeIcon, when: when(morning(6), today), at: morning(6).getTime(), text: `${b.name} has a birthday today.${wishes ? " Wishes are sent automatically." : ""}`, unread: false, href: `/members/${b.id}` });

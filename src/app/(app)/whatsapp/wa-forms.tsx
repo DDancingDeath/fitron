@@ -1,9 +1,11 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useState, type ReactNode } from "react";
+import Link from "next/link";
 import { LightningIcon } from "@phosphor-icons/react";
-import { campaignAction, saveTemplateAction, sendOneAction } from "./actions";
+import { campaignAction, saveRuleAction, saveTemplateAction, sendOneAction } from "./actions";
 import { Button, Field, Input, Notice, Select, Textarea } from "@/components/ui";
+import { WHEN } from "@/lib/domain/wa-rules";
 
 export function TemplateForm({ tkey, body, metaTemplateName, language, autoSend }: { tkey: string; body: string; metaTemplateName: string | null; language: string; autoSend: boolean }) {
   const [state, action, pending] = useActionState(saveTemplateAction.bind(null, tkey), undefined);
@@ -115,7 +117,7 @@ export function CampaignForm({ audiences }: { audiences: { key: string; label: s
 type Card = { key: string; name: string; trigger: string; body: string; autoSend: boolean; metaTemplateName: string | null; language: string; rule: string; due?: string; sent: number };
 
 /** A template card as in the prototype: trigger, Auto-send, the message, its rule and today's matches; Edit opens the text in place. */
-export function TemplateCard({ t, vars, canEdit, cloud, toggle }: { t: Card; vars: string[]; canEdit: boolean; cloud: boolean; toggle: (on: boolean) => Promise<void> }) {
+export function TemplateCard({ t, vars, canEdit, cloud, toggle, actions }: { t: Card; vars: string[]; canEdit: boolean; cloud: boolean; toggle: (on: boolean) => Promise<void>; actions?: ReactNode }) {
   const [editing, setEditing] = useState(false);
   const [body, setBody] = useState(t.body);
   const [saved, setSaved] = useState(t.body);
@@ -196,6 +198,7 @@ export function TemplateCard({ t, vars, canEdit, cloud, toggle }: { t: Card; var
               {t.due && <span className="mt-0.5 block text-xs text-accent">{t.due}</span>}
             </span>
           </div>
+          {actions}
           <div className="mt-1 flex items-center justify-between border-t border-line-soft pt-2.5 text-[13px] text-muted">
             <span>
               {t.autoSend ? "Auto-send on" : "Auto-send off"} · {t.sent} sent
@@ -209,5 +212,84 @@ export function TemplateCard({ t, vars, canEdit, cloud, toggle }: { t: Card; var
         </>
       )}
     </div>
+  );
+}
+
+export type RuleValues = { when: string; days: number; time: string; planId: string | null; gender: string | null; minDue: number; maxPerWeek: number; excludeAutopay: boolean };
+
+/** The prototype's "Edit rule" form: trigger, timing, filters and the gym's quiet hours. */
+export function RuleForm({ tkey, rule, plans, quietFrom, quietTo, dedupDays, close }: { tkey: string; rule: RuleValues; plans: { id: string; name: string }[]; quietFrom: string; quietTo: string; dedupDays: number; close: string }) {
+  const [state, action, pending] = useActionState(saveRuleAction.bind(null, tkey), undefined);
+  const e = state?.errors ?? {};
+  const v = (k: string, fallback: string) => {
+    const x = state?.values?.[k];
+    return typeof x === "string" ? x : fallback;
+  };
+  return (
+    <form action={action} key={state?.nonce} className="flex flex-col gap-3">
+      {state?.message && !state.ok && <Notice tone="alert">{state.message}</Notice>}
+      <div className="grid gap-x-3 gap-y-2.5 sm:grid-cols-2">
+        <Field label="Trigger" className="sm:col-span-2" error={e.when}>
+          <Select name="when" defaultValue={v("when", rule.when)}>
+            {Object.entries(WHEN).map(([k, label]) => (
+              <option key={k} value={k}>
+                {label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Days" error={e.days}>
+          <Input name="days" type="number" min={0} max={365} defaultValue={v("days", String(rule.days))} />
+        </Field>
+        <Field label="Send at" error={e.time}>
+          <Input name="time" type="time" defaultValue={v("time", rule.time)} />
+        </Field>
+        <Field label="Only for plan" error={e.planId}>
+          <Select name="planId" defaultValue={v("planId", rule.planId ?? "")}>
+            <option value="">All</option>
+            {plans.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Gender" error={e.gender}>
+          <Select name="gender" defaultValue={v("gender", rule.gender ?? "")}>
+            <option value="">All</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </Select>
+        </Field>
+        <Field label="Minimum balance (₹)" error={e.minDue}>
+          <Input name="minDue" type="number" min={0} step={1} defaultValue={v("minDue", String(Math.round(rule.minDue / 100)))} />
+        </Field>
+        <Field label="Max automated messages per member per week" error={e.maxPerWeek}>
+          <Input name="maxPerWeek" type="number" min={1} max={99} defaultValue={v("maxPerWeek", String(rule.maxPerWeek))} />
+        </Field>
+        <Field label="Quiet hours from" error={e.quietFrom}>
+          <Input name="quietFrom" type="time" defaultValue={v("quietFrom", quietFrom)} />
+        </Field>
+        <Field label="Quiet hours to" error={e.quietTo}>
+          <Input name="quietTo" type="time" defaultValue={v("quietTo", quietTo)} />
+        </Field>
+        <label className="flex flex-col gap-[5px] text-sm sm:col-span-2">
+          <span className="text-xs text-fg/70">Autopay</span>
+          <span className="flex items-center gap-2">
+            <input type="checkbox" name="excludeAutopay" defaultChecked={state?.values ? state.values.excludeAutopay === "on" : rule.excludeAutopay} className="size-4 accent-accent" />
+            Skip members on UPI autopay
+          </span>
+        </label>
+      </div>
+      <p className="m-0 text-[13px] text-muted">Every run respects the {dedupDays}-day repeat window and invalid numbers are skipped.</p>
+      <div className="flex justify-end gap-2.5">
+        <Link href={close} scroll={false} className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+          Cancel
+        </Link>
+        <Button variant="primary" disabled={pending}>
+          {pending ? "Saving…" : "Save rule"}
+        </Button>
+      </div>
+    </form>
   );
 }

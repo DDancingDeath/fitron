@@ -5,9 +5,10 @@ import { addDays } from "@/lib/domain/dates";
 import { createMember } from "./members";
 import { createPlan } from "./plans";
 import { sellMembership } from "./billing";
-import { putSetting } from "./settings";
+import { getAccessRules } from "./attendance";
+import { saveReminderSettings } from "./reminders";
 import { runDailyJobs } from "./jobs";
-import { todayIso } from "./time";
+import { istInstant, todayIso } from "./time";
 
 describe.skipIf(!hasDb)("daily reminder jobs follow Settings › Reminders (database)", () => {
   let gym: Awaited<ReturnType<typeof makeGym>>;
@@ -27,15 +28,17 @@ describe.skipIf(!hasDb)("daily reminder jobs follow Settings › Reminders (data
   });
 
   it("sends the 15-day reminder when that day is on, and nothing when only 7 is on", async () => {
-    await putSetting(admin, "reminders", { expiryDays: [7], dueEveryDays: 0, birthdays: false });
-    const quiet = await runDailyJobs(gym.org.id, addDays(today, -1));
+    // The pills switch the expiry templates' Auto-send, which the rule engine reads. Runs at 10 am, outside quiet hours.
+    const graceDays = (await getAccessRules(gym.org.id)).graceDays;
+    await saveReminderSettings(admin, { expiryDays: [7], dedupDays: 3, dueEveryDays: 0, defaultMonths: 1, graceDays, birthdays: false });
+    const quiet = await runDailyJobs(gym.org.id, addDays(today, -1), istInstant(addDays(today, -1), "10:00"));
     expect(result(quiet, "reminders.expiry")).toMatchObject({ status: "ran", result: { sent: 0 } });
     expect(await db.whatsAppMessage.count({ where: { memberId } })).toBe(0);
     expect(result(quiet, "reminders.dues")).toMatchObject({ status: "ran", result: { note: "off" } });
     expect(result(quiet, "reminders.birthday")).toMatchObject({ status: "ran", result: { note: "off" } });
 
-    await putSetting(admin, "reminders", { expiryDays: [15], dueEveryDays: 3, birthdays: true });
-    const out = await runDailyJobs(gym.org.id, today);
+    await saveReminderSettings(admin, { expiryDays: [15], dedupDays: 3, dueEveryDays: 3, defaultMonths: 1, graceDays, birthdays: true });
+    const out = await runDailyJobs(gym.org.id, today, istInstant(today, "10:00"));
     expect(result(out, "reminders.expiry")).toMatchObject({ status: "ran", result: { sent: 1 } });
     expect(result(out, "reminders.dues")).toMatchObject({ status: "ran", result: { sent: 0 } });
     expect(result(out, "reminders.birthday")).toMatchObject({ status: "ran", result: { sent: 0 } });

@@ -3,8 +3,10 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as z from "zod";
-import { requirePermission } from "@/lib/auth/current";
+import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } from "@/lib/services/settings";
+import { getWaSettings, sendTest, setLinked } from "@/lib/services/whatsapp";
+import { connectorLogout, connectorStatus, providerReady } from "@/lib/integrations/whatsapp";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
 import { branchInput, gymInput, numberingInput, reminderInput, taxInput } from "@/lib/validation/settings";
 import { accessInput } from "@/lib/validation/frontdesk";
@@ -110,4 +112,79 @@ export async function saveAutopay(fd: FormData) {
   await save(z.object({ mode: z.enum(["demo", "live"]) }), fd, "autopay", async (v) => {
     await putSetting(u, "autopay", v);
   });
+}
+
+/** Linking, testing and unlinking WhatsApp: a Super Admin on a plan with WhatsApp. */
+async function waUser() {
+  await requirePermission("settings.manage");
+  return requireFeature("whatsapp");
+}
+const waBack = (params: Record<string, string>) => back({ tab: "wa", ...params });
+
+/** "Send test" on the Linked WhatsApp card: one message to the gym's own number. */
+export async function sendTestAction() {
+  const u = await waUser();
+  let msg: Awaited<ReturnType<typeof sendTest>>;
+  try {
+    msg = await sendTest(u);
+  } catch (e) {
+    if (e instanceof UserError) waBack({ error: e.message });
+    throw e;
+  }
+  revalidatePath("/whatsapp");
+  if (msg.status === "Failed") waBack({ error: `Test failed: ${msg.error}` });
+  waBack({ msg: msg.status === "Queued" ? "Test message queued on your linked WhatsApp." : msg.status === "Logged" ? "Demo mode: test message logged, not sent." : "Test message sent." });
+}
+
+/** "Unlink": the connector signs out and messages are logged until the gym links again. */
+export async function unlinkAction() {
+  const u = await waUser();
+  if ((await getWaSettings(u.orgId)).mode === "connector" && !providerReady("connector")) await connectorLogout();
+  await setLinked(u, null, "demo");
+  revalidatePath("/", "layout");
+  waBack({ msg: "WhatsApp unlinked." });
+}
+
+/** "Simulate instead" in the Link WhatsApp dialog: demo mode, for gyms without a connector. */
+export async function simulateLinkAction() {
+  const u = await waUser();
+  await setLinked(u, null, "demo");
+  revalidatePath("/", "layout");
+  waBack({ msg: "Demo mode: messages are logged, not sent." });
+}
+
+export type LinkStatus = { state: "offline" | "waiting" | "qr" | "ready"; qr?: string; number?: string; text: string };
+const WAITING = "Waiting for the connector… checking every few seconds";
+
+/**
+ * Polled by the Link WhatsApp dialog: the connector's state and QR code. Once the phone is linked,
+ * the gym is marked linked (mode connector) and the dialog closes.
+ */
+export async function linkStatusAction(): Promise<LinkStatus> {
+  const u = await waUser();
+  const missing = providerReady("connector");
+  if (missing) return { state: "offline", text: `${missing} ${WAITING}` };
+  let st: Awaited<ReturnType<typeof connectorStatus>>;
+  try {
+    st = await connectorStatus();
+  } catch {
+    return { state: "offline", text: WAITING };
+  }
+  if (st.state === "ready") {
+    const number = (st.number ?? "").replace(/\D/g, "");
+    const s = await getWaSettings(u.orgId);
+    if (!(s.mode === "connector" && s.linked?.number === number)) {
+      let host = "gym PC";
+      try {
+        host = new URL(process.env.WA_CONNECTOR_URL ?? "").host || host;
+      } catch {
+        // Keep the fallback.
+      }
+      await setLinked(u, { number, device: `Fitron connector · ${host}`, at: new Date().toISOString() }, "connector");
+      revalidatePath("/", "layout");
+    }
+    return { state: "ready", number, text: "Linked." };
+  }
+  if (st.qr) return { state: "qr", qr: st.qr, text: "" };
+  return { state: "waiting", text: st.state === "authenticating" ? "Scanned. Finishing link…" : "Connector is starting WhatsApp…" };
 }

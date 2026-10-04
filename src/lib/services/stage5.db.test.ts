@@ -11,7 +11,8 @@ import { applyDeliveryStatus, sendTemplate } from "./whatsapp";
 import { applyRazorpayEvent, autopayStats, changeMandate, createMandate, listMandates, retryDemoDebit, runAutopayDay } from "./autopay";
 import { runDailyJobs } from "./jobs";
 import { listNotifications } from "./notifications";
-import { todayIso } from "./time";
+import { istInstant, todayIso } from "./time";
+import { runRules } from "./wa-automation";
 
 describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
   let gym: Awaited<ReturnType<typeof makeGym>>;
@@ -64,10 +65,11 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     const start = addDays(addDays(today, 7), -29);
     const s = await sellMembership(admin, m.id, { planId, startDate: start, discount: 0, includeRegFee: false, payAmount: 0 });
     expect(addDays(today, 7)).toBe(s.membership.endDate.toISOString().slice(0, 10));
-    const first = await runDailyJobs(gym.org.id, today);
+    // A daytime run, outside quiet hours, so the reminder goes straight out.
+    const first = await runDailyJobs(gym.org.id, today, istInstant(today, "10:00"));
     expect(first.find((j) => j.name === "reminders.expiry")?.status).toBe("ran");
-    expect(await db.whatsAppMessage.count({ where: { memberId: m.id, templateKey: "exp7" } })).toBe(1);
-    const second = await runDailyJobs(gym.org.id, today);
+    expect(await db.whatsAppMessage.count({ where: { memberId: m.id, templateKey: "exp7", status: "Logged" } })).toBe(1);
+    const second = await runDailyJobs(gym.org.id, today, istInstant(today, "10:00"));
     expect(second.every((j) => j.status === "skipped")).toBe(true);
   });
 
@@ -79,7 +81,10 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     await expect(createMandate(admin, { memberId: m.id, planId })).rejects.toThrow(/already has autopay/);
     await changeMandate(admin, md.id, "approve-demo");
     const debit = addDays(first.membership.endDate.toISOString().slice(0, 10), 1);
-    expect((await runAutopayDay(gym.org.id, addDays(debit, -1))).noticed).toBeGreaterThanOrEqual(1);
+    // The day-ahead notice is the autopay template's rule (1 day before each debit).
+    const notice = await runRules(gym.org.id, null, ["autopay"], addDays(debit, -1), istInstant(addDays(debit, -1), "10:00"), null);
+    expect(notice.sent).toBeGreaterThanOrEqual(1);
+    expect(await db.whatsAppMessage.count({ where: { memberId: m.id, templateKey: "autopay" } })).toBe(1);
     expect(await runAutopayDay(gym.org.id, debit)).toMatchObject({ charged: 1 });
     expect(await runAutopayDay(gym.org.id, debit)).toMatchObject({ charged: 0 });
     const ms = await db.membership.findMany({ where: { memberId: m.id }, orderBy: { startDate: "asc" } });

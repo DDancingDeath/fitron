@@ -3,6 +3,7 @@ import { WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { listMembers } from "@/lib/services/members";
 import { lastRenewalReminders, renewalAmounts } from "@/lib/services/reminders";
+import { reminderSchedule } from "@/lib/services/reminders";
 import { getWaSettings } from "@/lib/services/whatsapp";
 import { todayIso } from "@/lib/services/time";
 import { daysBetween } from "@/lib/domain/dates";
@@ -31,13 +32,13 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
   const cur = BUCKETS.find((b) => b[0] === w) ?? BUCKETS[3]!;
   const msg = typeof sp.msg === "string" ? sp.msg : null;
   const today = todayIso();
-  const [{ rows: all }, wa] = await Promise.all([listMembers(u, { all: true }), getWaSettings(u.orgId)]);
+  const [{ rows: all }, wa, schedule0] = await Promise.all([listMembers(u, { all: true }), getWaSettings(u.orgId), reminderSchedule(u.orgId)]);
   const withDays = all.filter((m) => m.latestEnd).map((m) => ({ ...m, days: daysBetween(m.latestEnd!, today) }));
   const rows = withDays.filter((m) => cur[2](m.days)).sort((a, b) => (a.days < 0 && b.days < 0 ? b.days - a.days : a.days - b.days));
   const ids = rows.map((m) => m.id);
   const [last, amounts] = await Promise.all([lastRenewalReminders(ids), renewalAmounts(ids)]);
   const here = `/renewals?w=${cur[0]}`;
-  const schedule = [...wa.expiryDays]
+  const schedule = [...schedule0.expiryDays]
     .sort((a, b) => b - a)
     .map((d) => (d === 0 ? "on expiry day" : `${d} day${d > 1 ? "s" : ""} before`))
     .join(", ");
