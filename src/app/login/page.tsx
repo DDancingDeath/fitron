@@ -30,6 +30,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <div className="mb-8 lg:hidden"><a href="/"><Logo /></a></div>
           <h2 className="text-3xl font-semibold">Log in</h2>
           <p className="mt-1 mb-6 text-muted">Use Google, or your email and password.</p>
+          {typeof q.idle === "string" && /^\d+$/.test(q.idle) && <div className="mb-4"><Notice tone="alert">You were signed out after {q.idle} minutes of inactivity.</Notice></div>}
           {q.reset && <div className="mb-4"><Notice tone="ok">Password changed. Log in with your new password.</Notice></div>}
           {q.verified && <div className="mb-4"><Notice tone="ok">Email confirmed. Log in to open your console.</Notice></div>}
           {googleMessage(q.google, q.email) && <div className="mb-4"><Notice tone="alert">{googleMessage(q.google, q.email)}</Notice></div>}

@@ -38,6 +38,8 @@ model Organization {
   autopayMandates   AutopayMandate[]
   assets            Asset[]
   purchases         Purchase[]
+  /// Created from the demo seed; the Go live checklist's "Clear demo data" removes its records and sets this false
+  demo              Boolean            @default(false)
   /// FITRON plan key from src/lib/domain/pricing.ts (starter, professional, enterprise)
   plan              String             @default("professional")
   /// MONTHLY | YEARLY

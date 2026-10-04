@@ -5,7 +5,7 @@ import { gymPlan } from "@/lib/services/saas";
 import { PERMISSION_FEATURE, planHas, type Feature, type GymPlanView } from "@/lib/domain/features";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { readSession } from "./session";
+import { readSession, sessionCheck } from "./session";
 import type { Permission } from "./permissions";
 
 export const BRANCH_COOKIE = "fitron_branch";
@@ -90,7 +90,10 @@ export const PLAN_ENDED = "Your FITRON plan has ended. Your data is safe; choose
  */
 export async function requireUser(opts: { allowBlocked?: boolean } = {}) {
   const u = await getCurrentUser();
-  if (!u) redirect("/login");
+  if (!u) {
+    const { endedBy, idleMinutes } = await sessionCheck();
+    redirect(endedBy === "idle" ? `/login?idle=${idleMinutes}` : "/login");
+  }
   if (u.planBlocked && !opts.allowBlocked) redirect(PLAN_ENDED_PATH);
   return u;
 }

@@ -12,7 +12,8 @@ import { SideLogo } from "@/components/side-logo";
 import { BellLink, TrialBanner } from "@/components/shell";
 import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
-import { getGymProfile } from "@/lib/services/settings";
+import { getGymProfile, getIdleMinutes } from "@/lib/services/settings";
+import { IdleSignout } from "@/components/idle-signout";
 import { getSubscriptionSettings } from "@/lib/services/subscription";
 import { getAiSettings } from "@/lib/services/ai-settings";
 import { gymLogoUrl } from "@/components/gym-logo";
@@ -26,7 +27,7 @@ const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_A
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
-  const [counts, plan, profile, sub, ai] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId), getSubscriptionSettings(u.orgId), getAiSettings(u.orgId)]);
+  const [counts, plan, profile, sub, ai, idleMinutes] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId), getSubscriptionSettings(u.orgId), getAiSettings(u.orgId), getIdleMinutes(u.orgId)]);
   const gymName = profile.name || u.orgName;
   const logo = gymLogoUrl(profile.logoKey);
   const s = plan.standing;
@@ -118,6 +119,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 lg:px-10">{children}</main>
       </div>
       {u.can("ai.use") && ai.enabled && <AskAi />}
+      <IdleSignout minutes={idleMinutes} />
     </div>
   );
 }

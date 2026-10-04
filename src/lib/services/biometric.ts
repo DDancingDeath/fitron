@@ -42,6 +42,9 @@ export function unseal(b: Uint8Array) {
 // ── What devices call ─────────────────────────────────────────────────────
 
 /** A device calling in. Unknown serials are recorded for a Super Admin to approve; nothing they send is used until then. */
+/** A device counts as online when it called in within the last five minutes. */
+export const isDeviceOnline = (d: { lastSeenAt: Date | null }, now = Date.now()) => !!d.lastSeenAt && now - d.lastSeenAt.getTime() <= 5 * 60_000;
+
 export async function deviceFor(serial: string, ip: string | null) {
   if (!/^[A-Za-z0-9_-]{4,40}$/.test(serial)) return null;
   const d = await db.device.upsert({ where: { serial }, create: { serial, ip }, update: { lastSeenAt: new Date(), ip } });

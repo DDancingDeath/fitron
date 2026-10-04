@@ -6,6 +6,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { audit } from "./audit";
 import { UserError } from "./errors";
 import type { GymInput, TaxInput } from "@/lib/validation/settings";
+import { DEFAULT_IDLE_MINUTES } from "@/lib/domain/security";
 
 type Tx = Prisma.TransactionClient;
 
@@ -15,7 +16,7 @@ export async function getSetting<T>(orgId: string, key: string): Promise<T | nul
 }
 
 /** Settings a Super Admin may change from the app. */
-export const EDITABLE_SETTINGS = ["gym", "tax", "numbering", "access", "whatsapp", "reminders", "autopay", "ai", "migration", "opening", "subscription"] as const;
+export const EDITABLE_SETTINGS = ["gym", "tax", "numbering", "access", "whatsapp", "reminders", "autopay", "ai", "migration", "opening", "subscription", "security", "privacy"] as const;
 export type EditableSetting = (typeof EDITABLE_SETTINGS)[number];
 
 /** Merges `value` into the setting and audits it, inside the caller's transaction. */
@@ -102,3 +103,14 @@ export async function saveBranch(u: CurrentUser, id: string | null, v: { name: s
     }
   });
 }
+
+/** Minutes without activity before staff are signed out (Setting `security`; 0 = never). */
+export async function getIdleMinutes(orgId: string) {
+  const s = await getSetting<{ idleMinutes?: number }>(orgId, "security");
+  const m = s?.idleMinutes;
+  return typeof m === "number" && Number.isFinite(m) && m >= 0 ? Math.floor(m) : DEFAULT_IDLE_MINUTES;
+}
+
+/** Settings › Privacy & DPDP: the grievance officer and how long data is kept after a membership ends. */
+export type PrivacySetting = { officer?: string; email?: string; phone?: string; retainMonths?: number };
+export const getPrivacy = async (orgId: string): Promise<PrivacySetting> => (await getSetting<PrivacySetting>(orgId, "privacy")) ?? {};
