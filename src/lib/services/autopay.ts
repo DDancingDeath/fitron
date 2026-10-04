@@ -7,7 +7,9 @@ import type { Prisma } from "@/generated/prisma/client";
 import { addDays } from "@/lib/domain/dates";
 import { invoiceTotals } from "@/lib/domain/billing";
 import { rupeesText } from "@/lib/domain/whatsapp";
-import { createPlan, createSubscription, pingRazorpay, razorpayReady, subscriptionAction } from "@/lib/integrations/razorpay";
+import { createPlan, createSubscription, getPayment, getSubscription, listSubscriptionInvoices, pingRazorpay, razorpayReady, subscriptionAction } from "@/lib/integrations/razorpay";
+import { simulateDebit } from "@/lib/domain/autopay";
+import { fmtDate } from "@/lib/format";
 import { withAutopayDefaults, type AutopaySettings } from "@/lib/domain/integrations";
 import { audit } from "./audit";
 import { sellMembership, suggestedStart } from "./billing";
@@ -79,6 +81,21 @@ async function cycleAmount(orgId: string, plan: { price: number; discount: numbe
 /** A UPI ID: name@handle. */
 export const VPA = /^[\w.-]{2,}@[a-z][a-z0-9]{1,}$/i;
 
+/** Finds or creates the Razorpay plan, creates the subscription and stores its id and approval link. */
+async function createAtRazorpay(m: { id: string; orgId: string; amount: number; months: number }, plan: { name: string; months: number }, startOn: string, memberCode: string) {
+  const plans = (await getSetting<Record<string, string>>(m.orgId, "autopay_plans")) ?? {};
+  const key = `${m.amount}|${plan.months}`;
+  let rzpPlan = plans[key];
+  if (!rzpPlan) {
+    rzpPlan = await createPlan(m.amount, plan.months, `${plan.name} (${plan.months} month${plan.months > 1 ? "s" : ""})`);
+    const value = { ...plans, [key]: rzpPlan };
+    await db.setting.upsert({ where: { orgId_key: { orgId: m.orgId, key: "autopay_plans" } }, create: { orgId: m.orgId, key: "autopay_plans", value }, update: { value } });
+  }
+  const sub = await createSubscription({ planId: rzpPlan, startAt: fromIso(startOn), notes: { fitron_mandate: m.id, member: memberCode } });
+  await db.autopayMandate.update({ where: { id: m.id }, data: { subscriptionId: sub.id, shortUrl: sub.short_url ?? null } });
+  return sub.short_url ?? null;
+}
+
 export async function createMandate(u: CurrentUser, a: { memberId: string; planId: string; startOn?: string; vpa?: string }) {
   const vpa = a.vpa?.trim().toLowerCase() || null;
   if (vpa && !VPA.test(vpa)) throw new UserError("Enter a UPI ID like name@okicici.", "vpa");
@@ -103,17 +120,7 @@ export async function createMandate(u: CurrentUser, a: { memberId: string; planI
 
   if (mode === "live") {
     try {
-      const plans = (await getSetting<Record<string, string>>(u.orgId, "autopay_plans")) ?? {};
-      const key = `${amount}|${plan.months}`;
-      let rzpPlan = plans[key];
-      if (!rzpPlan) {
-        rzpPlan = await createPlan(amount, plan.months, `${plan.name} (${plan.months} month${plan.months > 1 ? "s" : ""})`);
-        const value = { ...plans, [key]: rzpPlan };
-        await db.setting.upsert({ where: { orgId_key: { orgId: u.orgId, key: "autopay_plans" } }, create: { orgId: u.orgId, key: "autopay_plans", value }, update: { value } });
-      }
-      const sub = await createSubscription({ planId: rzpPlan, startAt: fromIso(startOn), notes: { fitron_mandate: mandate.id, member: member.code } });
-      await db.autopayMandate.update({ where: { id: mandate.id }, data: { subscriptionId: sub.id, shortUrl: sub.short_url ?? null } });
-      mandate.shortUrl = sub.short_url ?? null;
+      mandate.shortUrl = await createAtRazorpay(mandate, plan, startOn, member.code);
     } catch (e) {
       await db.autopayMandate.update({ where: { id: mandate.id }, data: { status: "Failed", lastResult: `Razorpay: ${e instanceof Error ? e.message : String(e)}` } });
       throw new UserError(`Razorpay refused the mandate: ${e instanceof Error ? e.message : String(e)}`);
@@ -168,7 +175,7 @@ export async function recordCharge(mandateId: string, charge: { paymentId: strin
   const total = await cycleAmount(m.orgId, plan);
   const r = await sellMembership(sys, m.memberId, { planId: plan.id, startDate: start, discount: plan.discount, includeRegFee: false, payAmount: Math.min(charge.amount, total), payMethod: "UPI", payRef: charge.paymentId }, { type: "AUTOPAY" });
   const next = addDays(toIso(r.membership.endDate), 1);
-  await db.$transaction((tx) => update(tx, m.orgId, null, m.id, { status: "Active", retries: 0, nextDebitOn: fromIso(next), lastResult: `Charged ₹${rupeesText(charge.amount)} on ${todayIso()} (${r.invoice.number})` }, "autopay.charged"));
+  await db.$transaction((tx) => update(tx, m.orgId, null, m.id, { status: "Active", retries: 0, nextRetryOn: null, nextDebitOn: fromIso(next), lastResult: `Charged ₹${rupeesText(charge.amount)} on ${todayIso()} (${r.invoice.number})` }, "autopay.charged"));
   await sendTemplate({ orgId: m.orgId, memberId: m.memberId, key: "renewal", auto: true, invoiceId: r.invoice.id, vars: { invoice_number: r.invoice.number, amount: rupeesText(r.invoice.total) } }).catch(() => null);
   return "renewed";
 }
@@ -237,36 +244,47 @@ export async function applyRazorpayEvent(eventId: string, ev: RzpEvent) {
   return result;
 }
 
+type DebitResult = { result: "renewed" | "failed" | "halted" | "duplicate" | "plan-inactive"; reason?: string; retries?: number; nextRetryOn?: string | null };
+
+/** One simulated demo debit (settings: retries, retryGap). Success renews; failure schedules a retry or halts. */
+async function demoDebit(m: { id: string; orgId: string; branchId: string; memberId: string; code: string; amount: number; retries: number }, today: string, opts?: { roll?: number }, userId: string | null = null): Promise<DebitResult> {
+  const st = await getAutopaySettings(m.orgId);
+  const o = simulateDebit({ mandateId: m.id, today, retries: m.retries, maxRetries: st.retries, retryGap: st.retryGap, roll: opts?.roll });
+  if (o.ok) return { result: (await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}_${m.retries}`, amount: m.amount })) as DebitResult["result"] };
+  const text = o.halted
+    ? `Autopay ${m.code} stopped after ${st.retries} failed tries: ${o.reason}. Collect the renewal at the desk.`
+    : `Autopay ${m.code} debit failed: ${o.reason}. Retry on ${fmtDate(o.nextRetryOn)}.`;
+  await db.$transaction(async (tx) => {
+    await update(tx, m.orgId, userId, m.id, { status: o.halted ? "Halted" : "Failed", retries: o.retries, nextRetryOn: o.nextRetryOn ? fromIso(o.nextRetryOn) : null, lastResult: o.lastResult }, o.halted ? "autopay.halted" : "autopay.failed");
+    await notify(tx, { orgId: m.orgId, branchId: m.branchId, type: "AUTOPAY", text, link: `/autopay/${m.id}` });
+  });
+  const [member, gym] = await Promise.all([db.member.findUnique({ where: { id: m.memberId }, select: { name: true } }), getSetting<{ name?: string }>(m.orgId, "gym")]);
+  const first = member?.name.split(" ")[0] ?? "there";
+  const gymName = gym?.name ?? "the gym";
+  const body = o.halted
+    ? `Hi ${first}, we could not collect your ${gymName} renewal of ₹${rupeesText(m.amount)} after ${st.retries} tries. Please pay at the desk or approve a new autopay.`
+    : `Hi ${first}, your UPI autopay of ₹${rupeesText(m.amount)} for ${gymName} did not go through (${o.reason.toLowerCase()}). We will retry on ${fmtDate(o.nextRetryOn)}. Keep the balance ready or pay at the desk.`;
+  await sendTemplate({ orgId: m.orgId, memberId: m.memberId, key: "due", auto: true, force: true, body }).catch(() => null);
+  return { result: o.halted ? "halted" : "failed", reason: o.reason, retries: o.retries, nextRetryOn: o.nextRetryOn };
+}
+
 /**
- * Daily, in demo mode: the debit itself on the renewal date. Live debits come from Razorpay
- * webhooks. The debit notice a day ahead is the "Autopay debit notice" template's rule (reminders.autopay).
+ * Daily, in demo mode: the simulated debit on the renewal date, and the scheduled retries of failed ones.
+ * Live debits come from Razorpay webhooks. The notice a day ahead is the "Autopay debit notice" rule.
  */
-export async function runAutopayDay(orgId: string, today = todayIso()) {
-  const due = await db.autopayMandate.findMany({ where: { orgId, mode: "demo", status: "Active", nextDebitOn: { lte: fromIso(today) } } });
+export async function runAutopayDay(orgId: string, today = todayIso(), opts?: { roll?: number }) {
+  const d = fromIso(today);
+  const due = await db.autopayMandate.findMany({ where: { orgId, mode: "demo", OR: [{ status: "Active", nextDebitOn: { lte: d } }, { status: "Failed", nextRetryOn: { lte: d } }] } });
   let charged = 0;
-  for (const m of due) {
-    const r = await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}`, amount: m.amount });
-    if (r === "renewed") charged++;
-  }
-  // Failed demo debits: retried every `retryGap` days up to `retries` times (Settings › Integrations & AI), then halted.
-  const settings = await getAutopaySettings(orgId);
-  const failed = await db.autopayMandate.findMany({ where: { orgId, mode: "demo", status: "Failed" } });
-  let retried = 0;
+  let failed = 0;
   let halted = 0;
-  for (const m of failed) {
-    if (m.retries >= settings.retries) {
-      await db.$transaction(async (tx) => {
-        await update(tx, orgId, null, m.id, { status: "Halted", lastResult: "Retries exhausted. Collect by hand." }, "autopay.halted");
-        await notify(tx, { orgId, branchId: m.branchId, type: "AUTOPAY", text: `Autopay ${m.code} stopped after failed retries. Collect the renewal at the desk.`, link: `/autopay/${m.id}` });
-      });
-      halted++;
-      continue;
-    }
-    if (toIso(m.updatedAt) > addDays(today, -settings.retryGap)) continue;
-    const r = await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}_retry${m.retries}`, amount: m.amount });
-    if (r === "renewed") retried++;
+  for (const m of due) {
+    const r = await demoDebit(m, today, opts);
+    if (r.result === "renewed") charged++;
+    else if (r.result === "failed") failed++;
+    else if (r.result === "halted") halted++;
   }
-  return { charged, retried, halted };
+  return { charged, failed, halted };
 }
 
 /** The Autopay screen's numbers (prototype KPIs): debits due in a week, collected in 30 days, debits per mandate. */
@@ -283,11 +301,143 @@ export async function autopayStats(u: CurrentUser, mandates: { id: string; membe
   return { collected: collected._sum.amount ?? 0, collectedCount: collected._count._all, debits };
 }
 
-/** "Retry now" on a failed or halted demo mandate: runs the debit again straight away. */
-export async function retryDemoDebit(u: CurrentUser, id: string) {
+/** "Retry now" on a failed or halted demo mandate: one more simulated attempt straight away. */
+export async function retryDemoDebit(u: CurrentUser, id: string, opts?: { roll?: number }) {
   const m = await db.autopayMandate.findFirst({ where: { ...scope(u), id } });
   if (!m) throw new UserError("Mandate not found.");
-  if (m.mode !== "demo") throw new UserError("Razorpay retries live debits itself.");
+  if (m.mode !== "demo") throw new UserError("This is a live mandate. Use the Razorpay retry.");
   if (!["Failed", "Halted"].includes(m.status)) throw new UserError("Only a failed debit can be retried.");
-  return recordCharge(m.id, { paymentId: `demo_${m.code}_${todayIso()}_retry${m.retries}`, amount: m.amount });
+  return demoDebit(m, todayIso(), opts, u.id);
+}
+
+export type SyncSummary = { checked: number; charged: number; changed: number; applied: number; errors: number; error?: string };
+
+const RZP_STATUS: Record<string, string> = { created: "Pending", authenticated: "Active", active: "Active", pending: "Failed", halted: "Halted", cancelled: "Cancelled", paused: "Paused", completed: "Cancelled", expired: "Cancelled" };
+
+/**
+ * "Sync with Razorpay": pulls each live mandate's subscription and paid invoices and applies what the
+ * webhook may have missed. Idempotent: charges dedupe on the payment id, state changes on a sync event id.
+ */
+export async function syncWithRazorpay(u: CurrentUser | { orgId: string }, opts?: { mandateIds?: string[] }): Promise<SyncSummary> {
+  const missing = razorpayReady();
+  if (missing) throw new UserError(missing);
+  const user = "branchIds" in u ? u : null;
+  const orgId = u.orgId;
+  const mandates = await db.autopayMandate.findMany({
+    where: { orgId, mode: "live", subscriptionId: { not: null }, status: { not: "Cancelled" }, ...(user ? { branchId: { in: user.branchIds } } : {}), ...(opts?.mandateIds ? { id: { in: opts.mandateIds } } : {}) },
+  });
+  const sum: SyncSummary = { checked: 0, charged: 0, changed: 0, applied: 0, errors: 0 };
+  for (const m of mandates) {
+    sum.checked++;
+    try {
+      const sid = m.subscriptionId!;
+      const [sub, inv] = await Promise.all([getSubscription(sid), listSubscriptionInvoices(sid)]);
+      for (const i of inv.items ?? []) {
+        if (i.status !== "paid" || !i.payment_id) continue;
+        const eventId = `sync:${sid}:${i.id}`;
+        if (await db.autopayEvent.findUnique({ where: { eventId } })) continue;
+        const result = await recordCharge(m.id, { paymentId: i.payment_id, amount: i.amount ?? m.amount });
+        await db.autopayEvent.create({ data: { eventId, mandateId: m.id, type: "sync.charged", payload: i as unknown as Prisma.InputJsonValue, result } });
+        if (result === "renewed") sum.charged++;
+      }
+      const cur = await db.autopayMandate.findUniqueOrThrow({ where: { id: m.id } });
+      const status = RZP_STATUS[sub.status] ?? cur.status;
+      const chargeAt = sub.charge_at ? toIso(new Date(sub.charge_at * 1000 + 330 * 60_000)) : null;
+      const nextIso = cur.nextDebitOn ? toIso(cur.nextDebitOn) : null;
+      const nextDebit = chargeAt && !["Cancelled", "Halted"].includes(status) ? chargeAt : nextIso;
+      if (status === cur.status && nextDebit === nextIso) continue;
+      let reason = "";
+      if (status === "Failed" && cur.status !== "Failed") {
+        const lastPaymentId = [...(inv.items ?? [])].reverse().find((i) => i.payment_id && i.status !== "paid")?.payment_id;
+        reason = (lastPaymentId && (await getPayment(lastPaymentId).catch(() => null))?.error_description) || "";
+      }
+      const lastResult = {
+        Active: `Synced with Razorpay · active${nextDebit ? `, next debit ${fmtDate(nextDebit)}` : ""}`,
+        Failed: reason ? `${reason} · Razorpay is retrying` : "Debit failed; Razorpay is retrying",
+        Halted: "Halted by Razorpay after repeated failures. Collect by hand.",
+        Cancelled: sub.status === "completed" ? "All cycles done" : "Cancelled at Razorpay",
+        Paused: "Paused at Razorpay",
+        Pending: "Waiting for the member to approve",
+      }[status] ?? "Synced with Razorpay";
+      const eventId = `sync:${sid}:${sub.status}:${sub.charge_at ?? 0}:${sub.paid_count ?? 0}`;
+      if (await db.autopayEvent.findUnique({ where: { eventId } })) continue;
+      await db.$transaction(async (tx) => {
+        await update(tx, orgId, user?.id ?? null, m.id, { status, nextDebitOn: nextDebit ? fromIso(nextDebit) : null, lastResult }, "autopay.sync");
+        if (status === "Halted" && cur.status !== "Halted") await notify(tx, { orgId, branchId: m.branchId, type: "AUTOPAY", text: `Autopay ${m.code} stopped after failed retries. Collect the renewal at the desk.`, link: `/autopay/${m.id}` });
+        if (status === "Failed" && cur.status !== "Failed") await notify(tx, { orgId, branchId: m.branchId, type: "AUTOPAY", text: `Autopay ${m.code} debit failed: ${reason || "Razorpay is retrying"}`, link: `/autopay/${m.id}` });
+        await tx.autopayEvent.create({ data: { eventId, mandateId: m.id, type: "subscription.synced", payload: sub as unknown as Prisma.InputJsonValue, result: `${cur.status}→${status}` } });
+      });
+      sum.changed++;
+    } catch (e) {
+      sum.errors++;
+      sum.error ??= `${m.code}: ${e instanceof Error ? e.message : String(e)}`;
+    }
+  }
+  sum.applied = sum.charged + sum.changed;
+  if (!opts?.mandateIds) {
+    const prev = await getSetting<Record<string, unknown>>(orgId, "autopay");
+    const value = JSON.parse(JSON.stringify({ ...(prev ?? {}), lastSyncAt: new Date().toISOString(), lastSync: sum })) as Prisma.InputJsonValue;
+    await db.$transaction(async (tx) => {
+      await tx.setting.upsert({ where: { orgId_key: { orgId, key: "autopay" } }, create: { orgId, key: "autopay", value }, update: { value } });
+      await audit(tx, { orgId, userId: user?.id ?? null, action: "autopay.sync", entity: "Setting", entityId: "autopay", after: sum });
+    });
+  }
+  return sum;
+}
+
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+
+/** The text under "Sync with Razorpay": demo mode only explains; live mode syncs. */
+export async function syncOrExplain(u: CurrentUser) {
+  if ((await getAutopayMode(u.orgId)) === "demo") {
+    const n = await db.autopayMandate.count({ where: { ...scope(u), mode: "live", status: { not: "Cancelled" } } });
+    return `Demo mode: nothing to sync. In live mode this asks Razorpay for the latest status, charges and failures of every live mandate and records them here.${n ? ` ${plural(n, "live mandate")} would be checked.` : ""}`;
+  }
+  const missing = razorpayReady();
+  if (missing) throw new UserError(`Live mode, but ${missing}`);
+  const r = await syncWithRazorpay(u);
+  if (!r.checked && !r.errors) return "No live mandates to sync yet.";
+  let msg = r.applied ? `${plural(r.applied, "update")} from Razorpay applied: ${plural(r.charged, "debit")} recorded, ${plural(r.changed, "status change")}.` : `Up to date with Razorpay. ${plural(r.checked, "mandate")} checked.`;
+  if (r.errors) msg += ` ${plural(r.errors, "mandate")} could not be checked: ${r.error}`;
+  return msg;
+}
+
+/** "Retry now" on a live mandate: re-create it at Razorpay, resume a halted one, or ask Razorpay what happened. */
+export async function retryLiveDebit(u: CurrentUser, id: string) {
+  const m = await db.autopayMandate.findFirst({ where: { ...scope(u), id }, include: { member: { select: { name: true, code: true } } } });
+  if (!m) throw new UserError("Mandate not found.");
+  if (m.mode !== "live") throw new UserError("This is a demo mandate.");
+  if (!["Failed", "Halted"].includes(m.status)) throw new UserError("Only a failed debit can be retried.");
+  const missing = razorpayReady();
+  if (missing) throw new UserError(`Live mode, but ${missing}`);
+  const first = m.member.name.split(" ")[0]!;
+  if (!m.subscriptionId) {
+    const plan = await db.membershipPlan.findFirst({ where: { id: m.planId, orgId: m.orgId } });
+    if (!plan) throw new UserError("The plan of this mandate no longer exists.");
+    let link: string | null;
+    try {
+      link = await createAtRazorpay(m, plan, m.nextDebitOn ? toIso(m.nextDebitOn) : todayIso(), m.member.code);
+    } catch (e) {
+      throw new UserError(`Razorpay refused the mandate: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    await db.$transaction((tx) => update(tx, m.orgId, u.id, m.id, { status: "Pending", retries: 0, lastResult: "Approval link sent" }, "autopay.retry"));
+    await sendTemplate({ orgId: m.orgId, memberId: m.memberId, key: "mandate", userId: u.id, auto: true, vars: { plan_name: plan.name, amount: rupeesText(m.amount), link: link ?? "(no link)" } }).catch(() => null);
+    return `Mandate created on Razorpay. Approval link sent to ${first}.`;
+  }
+  let resumed = false;
+  if (m.status === "Halted") {
+    try {
+      await subscriptionAction(m.subscriptionId, "resume");
+      resumed = true;
+    } catch (e) {
+      throw new UserError(`Razorpay: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  const r = await syncWithRazorpay(u, { mandateIds: [m.id] });
+  const after = await db.autopayMandate.findUniqueOrThrow({ where: { id: m.id } });
+  await db.$transaction((tx) => audit(tx, { orgId: m.orgId, userId: u.id, action: "autopay.retry", entity: "AutopayMandate", entityId: m.id, before: m, after }));
+  if (r.errors) throw new UserError(`Razorpay: ${r.error}`);
+  if (r.charged) return "Debit succeeded. Membership renewed and invoice sent.";
+  const next = after.nextDebitOn && after.status === "Active" ? ` · next attempt ${fmtDate(toIso(after.nextDebitOn))}` : "";
+  return resumed ? `Asked Razorpay to resume the mandate. Latest: ${after.lastResult ?? after.status}${next}` : `Razorpay is still retrying this debit. Latest: ${after.lastResult ?? after.status}${next}`;
 }

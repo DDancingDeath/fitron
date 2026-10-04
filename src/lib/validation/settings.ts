@@ -124,8 +124,8 @@ export type BillingDetailsInput = z.infer<typeof billingDetailsInput>;
 /** Settings › Integrations & AI › UPI autopay. The provider is read-only (Razorpay only). */
 export const autopayInput = z.object({
   mode: z.enum(["demo", "live"]),
-  retries: z.coerce.number().int({ error: "Retries must be a whole number." }).min(0, { error: "Retries: 0 to 5." }).max(5, { error: "Retries: 0 to 5." }),
-  retryGap: z.coerce.number().int({ error: "Days between retries must be a whole number." }).min(1, { error: "Days between retries: 1 to 7." }).max(7, { error: "Days between retries: 1 to 7." }),
+  retries: z.coerce.number().int({ error: "Retries must be a whole number." }).min(1, { error: "Retries: 1 to 10." }).max(10, { error: "Retries: 1 to 10." }),
+  retryGap: z.coerce.number().int({ error: "Days between retries must be a whole number." }).min(1, { error: "Days between retries: 1 to 30." }).max(30, { error: "Days between retries: 1 to 30." }),
 });
 export type AutopayInput = z.infer<typeof autopayInput>;
 

@@ -1,7 +1,8 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
-import { runAutopayDay } from "./autopay";
+import { getAutopayMode, runAutopayDay, syncWithRazorpay } from "./autopay";
+import { razorpayReady } from "@/lib/integrations/razorpay";
 import { backupNudge, createBackup, pruneBackups } from "./backup";
 import { sizeText } from "@/lib/domain/backup";
 import { isUniqueViolation } from "./errors";
@@ -96,6 +97,11 @@ export const JOBS: Job[] = [
     name: "autopay",
     label: "UPI Autopay demo debits",
     run: (orgId, today) => runAutopayDay(orgId, today),
+  },
+  {
+    name: "autopay.sync",
+    label: "Sync live mandates with Razorpay",
+    run: async (orgId) => ((await getAutopayMode(orgId)) === "live" && !razorpayReady() ? syncWithRazorpay({ orgId }) : { skipped: 1 }),
   },
   {
     name: "leads.followup",

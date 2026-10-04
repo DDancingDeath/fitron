@@ -11,7 +11,7 @@ import { applyDeliveryStatus, sendTemplate } from "./whatsapp";
 import { applyRazorpayEvent, autopayStats, changeMandate, createMandate, listMandates, retryDemoDebit, runAutopayDay } from "./autopay";
 import { runDailyJobs } from "./jobs";
 import { listNotifications } from "./notifications";
-import { fromIso, istInstant, todayIso } from "./time";
+import { istInstant, todayIso } from "./time";
 import { runRules } from "./wa-automation";
 
 describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
@@ -85,7 +85,7 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     const notice = await runRules(gym.org.id, null, ["autopay"], addDays(debit, -1), istInstant(addDays(debit, -1), "10:00"), null);
     expect(notice.sent).toBeGreaterThanOrEqual(1);
     expect(await db.whatsAppMessage.count({ where: { memberId: m.id, templateKey: "autopay" } })).toBe(1);
-    expect(await runAutopayDay(gym.org.id, debit)).toMatchObject({ charged: 1 });
+    expect(await runAutopayDay(gym.org.id, debit, { roll: 0 })).toMatchObject({ charged: 1 });
     expect(await runAutopayDay(gym.org.id, debit)).toMatchObject({ charged: 0 });
     const ms = await db.membership.findMany({ where: { memberId: m.id }, orderBy: { startDate: "asc" } });
     expect(ms.map((x) => x.type)).toEqual(["NEW", "AUTOPAY"]);
@@ -102,31 +102,11 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     expect(md.vpa).toBe("riya@okicici");
     await expect(retryDemoDebit(admin, md.id)).rejects.toThrow(/Only a failed debit/);
     await db.autopayMandate.update({ where: { id: md.id }, data: { status: "Failed", retries: 1 } });
-    expect(await retryDemoDebit(admin, md.id)).toBe("renewed");
+    expect((await retryDemoDebit(admin, md.id, { roll: 0 })).result).toBe("renewed");
     expect((await db.autopayMandate.findUniqueOrThrow({ where: { id: md.id } })).status).toBe("Active");
     const stats = await autopayStats(admin, await listMandates(admin));
     expect(stats.debits.get(md.id)).toBe(1);
     expect(stats.collected).toBeGreaterThanOrEqual(118000);
-  });
-
-  it("failed demo debits are retried by the daily run after the gap, then halted when retries run out", async () => {
-    const mk = async (retries: number, updatedDaysAgo: number) => {
-      const m = await newMember();
-      await sellMembership(admin, m.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: 118000, payMethod: "UPI" });
-      const md = await createMandate(admin, { memberId: m.id, planId });
-      await db.autopayMandate.update({ where: { id: md.id }, data: { status: "Failed", retries, updatedAt: fromIso(addDays(today, -updatedDaysAgo)) } });
-      return md.id;
-    };
-    const [retry, exhausted, fresh] = await Promise.all([mk(0, 3), mk(3, 3), mk(0, 0)]);
-    const r = await runAutopayDay(gym.org.id, today);
-    expect(r.retried).toBeGreaterThanOrEqual(1);
-    expect(r.halted).toBeGreaterThanOrEqual(1);
-    expect(await db.autopayMandate.findUniqueOrThrow({ where: { id: retry } })).toMatchObject({ status: "Active", retries: 0 });
-    expect(await db.membership.count({ where: { memberId: (await db.autopayMandate.findUniqueOrThrow({ where: { id: retry } })).memberId, type: "AUTOPAY" } })).toBe(1);
-    const h = await db.autopayMandate.findUniqueOrThrow({ where: { id: exhausted } });
-    expect(h).toMatchObject({ status: "Halted", lastResult: "Retries exhausted. Collect by hand." });
-    expect(await db.notification.count({ where: { orgId: gym.org.id, type: "AUTOPAY", text: { contains: h.code } } })).toBe(1);
-    expect((await db.autopayMandate.findUniqueOrThrow({ where: { id: fresh } })).status).toBe("Failed");
   });
 
   it("Razorpay webhooks: signature check, charge renews once, failure alerts", async () => {

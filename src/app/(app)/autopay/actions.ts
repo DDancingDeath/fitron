@@ -5,8 +5,11 @@ import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
 import { simpleAction } from "@/lib/form-action";
 import type { FormState } from "@/lib/validation/common";
-import { changeMandate, createMandate, getAutopayMode, retryDemoDebit, runAutopayDay } from "@/lib/services/autopay";
+import { changeMandate, createMandate, getAutopayMode, getAutopaySettings, retryDemoDebit, retryLiveDebit, runAutopayDay, syncOrExplain } from "@/lib/services/autopay";
 import { runRules } from "@/lib/services/wa-automation";
+import { fmtDate } from "@/lib/format";
+import { toIso } from "@/lib/services/time";
+import { db } from "@/lib/db";
 import { resolveMemberRef } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
 
@@ -54,10 +57,31 @@ export async function rowAction(id: string, action: "pause" | "resume" | "cancel
   back(msg, f);
 }
 
-/** "Retry now" (demo mode). */
+/** "Retry now": a simulated debit in demo mode, Razorpay in live mode. */
 export async function retryAction(id: string, f: string) {
   const u = await requirePermission("autopay.manage");
-  const msg = await said(async () => ((await retryDemoDebit(u, id)) === "renewed" ? "Debit succeeded. Membership renewed and invoice sent." : "Nothing to retry."));
+  const msg = await said(async () => {
+    const m = await db.autopayMandate.findFirst({ where: { id, orgId: u.orgId, branchId: { in: u.branchIds } }, include: { member: { select: { name: true } } } });
+    if (m?.mode === "live") return retryLiveDebit(u, id);
+    const r = await retryDemoDebit(u, id);
+    const name = m?.member.name ?? "Member";
+    const max = (await getAutopaySettings(u.orgId)).retries;
+    if (r.result === "renewed") {
+      const a = await db.autopayMandate.findUniqueOrThrow({ where: { id } });
+      return `Debit succeeded. ${name} renewed till ${fmtDate(a.nextDebitOn ? toIso(new Date(a.nextDebitOn.getTime() - 86400000)) : null)} (${a.lastResult?.match(/\(([^)]+)\)/)?.[1] ?? "invoice"}).`;
+    }
+    if (r.result === "failed") return `${name}: debit failed (${r.reason}). Retry ${r.retries} of ${max} on ${fmtDate(r.nextRetryOn)}.`;
+    if (r.result === "halted") return `${name}: debit failed (${r.reason}) · ${max} retries used. Autopay halted — collect manually.`;
+    return "Nothing to retry.";
+  });
+  revalidatePath("/autopay");
+  back(msg, f);
+}
+
+/** "Sync with Razorpay": live mode pulls subscription status and charges; demo mode says what it would do. */
+export async function syncAction(f: string) {
+  const u = await requirePermission("autopay.manage");
+  const msg = await said(() => syncOrExplain(u));
   revalidatePath("/autopay");
   back(msg, f);
 }

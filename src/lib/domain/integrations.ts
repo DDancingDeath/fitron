@@ -4,9 +4,9 @@ import { fmtStamp, fmtTime } from "@/lib/format";
 
 export type AutopaySettings = {
   mode: "demo" | "live";
-  /** How many times a failed demo debit is retried before the mandate halts (0–5). */
+  /** How many times a failed demo debit is retried before the mandate halts (1–10). */
   retries: number;
-  /** Days between those retries (1–7). */
+  /** Days between those retries (1–30). */
   retryGap: number;
   /** The last "Test connection" result; absent until the first check. */
   connOk?: boolean;
@@ -14,6 +14,9 @@ export type AutopaySettings = {
   keyId?: string;
   error?: string;
   checkedAt?: string;
+  /** The last "Sync with Razorpay" (ISO instant) and what it found. */
+  lastSyncAt?: string;
+  lastSync?: { checked: number; charged: number; changed: number; applied: number; errors: number; error?: string };
 };
 
 export const DEFAULT_AUTOPAY: AutopaySettings = { mode: "demo", retries: 3, retryGap: 2 };
@@ -22,8 +25,8 @@ export const withAutopayDefaults = (row: Partial<AutopaySettings> | null | undef
   ...DEFAULT_AUTOPAY,
   ...(row ?? {}),
   mode: row?.mode === "live" ? "live" : "demo",
-  retries: clampInt(row?.retries, 0, 5, DEFAULT_AUTOPAY.retries),
-  retryGap: clampInt(row?.retryGap, 1, 7, DEFAULT_AUTOPAY.retryGap),
+  retries: clampInt(row?.retries, 1, 10, DEFAULT_AUTOPAY.retries),
+  retryGap: clampInt(row?.retryGap, 1, 30, DEFAULT_AUTOPAY.retryGap),
 });
 
 function clampInt(v: unknown, min: number, max: number, dflt: number) {
