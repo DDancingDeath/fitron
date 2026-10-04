@@ -87,7 +87,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/whatsap
           ["templates", "Templates & automation", "/whatsapp"],
           ["log", "Message log", "/whatsapp?tab=log"],
         ].map(([k, label, href]) => (
-          <Link key={k} href={href!} className={cx("border-b-2 px-3 py-2 text-[15px]", k === tab ? "border-accent text-accent" : "border-transparent text-muted hover:text-fg")}>
+          <Link key={k} href={href!} className={cx("border-b-2 px-3 py-2 text-[15px]", k === tab ? "border-accent text-fg" : "border-transparent text-muted hover:text-fg")}>
             {label}
           </Link>
         ))}

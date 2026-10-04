@@ -149,9 +149,20 @@ export default async function PlansPage({ searchParams }: PageProps<"/plans">) {
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="m-0 text-sm text-muted">No offer codes yet. Create one for festivals, referrals or students.</p>
-        )}
+        ) : null}
+        <section className="flex flex-col gap-2">
+          <h3 className="m-0 text-[20px]">Offer codes</h3>
+          {offers.map((o) => {
+            const st = offerState({ ...o, validTill: toIso(o.validTill) }, today);
+            return (
+              <div key={o.id} className="flex items-center justify-between gap-3 border-b border-line py-2.5">
+                <span className="font-semibold tracking-[0.06em]">{o.code}</span>
+                <Tag label={st}>{st}</Tag>
+              </div>
+            );
+          })}
+          {!offers.length && <p className="m-0 text-sm text-muted">No offer codes yet. Create one for festivals, referrals or students.</p>}
+        </section>
       </section>
     </div>
   );
