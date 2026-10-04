@@ -32,7 +32,8 @@ export async function signUpGym(_: FormState, fd: FormData): Promise<FormState> 
     fd,
     gymSignupSchema,
     async (d) => {
-      const { user, verified } = await createGymAccount(d, !!google);
+      const logo = fd.get("logo");
+      const { user, verified } = await createGymAccount({ ...d, logo: logo instanceof File && logo.size > 0 ? logo : null }, !!google);
       if (google) store.delete(GOOGLE_SIGNUP_COOKIE);
       if (verified) {
         await createSession(user.id);
@@ -42,6 +43,13 @@ export async function signUpGym(_: FormState, fd: FormData): Promise<FormState> 
     "",
   );
   if (next) redirect(next);
+  // On the /login card the phone and the first error read as the card's own wording.
+  if (state?.errors && fd.get("source") === "login") {
+    const errors = { ...state.errors };
+    if (errors.phone) errors.phone = ["Gym phone must be 10 digits."];
+    const first = Object.values(errors).flat()[0];
+    return { ...state, errors, message: first ?? state.message };
+  }
   return state;
 }
 

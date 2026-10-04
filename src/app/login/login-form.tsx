@@ -26,15 +26,15 @@ export function LoginForm({ next }: { next?: string }) {
       <Field label="Email" error={state?.errors?.email}>
         <Input name="email" type="email" autoComplete="username" required autoFocus defaultValue={state?.email} key={state?.email} />
       </Field>
-      <Field label="Password" error={state?.errors?.password}>
-        <Input name="password" type="password" autoComplete="current-password" required />
-      </Field>
-      <Button variant="primary" disabled={pending} className="mt-2 min-h-12">
-        {pending ? "Logging in…" : "Log in"}
+      <div className="flex flex-col gap-1.5">
+        <Field label="Password" error={state?.errors?.password}>
+          <Input name="password" type="password" autoComplete="current-password" required />
+        </Field>
+        <Link href="/forgot-password" className="self-end text-[13px] text-accent no-underline">Forgot password?</Link>
+      </div>
+      <Button variant="primary" disabled={pending} className="min-h-12">
+        {pending ? "Signing in…" : "Sign in"}
       </Button>
-      <Link href="/forgot-password" className="text-center text-sm text-muted underline">
-        Forgot your password?
-      </Link>
     </form>
   );
 }

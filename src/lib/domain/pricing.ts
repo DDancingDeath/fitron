@@ -67,3 +67,8 @@ export function rupeesLabel(paise: number) {
   const r = paise / 100;
   return "₹" + r.toLocaleString("en-IN", { maximumFractionDigits: Number.isInteger(r) ? 0 : 2 });
 }
+
+/** The lowest Gym Accounting price for a billing cycle, in paise. */
+export function lowestGymPrice(cycle: Cycle) {
+  return Math.min(...PLANS.filter((p) => p.product === "GYM_ACCOUNTING").map((p) => p.price[cycle]));
+}

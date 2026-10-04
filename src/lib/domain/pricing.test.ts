@@ -1,12 +1,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { PLANS, findPlan, rupeesLabel, type PlanDef } from "./pricing";
+import { PLANS, findPlan, lowestGymPrice, rupeesLabel, type PlanDef } from "./pricing";
+import { formatInr } from "./billing";
 
 describe("pricing", () => {
   it("formats rupees the Indian way", () => {
     expect(rupeesLabel(19_99_000)).toBe("₹19,990");
     expect(rupeesLabel(39_99_000)).toBe("₹39,990");
     expect(rupeesLabel(29_950)).toBe("₹299.5");
+  });
+
+  it("finds the lowest gym price for the login page", () => {
+    const yearly = Math.min(...PLANS.filter((p) => p.product === "GYM_ACCOUNTING").map((p) => p.price.YEARLY));
+    expect(lowestGymPrice("YEARLY")).toBe(yearly);
+    expect(formatInr(lowestGymPrice("YEARLY")).replace(/\.00$/, "")).toBe("₹9,990");
   });
 
   it("finds plans by key", () => {

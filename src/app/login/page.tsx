@@ -1,46 +1,83 @@
+import Image from "next/image";
+import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/current";
 import { LoginForm } from "./login-form";
+import { CreateAccountForm } from "./create-account-form";
 import { Notice } from "@/components/ui";
 import { safeNext } from "@/lib/auth/next";
 import { GoogleButton, googleMessage } from "@/components/google-button";
+import { DEFAULT_PLAN, findPlan, lowestGymPrice } from "@/lib/domain/pricing";
+import { formatInr } from "@/lib/format";
+import { googleReady } from "@/lib/integrations/google";
 
-export const metadata = { title: "Log in · FITRON" };
+export const metadata = { title: "Sign in · FITRON" };
+
+const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : undefined);
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const q = await searchParams;
   const next = safeNext(q.next, "");
   if (await getCurrentUser()) redirect(next || "/dashboard");
+  const up = q.tab === "up";
+  const planQ = one(q.plan);
+  const plan = findPlan(planQ)?.product === "GYM_ACCOUNTING" ? planQ! : DEFAULT_PLAN;
+  const cycle = q.cycle === "YEARLY" || q.cycle === "year" ? "YEARLY" : "MONTHLY";
+  const fromYearly = formatInr(lowestGymPrice("YEARLY")).replace(/\.00$/, "");
+  const upHref = `/login?${new URLSearchParams({ tab: "up", ...(planQ ? { plan } : {}), ...(one(q.cycle) ? { cycle } : {}), ...(next ? { next } : {}) })}`;
+  const inHref = next ? `/login?${new URLSearchParams({ next })}` : "/login";
+  const tab = "rounded-[5px] px-3.5 py-1.5 text-[13px] font-semibold";
+  const gMsg = googleMessage(q.google, q.email);
+  const stats: [string, string][] = [
+    [fromYearly, "a year, white-labelled"],
+    ["24/7", "AI coach for members"],
+    ["UPI", "autopay and reminders"],
+  ];
   return (
     <main className="grid min-h-screen lg:grid-cols-2">
-      <section className="hidden flex-col justify-between bg-[radial-gradient(ellipse_at_top_left,var(--accent-soft),transparent_60%)] p-12 lg:flex">
-        <a href="/"><Logo size={56} /></a>
-        <div>
-          <p className="mb-4 text-xs font-semibold tracking-[0.2em] text-accent uppercase">Fitron gym accounting solution</p>
-          <h1 className="text-5xl leading-tight font-semibold">Run your gym on Fitron.</h1>
-          <p className="mt-4 max-w-md text-lg text-muted">
-            Members, payments, WhatsApp reminders and accounting in one console for the front desk and the owner.
+      <section className="hidden flex-col justify-between gap-10 bg-[#0e0d0a] bg-[radial-gradient(ellipse_at_top_left,rgba(207,169,79,0.18),transparent_60%)] p-10 text-[#f3ede0] lg:flex">
+        <div className="flex items-center justify-between gap-3">
+          <a href="/#top"><Image src="/fitron-logo.png" alt="FITRON" width={599} height={218} className="block h-auto w-full max-w-[340px]" priority /></a>
+          <a href="/#products" className="text-[13px] text-[#cfa94f]">For gyms ↗</a>
+        </div>
+        <div className="max-w-[440px]">
+          <p className="mb-4 text-xs font-semibold tracking-[0.14em] text-[#cfa94f] uppercase">Fitron Gym Accounting Solution</p>
+          <h1 className="text-[40px] leading-[1.08] font-semibold">Run your gym on FITRON.</h1>
+          <p className="mt-4 text-base text-[#f3ede0]/70">
+            Members, payments, WhatsApp reminders, accounting and an AI coach under your brand. One console for the front desk and the owner.
           </p>
         </div>
-        <p className="text-sm text-muted">Need help? hello@fitron.in</p>
+        <div className="flex flex-wrap gap-7 text-xs text-[#f3ede0]/60">
+          {stats.map(([a, b]) => (
+            <span key={b}><strong className="block text-xl text-[#f3ede0]">{a}</strong>{b}</span>
+          ))}
+        </div>
       </section>
-      <section className="flex items-center justify-center px-4 py-12">
-        <div className="w-full max-w-sm">
-          <div className="mb-8 lg:hidden"><a href="/"><Logo /></a></div>
-          <h2 className="text-3xl font-semibold">Log in</h2>
-          <p className="mt-1 mb-6 text-muted">Use Google, or your email and password.</p>
-          {typeof q.idle === "string" && /^\d+$/.test(q.idle) && <div className="mb-4"><Notice tone="alert">You were signed out after {q.idle} minutes of inactivity.</Notice></div>}
-          {q.reset && <div className="mb-4"><Notice tone="ok">Password changed. Log in with your new password.</Notice></div>}
-          {q.verified && <div className="mb-4"><Notice tone="ok">Email confirmed. Log in to open your console.</Notice></div>}
-          {googleMessage(q.google, q.email) && <div className="mb-4"><Notice tone="alert">{googleMessage(q.google, q.email)}</Notice></div>}
-          <div className="mb-4 flex flex-col gap-4">
-            <GoogleButton href={`/auth/google?${new URLSearchParams({ for: "staff", ...(next ? { next } : {}) })}`} />
-          </div>
-          <LoginForm next={next} />
-          <p className="mt-8 text-center text-sm text-muted">
-            New to FITRON? <a href="/signup" className="text-accent underline">Start a free trial</a>
-          </p>
+      <section className="flex items-center justify-center px-6 py-10">
+        <div className="flex w-full max-w-[400px] flex-col gap-[18px]">
+          <div className="lg:hidden"><a href="/"><Logo /></a></div>
+          <nav className="inline-flex gap-[2px] self-start rounded-md bg-surface p-[3px]" aria-label="Sign in or create account">
+            <Link href={inHref} aria-current={up ? undefined : "page"} className={`${tab} ${up ? "text-fg" : "bg-accent text-accent-ink"}`}>Sign in</Link>
+            <Link href={upHref} aria-current={up ? "page" : undefined} className={`${tab} ${up ? "bg-accent text-accent-ink" : "text-fg"}`}>Create account</Link>
+          </nav>
+          {up ? (
+            <CreateAccountForm plan={plan} cycle={cycle} googleOn={googleReady()} />
+          ) : (
+            <>
+              <div>
+                <h2 className="text-[28px] font-semibold">Sign in to Fitron</h2>
+                <p className="mt-1 text-sm text-muted">Use your staff email or Google account.</p>
+              </div>
+              {typeof q.idle === "string" && /^\d+$/.test(q.idle) && <Notice tone="alert">You were signed out after {q.idle} minutes of inactivity.</Notice>}
+              {q.reset && <Notice tone="ok">Password changed. Sign in with your new password.</Notice>}
+              {q.verified && <Notice tone="ok">Email confirmed. Sign in to open your console.</Notice>}
+              {gMsg && <Notice tone="alert">{gMsg}</Notice>}
+              <GoogleButton href={`/auth/google?${new URLSearchParams({ for: "staff", ...(next ? { next } : {}) })}`} divider="or with email" />
+              <LoginForm next={next} />
+            </>
+          )}
+          <p className="text-xs text-muted">New to FITRON? <a href="/#pricing" className="text-accent underline">See plans and pricing</a></p>
         </div>
       </section>
     </main>

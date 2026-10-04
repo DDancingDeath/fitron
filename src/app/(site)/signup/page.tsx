@@ -47,7 +47,7 @@ export default async function SignupPage({ searchParams }: PageProps<"/signup">)
           </ol>
         )}
         <p className="mt-8 text-sm text-muted">
-          Already have an account? <a href="/login" className="text-accent underline">Log in</a>
+          Already have an account? <a href="/login" className="text-accent underline">Sign in</a>
         </p>
       </section>
       <section className="rounded-xl border border-line bg-surface p-5 sm:p-6">

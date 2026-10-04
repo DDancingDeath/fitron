@@ -20,7 +20,7 @@ export default async function VerifyEmailPage({ searchParams }: PageProps<"/veri
       </p>
       <EmailForm action={resendLink} email={sent} label="Send a new link" />
       <p className="mt-8 text-sm text-muted">
-        Already confirmed? <a href="/login" className="text-accent underline">Log in</a>
+        Already confirmed? <a href="/login" className="text-accent underline">Sign in</a>
       </p>
     </div>
   );

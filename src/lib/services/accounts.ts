@@ -1,9 +1,12 @@
 import "server-only";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { findPlan, TRIAL_DAYS, type Cycle } from "@/lib/domain/pricing";
 import { emailReady, sendEmail } from "@/lib/integrations/email";
+import { putObject, sniffType } from "@/lib/integrations/storage";
+import { audit } from "./audit";
+import { MAX_LOGO_BYTES } from "./gym-logo";
 import { ensureExpenseCategories, ensureRoles } from "../../../prisma/roles";
 import { isUniqueViolation, UserError } from "./errors";
 
@@ -34,7 +37,8 @@ async function redeemToken(token: string, purpose: Purpose) {
   return count === 1 ? row.userId : null;
 }
 
-export type GymSignup = { plan: string; cycle: Cycle; name: string; email: string; phone: string; business: string; city?: string; password: string };
+export type GymSignup = { plan: string; cycle: Cycle; name: string; email: string; phone: string; business: string; city?: string; password: string;
+  gymEmail?: string; address?: string; state?: string; pin?: string; tagline?: string; website?: string; instagram?: string; logo?: File | null };
 
 /**
  * Creates a gym on a free trial: the organisation, its first branch, default roles and
@@ -48,6 +52,15 @@ export async function createGymAccount(d: GymSignup, emailVerified = false) {
   if (await db.user.findUnique({ where: { email: d.email } })) {
     throw new UserError("There's already an account with this email. Log in, or reset your password.", "email");
   }
+  // Check the logo first so a bad file fails before anything is created.
+  let logo: { bytes: Uint8Array; mime: string; ext: string } | null = null;
+  if (d.logo && d.logo.size > 0) {
+    if (d.logo.size > MAX_LOGO_BYTES) throw new UserError("Logo must be under 1 MB.", "logo");
+    const bytes = new Uint8Array(await d.logo.arrayBuffer());
+    const type = sniffType(bytes);
+    if (!type || (type.mime !== "image/png" && type.mime !== "image/jpeg")) throw new UserError("Use a PNG or JPG logo.", "logo");
+    logo = { bytes, ...type };
+  }
   const roles = await ensureRoles(db);
   await ensureExpenseCategories(db);
   const passwordHash = await hashPassword(d.password);
@@ -58,9 +71,14 @@ export async function createGymAccount(d: GymSignup, emailVerified = false) {
       const org = await tx.organization.create({
         data: { name: d.business, plan: plan.key, planCycle: d.cycle, trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * HOUR) },
       });
-      const branch = await tx.branch.create({ data: { orgId: org.id, name: "Main", address: d.city ?? "", phone: d.phone } });
-      await tx.setting.create({ data: { orgId: org.id, key: "gym", value: { name: d.business } } });
-      return tx.user.create({
+      const address = [d.address, d.city, d.pin].filter(Boolean).join(", ") || (d.city ?? "");
+      const branch = await tx.branch.create({ data: { orgId: org.id, name: "Main", address, phone: d.phone } });
+      const gym = compact({ name: d.business, phone: d.phone, email: d.gymEmail, address: d.address, city: d.city, state: d.state, pin: d.pin, tagline: d.tagline, website: d.website, instagram: d.instagram });
+      // The DPDP consent record: what was accepted, when and by whom.
+      const legal = { tos: "v1", privacy: "v1", dpa: "v1", marketing: false, at: new Date().toISOString(), by: d.email };
+      await tx.setting.create({ data: { orgId: org.id, key: "gym", value: gym } });
+      await tx.setting.create({ data: { orgId: org.id, key: "legal", value: legal } });
+      const owner = await tx.user.create({
         data: {
           orgId: org.id,
           name: d.name,
@@ -72,13 +90,36 @@ export async function createGymAccount(d: GymSignup, emailVerified = false) {
           branches: { create: [{ branchId: branch.id }] },
         },
       });
+      await audit(tx, { orgId: org.id, userId: owner.id, action: "account.create", entity: "Organization", entityId: org.id, after: { plan: plan.key, cycle: d.cycle, gym, legal, via: emailVerified ? "google" : "email" } });
+      return owner;
     });
   } catch (e) {
     if (isUniqueViolation(e)) throw new UserError("There's already an account with this email. Log in, or reset your password.", "email");
     throw e;
   }
+  if (logo) {
+    // The file needs the org id, so it goes up after the account exists. A failed upload never undoes the account.
+    try {
+      const key = `${user.orgId}/gym/logo-${randomUUID()}.${logo.ext}`;
+      await putObject(key, logo.bytes, logo.mime);
+      const row = await db.setting.findUniqueOrThrow({ where: { orgId_key: { orgId: user.orgId, key: "gym" } } });
+      await db.setting.update({ where: { orgId_key: { orgId: user.orgId, key: "gym" } }, data: { value: { ...(row.value as object), logoKey: key } } });
+    } catch (e) {
+      console.error("Gym logo upload failed at sign-up", e);
+    }
+  }
   if (!verifyNow) await sendVerification(user.id);
   return { user, verified: verifyNow };
+}
+
+const compact = (o: Record<string, string | undefined>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined && v !== "")) as Record<string, string>;
+
+/** A successful sign-in: stamps lastLoginAt and records how, in one transaction. */
+export async function recordSignIn(userId: string, via: "email" | "google") {
+  await db.$transaction(async (tx) => {
+    const u = await tx.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+    await audit(tx, { orgId: u.orgId, userId, action: "auth.login", entity: "User", entityId: userId, after: { via } });
+  });
 }
 
 export async function sendVerification(userId: string) {

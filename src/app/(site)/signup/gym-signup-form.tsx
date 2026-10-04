@@ -79,7 +79,7 @@ export function GymSignupForm({ plan: initialPlan, cycle: initialCycle, google }
       <label className="flex items-start gap-2 text-sm">
         <input type="checkbox" name="terms" className="mt-1" defaultChecked={v("terms") === "on"} required />
         <span>
-          I agree to the <a href="/terms" target="_blank" className="underline">Terms</a> and <a href="/privacy" target="_blank" className="underline">Privacy Policy</a>.
+          I agree to Fitron’s <a href="/terms" target="_blank" className="underline">Terms of Service</a>, <a href="/privacy" target="_blank" className="underline">Privacy Policy</a> and <a href="/privacy#dpa" target="_blank" className="underline">Data Processing terms</a> under the DPDP Act, 2023.
           {e.terms?.map((m) => <span key={m} className="block text-xs text-alert">{m}</span>)}
         </span>
       </label>

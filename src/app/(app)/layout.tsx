@@ -19,12 +19,12 @@ import { getSubscriptionSettings } from "@/lib/services/subscription";
 import { getAiSettings } from "@/lib/services/ai-settings";
 import { gymLogoUrl } from "@/components/gym-logo";
 import { gymPlan } from "@/lib/services/saas";
-import { PLANS } from "@/lib/domain/pricing";
+import { lowestGymPrice } from "@/lib/domain/pricing";
 import { daysBetween } from "@/lib/domain/dates";
 import { todayIso } from "@/lib/services/time";
 import { fmtDate, formatInr } from "@/lib/format";
 
-const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_ACCOUNTING").map((p) => p.price.MONTHLY))).replace(/\.00$/, "");
+const fromPrice = formatInr(lowestGymPrice("MONTHLY")).replace(/\.00$/, "");
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
