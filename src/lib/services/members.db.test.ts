@@ -1,9 +1,13 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { getObject } from "@/lib/integrations/storage";
 import { db } from "@/lib/db";
 import { hasDb, makeGym, pick } from "@/test/db";
-import { createMember, deleteMember, getMember, listDeleted, listMembers, restoreMember, summarize, updateMember } from "./members";
-import { sellMembership } from "./billing";
-import { todayIso } from "./time";
+import { createMember, deleteMember, getMember, readMemberPhoto, removeMemberPhoto, setMemberPhoto, listDeleted, listMembers, restoreMember, summarize, updateMember } from "./members";
+import { collectPayment, sellMembership } from "./billing";
+import { fromIso, todayIso } from "./time";
 import { createPlan, deletePlan } from "./plans";
 import { UserError } from "./errors";
 import type { MemberInput } from "@/lib/validation/member";
@@ -20,6 +24,8 @@ const input = (over: Partial<MemberInput> = {}): MemberInput => ({
 describe.skipIf(!hasDb)("members (database)", () => {
   let gym: Awaited<ReturnType<typeof makeGym>>;
   beforeAll(async () => {
+    vi.stubEnv("STORAGE_DIR", mkdtempSync(path.join(tmpdir(), "fitron-members-")));
+    vi.stubEnv("S3_BUCKET", "");
     gym = await makeGym();
   });
 
@@ -36,7 +42,7 @@ describe.skipIf(!hasDb)("members (database)", () => {
     const admin = pick(await gym.user("Super Admin"), gym.a.id);
     const m = await createMember(admin, input({ phone: "9876500021" }));
     await expect(createMember(admin, input({ phone: "9876500021" }))).rejects.toThrow(UserError);
-    await deleteMember(admin, m.id);
+    await deleteMember(admin, m.id, "test cleanup");
     const again = await createMember(admin, input({ phone: "9876500021", name: "New Owner" }));
     expect(again.name).toBe("New Owner");
     expect(await getMember(admin, m.id)).toBeNull();
@@ -83,12 +89,12 @@ describe.skipIf(!hasDb)("members (database)", () => {
   it("restores a deleted member unless their phone was taken meanwhile", async () => {
     const admin = pick(await gym.user("Super Admin"), gym.a.id);
     const m = await createMember(admin, input({ phone: "9876500091", name: "Comes Back" }));
-    await deleteMember(admin, m.id);
+    await deleteMember(admin, m.id, "test cleanup");
     expect((await listDeleted(admin)).find((d) => d.id === m.id)?.deletedBy).toBe(admin.name);
     await restoreMember(admin, m.id);
     expect(await getMember(admin, m.id)).not.toBeNull();
 
-    await deleteMember(admin, m.id);
+    await deleteMember(admin, m.id, "test cleanup");
     await createMember(admin, input({ phone: "9876500091", name: "New Number Owner" }));
     await expect(restoreMember(admin, m.id)).rejects.toThrow(/now belongs to New Number Owner/);
   });
@@ -125,5 +131,73 @@ describe.skipIf(!hasDb)("members (database)", () => {
     expect(row?.erasedAt?.getTime()).toBe(erasedAt.getTime());
     expect(row?.name).toBe("Erased member");
     await expect(restoreMember(admin, m.id)).rejects.toThrow(/can't be restored/);
+  });
+
+  it("needs a reason, records who and why, and restore clears it", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ phone: "9876500201" }));
+    await expect(deleteMember(admin, m.id, " ab")).rejects.toThrow(/reason/);
+    expect(await getMember(admin, m.id)).not.toBeNull();
+    await deleteMember(admin, m.id, "Moved city");
+    const row = await db.member.findUniqueOrThrow({ where: { id: m.id } });
+    expect(row).toMatchObject({ deletedById: admin.id, deleteReason: "Moved city" });
+    const log = await db.auditLog.findFirstOrThrow({ where: { entityId: m.id, action: "member.delete" } });
+    expect((log.after as { deleteReason: string }).deleteReason).toBe("Moved city");
+    expect((await listDeleted(admin)).find((d) => d.id === m.id)).toMatchObject({ deletedBy: admin.name, deleteReason: "Moved city" });
+    await restoreMember(admin, m.id);
+    expect(await db.member.findUniqueOrThrow({ where: { id: m.id } })).toMatchObject({ deletedAt: null, deletedById: null, deleteReason: null });
+  });
+
+  it("won't delete a member who still owes money", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ phone: "9876500202" }));
+    const p = await createPlan(admin, { name: "Owed", kind: "Membership", months: 1, price: 100000, regFee: 0, discount: 0, gstApplicable: false, features: [] });
+    const sold = await sellMembership(admin, m.id, { planId: p.id, startDate: todayIso(), discount: 0, includeRegFee: false, payAmount: 0 });
+    await expect(deleteMember(admin, m.id, "Moved city")).rejects.toThrow(/still owes/);
+    await collectPayment(admin, sold.invoice.id, { amount: 100000, method: "Cash", date: todayIso() } as never);
+    await deleteMember(admin, m.id, "Moved city");
+    expect(await getMember(admin, m.id)).toBeNull();
+  });
+
+  it("cancels autopay and closes an open check-in on delete", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ phone: "9876500203" }));
+    const p = await createPlan(admin, { name: "Auto", kind: "Membership", months: 1, price: 100000, regFee: 0, discount: 0, gstApplicable: false, features: [] });
+    const mandate = await db.autopayMandate.create({ data: { code: `MAN-${Date.now()}`, orgId: gym.org.id, branchId: gym.a.id, memberId: m.id, planId: p.id, amount: 100000, months: 1, mode: "demo", status: "Active", createdById: admin.id } });
+    const visit = await db.attendance.create({ data: { branchId: gym.a.id, memberId: m.id, type: "MEMBER", date: fromIso(todayIso()), checkIn: new Date(), method: "Manual", createdById: admin.id } });
+    await deleteMember(admin, m.id, "Moved city");
+    expect((await db.autopayMandate.findUniqueOrThrow({ where: { id: mandate.id } })).status).toBe("Cancelled");
+    expect((await db.attendance.findUniqueOrThrow({ where: { id: visit.id } })).checkOut).not.toBeNull();
+    expect(await db.auditLog.count({ where: { entityId: mandate.id, action: "mandate.cancel" } })).toBe(1);
+  });
+
+  it("stores a member photo privately, replaces and removes it", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const m = await createMember(admin, input({ phone: "9876500204" }));
+    const png = () => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3])], "me.png", { type: "image/png" });
+    await expect(setMemberPhoto(admin, m.id, new File(["%PDF-1.4"], "x.pdf"))).rejects.toThrow(/JPG, PNG or WebP/);
+    await expect(setMemberPhoto(admin, m.id, new File([], "e.png"))).rejects.toThrow(/Choose a photo/);
+    await setMemberPhoto(admin, m.id, png());
+    const first = (await db.member.findUniqueOrThrow({ where: { id: m.id } })).photoKey!;
+    expect(first).toContain(`/members/${m.id}/photo/`);
+    await setMemberPhoto(admin, m.id, png());
+    const second = (await db.member.findUniqueOrThrow({ where: { id: m.id } })).photoKey!;
+    expect(second).not.toBe(first);
+    await expect(getObject(first)).rejects.toThrow();
+    await updateMember(admin, m.id, input({ phone: "9876500204", name: "Renamed" }));
+    expect((await db.member.findUniqueOrThrow({ where: { id: m.id } })).photoKey).toBe(second);
+
+    const desk = pick(await gym.user("Receptionist"), gym.a.id);
+    expect((await readMemberPhoto(desk, m.id))?.mime).toBe("image/png");
+    expect(await readMemberPhoto(pick(await gym.user("Receptionist"), gym.b.id), m.id)).toBeNull();
+    expect(await readMemberPhoto(await (await makeGym()).user("Super Admin"), m.id)).toBeNull();
+    expect(await readMemberPhoto(pick(await gym.user("Trainer"), gym.a.id), m.id)).toBeNull();
+
+    await removeMemberPhoto(admin, m.id);
+    expect((await db.member.findUniqueOrThrow({ where: { id: m.id } })).photoKey).toBeNull();
+    await expect(getObject(second)).rejects.toThrow();
+    const actions = (await db.auditLog.findMany({ where: { entityId: m.id } })).map((a) => a.action);
+    expect(actions.filter((a) => a === "member.photo")).toHaveLength(2);
+    expect(actions).toContain("member.photo.remove");
   });
 });

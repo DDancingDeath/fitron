@@ -5,6 +5,7 @@ import path from "node:path";
 import { db } from "@/lib/db";
 import { hasDb, makeGym, pick } from "@/test/db";
 import { createMember } from "./members";
+import { getObject } from "@/lib/integrations/storage";
 import { deleteDocument, listDocuments, purgeDocuments, readDocument, replaceDocument, uploadDocument } from "./documents";
 
 const pdf = (text: string) => new File([`%PDF-1.4\n${text}`], "scan.pdf", { type: "application/pdf" });
@@ -46,5 +47,17 @@ describe.skipIf(!hasDb)("Member documents (database)", () => {
     expect(await readDocument(pick(await gym.user("Receptionist"), gym.b.id), d.id)).toBeNull();
     expect(await purgeDocuments(gym.org.id, memberId)).toBe(3);
     expect(await db.memberDocument.count({ where: { memberId } })).toBe(0);
+  });
+
+  it("a Photo document becomes the member photo and follows replace and delete", async () => {
+    const png = (n: number) => new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, n])], "p.png", { type: "image/png" });
+    await expect(uploadDocument(desk, memberId, { kind: "Photo", title: "Photo" }, pdf("x"))).rejects.toThrow(/JPG, PNG or WebP/);
+    const d1 = await uploadDocument(desk, memberId, { kind: "Photo", title: "Photo" }, png(1));
+    expect((await db.member.findUniqueOrThrow({ where: { id: memberId } })).photoKey).toBe(d1.storageKey);
+    const d2 = await replaceDocument(desk, d1.id, png(2));
+    expect((await db.member.findUniqueOrThrow({ where: { id: memberId } })).photoKey).toBe(d2.storageKey);
+    await deleteDocument(desk, d2.id, "Wrong photo");
+    expect((await db.member.findUniqueOrThrow({ where: { id: memberId } })).photoKey).toBeNull();
+    await expect(getObject(d2.storageKey)).resolves.toBeTruthy();
   });
 });

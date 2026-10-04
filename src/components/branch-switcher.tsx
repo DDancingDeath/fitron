@@ -7,6 +7,7 @@ export function BranchSwitcher({ branches, value }: { branches: { id: string; na
   return (
     <form action={switchBranch} className="hidden sm:block">
       <select
+        key={value}
         name="branch"
         defaultValue={value}
         aria-label="Branch"

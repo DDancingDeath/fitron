@@ -233,11 +233,14 @@ model Member {
   riskReasons        String[]          @default([])
   /// User PIN on biometric devices, given at enrolment.
   devicePin          String?
+  /// RFID card number pushed to door devices as USERINFO Card=
+  cardNo             String?
   biometricConsentAt DateTime?         @db.Timestamptz
   memberships        Membership[]
   attendance         Attendance[]
   bookings           Booking[]
   progress           ProgressLog[]
+  records            PersonalRecord[]
   lead               Lead?
   waMessages         WhatsAppMessage[]
   mandates           AutopayMandate[]
@@ -248,6 +251,8 @@ model Member {
   createdAt          DateTime          @default(now()) @db.Timestamptz
   updatedAt          DateTime          @updatedAt @db.Timestamptz
   deletedAt          DateTime?         @db.Timestamptz
+  deletedById        String?
+  deleteReason       String?
   /// Personal data stripped (DPDP erasure); set with deletedAt. Restore is refused.
   erasedAt           DateTime?         @db.Timestamptz
 
@@ -255,6 +260,7 @@ model Member {
   // unique index in a migration: WHERE "deletedAt" IS NULL AND NOT "walkIn".
   @@unique([orgId, code])
   @@unique([orgId, devicePin])
+  @@unique([orgId, cardNo])
   @@index([orgId, phone])
   @@index([branchId])
   @@index([name])
@@ -504,9 +510,16 @@ model AuditLog {
   after     Json?
   ip        String?
   userAgent String?
+  /// null = org-wide ("All branches")
+  branchId  String?
+  /// sha256 of this entry chained onto prevHash; null on entries written before hashing was enabled
+  hash      String?      @db.VarChar(64)
+  /// hash of the previous hashed entry of this organisation, or "0000"
+  prevHash  String?      @db.VarChar(64)
   createdAt DateTime     @default(now()) @db.Timestamptz
 
   @@index([orgId, createdAt])
+  @@index([orgId, id])
   @@index([entity, entityId])
 }
 
@@ -1492,4 +1505,20 @@ model SupportTicketReply {
   createdAt DateTime      @default(now()) @db.Timestamptz
 
   @@index([ticketId, createdAt])
+}
+
+model PersonalRecord {
+  id          String   @id @default(cuid())
+  orgId       String
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  /// e.g. Bench press
+  lift        String
+  weightKg    Decimal  @db.Decimal(5, 1)
+  reps        Int      @default(1)
+  date        DateTime @db.Date
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([memberId, lift])
 }

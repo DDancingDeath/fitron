@@ -6,7 +6,7 @@ import { createMember, summarize } from "./members";
 import { createPlan } from "./plans";
 import { sellMembership } from "./billing";
 import { checkIn } from "./attendance";
-import { freezeMembership, openFreeze, transferMember, unfreezeMembership } from "./freeze";
+import { freezeMembership, frozenMemberIds, openFreeze, transferMember, unfreezeMembership } from "./freeze";
 import { todayIso } from "./time";
 
 describe.skipIf(!hasDb)("freeze and transfer (database)", () => {
@@ -38,5 +38,26 @@ describe.skipIf(!hasDb)("freeze and transfer (database)", () => {
     await expect(transferMember(admin, m.id, gym.a.id)).rejects.toThrow(/different branch/);
     await transferMember(admin, m.id, gym.b.id, "Moved house");
     expect((await db.member.findUniqueOrThrow({ where: { id: m.id } })).branchId).toBe(gym.b.id);
+  });
+  it("lists the members whose freeze is still on hold", async () => {
+    const gym = await makeGym();
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const today = todayIso();
+    const plan = await createPlan(admin, { name: "Monthly", kind: "Membership", months: 1, price: 150000, regFee: 0, discount: 0, gstApplicable: false, features: [] });
+    const ms = [];
+    for (const [i, name] of ["One", "Two", "Three", "Four"].entries()) {
+      const m = await createMember(admin, { name: `Hold ${name}`, gender: "Female", phone: `98765560${i}1`, source: "Walk-in", tags: [] });
+      await sellMembership(admin, m.id, { planId: plan.id, startDate: addDays(today, -5), discount: 0, includeRegFee: false, payAmount: 150000, payMethod: "Cash" });
+      ms.push(m);
+    }
+    const [m1, m2, m3, m4] = ms as [(typeof ms)[0], (typeof ms)[0], (typeof ms)[0], (typeof ms)[0]];
+    await freezeMembership(admin, m1.id, { days: 10, from: today, reason: "Travel" });
+    await freezeMembership(admin, m2.id, { days: 3, from: addDays(today, 2), reason: "Travel" });
+    await freezeMembership(admin, m3.id, { days: 5, from: today, reason: "Travel" });
+    await unfreezeMembership(admin, m3.id);
+    await db.membershipFreeze.create({ data: { orgId: admin.orgId, memberId: m4.id, membershipId: (await db.membership.findFirstOrThrow({ where: { memberId: m4.id } })).id, fromDate: new Date(addDays(today, -20) + "T00:00:00Z"), days: 5, reason: "Old", createdById: admin.id } });
+    const ids = await frozenMemberIds([m1.id, m2.id, m3.id, m4.id]);
+    expect([...ids].sort()).toEqual([m1.id, m2.id].sort());
+    expect((await frozenMemberIds([])).size).toBe(0);
   });
 });

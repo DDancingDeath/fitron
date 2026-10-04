@@ -13,6 +13,9 @@ import { todayIso, toIso, fromIso } from "./time";
 import { getSetting } from "./settings";
 import { markLeadWon } from "./leads";
 import { eraseBiometrics } from "./biometric";
+import { randomUUID } from "node:crypto";
+import { deleteObject, getObject, putObject, sniffType } from "@/lib/integrations/storage";
+import { formatRupees } from "@/lib/format";
 import { assertBranchWritable, assertMemberRoom } from "./saas";
 
 /** Members a user may see: their branches, and only assigned members for trainers. */
@@ -208,35 +211,45 @@ export async function setSuspended(u: CurrentUser, id: string, suspended: boolea
   });
 }
 
-/** Rule 9: members are soft-deleted; their financial history stays. */
-export async function deleteMember(u: CurrentUser, id: string) {
-  const before = await db.member.findFirst({ where: { ...memberScope(u), id } });
+/** Rule 9: members are soft-deleted; their financial history stays. Needs a reason and a settled balance. */
+export async function deleteMember(u: CurrentUser, id: string, reason: string) {
+  const before = await db.member.findFirst({ where: { ...memberScope(u), id, walkIn: false } });
   if (!before) throw new UserError("Member not found.");
+  const why = reason.trim();
+  if (why.length < 3) throw new UserError("Give a reason.", "reason");
+  if (why.length > 300) throw new UserError("Keep the reason under 300 characters.", "reason");
+  const { outstanding } = (await summarize([id])).get(id)!;
+  if (outstanding > 0) throw new UserError(`${before.name} still owes ${formatRupees(outstanding)}. Collect it or cancel the invoice before deleting.`);
   await db.$transaction(async (tx) => {
     // Biometric data doesn't outlive the member (DPDP).
     await eraseBiometrics(u, id, tx);
-    const after = await tx.member.update({ where: { id }, data: { deletedAt: new Date() } });
-    await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.delete", entity: "Member", entityId: id, before, after });
+    const mandates = await tx.autopayMandate.findMany({ where: { memberId: id, status: { in: ["Pending", "Active", "Paused", "Failed", "Halted"] } }, select: { id: true } });
+    if (mandates.length) {
+      await tx.autopayMandate.updateMany({ where: { id: { in: mandates.map((x) => x.id) } }, data: { status: "Cancelled", lastResult: "Member deleted" } });
+      for (const x of mandates) await audit(tx, { orgId: u.orgId, userId: u.id, action: "mandate.cancel", entity: "AutopayMandate", entityId: x.id, after: { reason: "Member deleted" } });
+    }
+    await tx.attendance.updateMany({ where: { memberId: id, checkOut: null }, data: { checkOut: new Date() } });
+    const after = await tx.member.update({ where: { id }, data: { deletedAt: new Date(), deletedById: u.id, deleteReason: why } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.delete", entity: "Member", entityId: id, before, after: { ...after, deleteReason: why } });
   });
 }
 
-/** Members deleted in the picked branch(es), newest first, with who deleted them (for "Recently deleted"). */
+/** Members deleted in the picked branch(es), newest first, with who deleted them and why (for "Recently deleted"). */
 export async function listDeleted(u: CurrentUser) {
   const gone = await db.member.findMany({
     where: { orgId: u.orgId, branchId: { in: u.branchIds }, walkIn: false, deletedAt: { not: null } },
     orderBy: { deletedAt: "desc" },
     take: 50,
-    select: { id: true, code: true, name: true, deletedAt: true, erasedAt: true },
+    select: { id: true, code: true, name: true, deletedAt: true, erasedAt: true, deletedById: true, deleteReason: true },
   });
-  const logs = await db.auditLog.findMany({
-    where: { orgId: u.orgId, entity: "Member", action: "member.delete", entityId: { in: gone.map((m) => m.id) } },
-    orderBy: { id: "desc" },
-    select: { entityId: true, userId: true },
-  });
-  const users = await db.user.findMany({ where: { id: { in: [...new Set(logs.map((l) => l.userId).filter((x): x is string => !!x))] } }, select: { id: true, name: true } });
+  // Members deleted before the reason was recorded: the audit log knows who.
+  const legacy = gone.filter((m) => !m.deletedById).map((m) => m.id);
+  const logs = legacy.length ? await db.auditLog.findMany({ where: { orgId: u.orgId, entity: "Member", action: "member.delete", entityId: { in: legacy } }, orderBy: { id: "desc" }, select: { entityId: true, userId: true } }) : [];
+  const ids = [...new Set([...gone.map((m) => m.deletedById), ...logs.map((l) => l.userId)].filter((x): x is string => !!x))];
+  const users = await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } });
   return gone.map((m) => {
-    const by = logs.find((l) => l.entityId === m.id)?.userId;
-    return { ...m, deletedBy: users.find((x) => x.id === by)?.name ?? "—" };
+    const by = m.deletedById ?? logs.find((l) => l.entityId === m.id)?.userId;
+    return { ...m, deletedBy: users.find((x) => x.id === by)?.name ?? "—", deleteReason: m.deleteReason };
   });
 }
 
@@ -248,7 +261,7 @@ export async function restoreMember(u: CurrentUser, id: string) {
   const clash = await db.member.findFirst({ where: { orgId: u.orgId, phone: before.phone, deletedAt: null, walkIn: false }, select: { code: true, name: true } });
   if (clash) throw new UserError(`${before.phone} now belongs to ${clash.name} (${clash.code}). Change one of the numbers first.`);
   await db.$transaction(async (tx) => {
-    const after = await tx.member.update({ where: { id }, data: { deletedAt: null } });
+    const after = await tx.member.update({ where: { id }, data: { deletedAt: null, deletedById: null, deleteReason: null } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.restore", entity: "Member", entityId: id, before, after });
   });
 }
@@ -264,4 +277,66 @@ export async function resolveMemberRef(u: CurrentUser, text: string) {
   const code = text.trim().split(/\s+/)[0] ?? "";
   if (!code) return null;
   return db.member.findFirst({ where: { ...memberScope(u), walkIn: false, code: { equals: code, mode: "insensitive" } }, select: { id: true, name: true } });
+}
+
+// ---- Member photo (private, like staff photos) ----
+export const MAX_MEMBER_PHOTO_BYTES = 5 * 1024 * 1024;
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+export async function checkPhoto(file: File) {
+  if (!file || typeof file.arrayBuffer !== "function" || file.size === 0) throw new UserError("Choose a photo.", "photo");
+  if (file.size > MAX_MEMBER_PHOTO_BYTES) throw new UserError("That photo is over 5 MB. Pick a smaller one.", "photo");
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const type = sniffType(bytes);
+  if (!type || !PHOTO_TYPES.includes(type.mime)) throw new UserError("Use a JPG, PNG or WebP photo.", "photo");
+  return { bytes, type };
+}
+
+/** The old file goes unless a document in the member's history still points at it. */
+async function dropPhotoFile(key: string | null) {
+  if (!key) return;
+  if (await db.memberDocument.findFirst({ where: { storageKey: key }, select: { id: true } })) return;
+  await deleteObject(key).catch(() => {});
+}
+
+export async function setMemberPhoto(u: CurrentUser, memberId: string, file: File) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false }, select: { id: true } });
+  if (!m) throw new UserError("Member not found.");
+  const { bytes, type } = await checkPhoto(file);
+  const key = `${u.orgId}/members/${memberId}/photo/${randomUUID()}.${type.ext}`;
+  await putObject(key, bytes, type.mime);
+  let old: string | null;
+  try {
+    old = await db.$transaction(async (tx) => {
+      const { photoKey } = await tx.member.findUniqueOrThrow({ where: { id: memberId }, select: { photoKey: true } });
+      await tx.member.update({ where: { id: memberId }, data: { photoKey: key } });
+      await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.photo", entity: "Member", entityId: memberId, before: { photoKey }, after: { photoKey: key } });
+      return photoKey;
+    });
+  } catch (e) {
+    await deleteObject(key).catch(() => {});
+    throw e;
+  }
+  await dropPhotoFile(old);
+}
+
+export async function removeMemberPhoto(u: CurrentUser, memberId: string) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false }, select: { id: true } });
+  if (!m) throw new UserError("Member not found.");
+  const old = await db.$transaction(async (tx) => {
+    const { photoKey } = await tx.member.findUniqueOrThrow({ where: { id: memberId }, select: { photoKey: true } });
+    if (!photoKey) return null;
+    await tx.member.update({ where: { id: memberId }, data: { photoKey: null } });
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.photo.remove", entity: "Member", entityId: memberId, before: { photoKey }, after: { photoKey: null } });
+    return photoKey;
+  });
+  await dropPhotoFile(old);
+}
+
+export async function readMemberPhoto(u: CurrentUser, memberId: string) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId }, select: { photoKey: true } });
+  if (!m?.photoKey) return null;
+  const ext = m.photoKey.split(".").pop();
+  const mime = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+  return { body: await getObject(m.photoKey), mime };
 }

@@ -43,6 +43,15 @@ describe.skipIf(!hasDb)("billing (database)", () => {
     expect((await getInvoice(admin, invoice.id))?.status).toBe("PAID");
   });
 
+  it("records the invoice number on the payment audit entry", async () => {
+    const m = await newMember();
+    const { invoice } = await sellMembership(admin, m.id, sale({ payAmount: 100000, payMethod: "Cash" as const }));
+    const p = await collectPayment(admin, invoice.id, { amount: 1000, method: "UPI", date: today });
+    const row = await db.auditLog.findFirstOrThrow({ where: { orgId: admin.orgId, action: "payment.create", entityId: p.id } });
+    expect((row.after as { invoiceNumber?: string }).invoiceNumber).toBe(invoice.number);
+    expect(row.hash).toBeTruthy();
+  });
+
   it("renews from the day after the current membership ends, without a registration fee by default", async () => {
     const m = await newMember();
     const first = await sellMembership(admin, m.id, sale());

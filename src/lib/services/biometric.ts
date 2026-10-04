@@ -3,13 +3,13 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
 import type { Prisma } from "@/generated/prisma/client";
-import { entryBlock } from "@/lib/domain/access";
+import { entryBlock, passbackBlock } from "@/lib/domain/access";
 import { cmd, parseAcks, parseAttlog, parseTemplates, verifyMethod, type Punch } from "@/lib/domain/adms";
 import { getAccessRules } from "./attendance";
 import { audit } from "./audit";
 import { frozenBlocks } from "./freeze";
 import { UserError } from "./errors";
-import { summarize } from "./members";
+import { memberScope, summarize } from "./members";
 import { notify } from "./notifications";
 import { nextNumber } from "./sequence";
 import { fromIso, nowHHMM, todayIso } from "./time";
@@ -103,17 +103,25 @@ export async function recordPunches(d: Device, punches: Punch[]) {
     const s = (await summarize([member.id], date)).get(member.id)!;
     const block = entryBlock({ suspended: member.suspended, ...s }, rules, date, nowHHMM(at)) ?? (await frozenBlocks([member.id], date)).get(member.id) ?? null;
     await db.$transaction(async (tx) => {
-      await tx.accessLog.create({ data: { deviceId: d.id, branchId: d.branchId, memberId: member.id, pin: p.pin, method, result: block ? "DENIED" : "ALLOWED", reason: block, at } });
+      const log = (result: "ALLOWED" | "DENIED", reason: string | null) => tx.accessLog.create({ data: { deviceId: d.id, branchId: d.branchId, memberId: member.id, pin: p.pin, method, result, reason, at } });
       if (block) {
+        await log("DENIED", block);
         if (date === today) await notify(tx, { orgId, branchId: d.branchId!, type: "CHECKIN_OVERRIDE", text: `${member.name} was refused at ${d.name ?? d.serial}: ${block}`, link: `/members/${member.id}` });
         return;
       }
       const open = await tx.attendance.findFirst({ where: { memberId: member.id, date: fromIso(date), checkOut: null }, orderBy: { checkIn: "desc" } });
       if (open) {
-        if (at.getTime() - open.checkIn.getTime() >= 20 * 60_000) await tx.attendance.update({ where: { id: open.id }, data: { checkOut: at } });
+        if (at.getTime() - open.checkIn.getTime() >= 20 * 60_000) {
+          await tx.attendance.update({ where: { id: open.id }, data: { checkOut: at } });
+          await log("ALLOWED", "Check-out");
+        } else {
+          const pb = passbackBlock(rules, nowHHMM(open.checkIn));
+          await log(pb ? "DENIED" : "ALLOWED", pb ?? "Already inside");
+        }
       } else {
         const visitedToday = await tx.attendance.findFirst({ where: { memberId: member.id, date: fromIso(date), checkOut: { gt: new Date(at.getTime() - 20 * 60_000) } } });
         if (!visitedToday) await tx.attendance.create({ data: { branchId: d.branchId!, memberId: member.id, type: "MEMBER", date: fromIso(date), checkIn: at, method, deviceId: d.id } });
+        await log("ALLOWED", visitedToday ? "Re-entry" : "Door opened · check-in");
       }
     });
     if (block) await setOnDevice(d, member, false);
@@ -146,13 +154,13 @@ export async function handleCdataPost(d: Device, table: string, body: string) {
 
 // ── Keeping devices in step with who may come in ──────────────────────────
 
-async function setOnDevice(d: Device, m: { id: string; name: string; devicePin: string | null }, allowed: boolean) {
+async function setOnDevice(d: Device, m: { id: string; name: string; devicePin: string | null; cardNo: string | null }, allowed: boolean) {
   if (!m.devicePin) return false;
   const cur = await db.deviceUser.findUnique({ where: { deviceId_memberId: { deviceId: d.id, memberId: m.id } } });
   if (cur?.allowed === allowed) return false;
   await db.$transaction(async (tx) => {
     if (allowed) {
-      await queue(tx, d.id, cmd.addUser(m.devicePin!, m.name));
+      await queue(tx, d.id, cmd.addUser(m.devicePin!, m.name, m.cardNo ?? ""));
       const templates = await tx.biometricTemplate.findMany({ where: { memberId: m.id } });
       for (const t of templates) await queue(tx, d.id, cmd.restoreTemplate({ type: t.type, line: unseal(t.data) }));
     } else {
@@ -167,7 +175,7 @@ async function setOnDevice(d: Device, m: { id: string; name: string; devicePin: 
 export async function syncDevices(orgId: string, today = todayIso()) {
   const devices = await db.device.findMany({ where: { orgId, approved: true } });
   if (!devices.length) return { devices: 0, changes: 0 };
-  const members = await db.member.findMany({ where: { orgId, deletedAt: null, devicePin: { not: null } }, select: { id: true, name: true, devicePin: true, suspended: true, branchId: true } });
+  const members = await db.member.findMany({ where: { orgId, deletedAt: null, devicePin: { not: null } }, select: { id: true, name: true, devicePin: true, cardNo: true, suspended: true, branchId: true } });
   const sums = await summarize(members.map((m) => m.id), today);
   const rules = await getAccessRules(orgId);
   const frozen = await frozenBlocks(members.map((m) => m.id), today);
@@ -227,6 +235,7 @@ export async function openDoor(u: CurrentUser, id: string) {
   if (!d) throw new UserError("Device not found.");
   await db.$transaction(async (tx) => {
     await queue(tx, id, cmd.openDoor(d.relaySeconds));
+    await tx.accessLog.create({ data: { deviceId: id, branchId: d.branchId, memberId: null, pin: "", method: "Remote", result: "ALLOWED", reason: `Door opened remotely by ${u.name}`, at: new Date() } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "device.open-door", entity: "Device", entityId: id });
   });
 }
@@ -250,7 +259,7 @@ export async function enrol(u: CurrentUser, memberId: string, deviceId: string, 
     if (!pin) pin = String(await nextNumber(tx, u.orgId, "devicePin", 1001));
     const after = await tx.member.update({ where: { id: m.id }, data: { devicePin: pin, biometricConsentAt: m.biometricConsentAt ?? new Date() } });
     if (!m.biometricConsentAt) await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.biometric-consent", entity: "Member", entityId: m.id, before: { consent: null }, after: { consent: after.biometricConsentAt } });
-    await queue(tx, d.id, cmd.addUser(pin, m.name));
+    await queue(tx, d.id, cmd.addUser(pin, m.name, m.cardNo ?? ""));
     await queue(tx, d.id, kind === "FP" ? cmd.enrollFinger(pin) : cmd.enrollFace(pin));
     await tx.deviceUser.upsert({ where: { deviceId_memberId: { deviceId: d.id, memberId: m.id } }, create: { deviceId: d.id, memberId: m.id, allowed: true }, update: { allowed: true } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.biometric-enrol", entity: "Member", entityId: m.id, after: { device: d.serial, kind, pin } });
@@ -262,14 +271,14 @@ export async function eraseBiometrics(u: CurrentUser, memberId: string, tx?: Pri
   const run = async (t: Prisma.TransactionClient) => {
     const m = await t.member.findFirst({ where: { id: memberId, orgId: u.orgId } });
     if (!m) throw new UserError("Member not found.");
-    if (!m.devicePin && !m.biometricConsentAt) return;
+    if (!m.devicePin && !m.biometricConsentAt && !m.cardNo) return;
     await t.biometricTemplate.deleteMany({ where: { memberId } });
     if (m.devicePin) {
       const on = await t.deviceUser.findMany({ where: { memberId } });
       for (const x of on) await queue(t, x.deviceId, cmd.deleteUser(m.devicePin));
       await t.deviceUser.deleteMany({ where: { memberId } });
     }
-    await t.member.update({ where: { id: memberId }, data: { biometricConsentAt: null, devicePin: null } });
+    await t.member.update({ where: { id: memberId }, data: { biometricConsentAt: null, devicePin: null, cardNo: null } });
     await audit(t, { orgId: u.orgId, userId: u.id, action: "member.biometric-erase", entity: "Member", entityId: memberId });
   };
   return tx ? run(tx) : db.$transaction(run);
@@ -281,4 +290,99 @@ export async function memberBiometrics(memberId: string) {
     db.deviceUser.findMany({ where: { memberId }, include: { device: { select: { name: true, serial: true } } } }),
   ]);
   return { fingerprints: templates.find((t) => t.type === "FP")?._count._all ?? 0, faces: templates.find((t) => t.type === "FACE")?._count._all ?? 0, devices };
+}
+
+/** Re-push every member's validity (and the current rules' verdict) to one device. */
+export async function syncDevice(u: CurrentUser, deviceId: string) {
+  const d = await db.device.findFirst({ where: { id: deviceId, orgId: u.orgId, approved: true, branchId: { in: u.branchIds } } });
+  if (!d) throw new UserError("Device not found.");
+  const today = todayIso();
+  const members = await db.member.findMany({ where: { orgId: u.orgId, deletedAt: null, devicePin: { not: null } }, select: { id: true, name: true, devicePin: true, cardNo: true, suspended: true, branchId: true } });
+  const sums = await summarize(members.map((m) => m.id), today);
+  const rules = await getAccessRules(u.orgId);
+  const frozen = await frozenBlocks(members.map((m) => m.id), today);
+  const templates = await db.biometricTemplate.findMany({ where: { memberId: { in: members.map((m) => m.id) } } });
+  let commands = 0;
+  let allowedCount = 0;
+  await db.$transaction(async (tx) => {
+    for (const m of members) {
+      const allowed = !entryBlock({ suspended: m.suspended, ...sums.get(m.id)! }, rules, today) && !frozen.has(m.id);
+      if (allowed) {
+        allowedCount++;
+        await queue(tx, d.id, cmd.addUser(m.devicePin!, m.name, m.cardNo ?? ""));
+        commands++;
+        for (const t of templates.filter((x) => x.memberId === m.id)) {
+          await queue(tx, d.id, cmd.restoreTemplate({ type: t.type, line: unseal(t.data) }));
+          commands++;
+        }
+      } else {
+        await queue(tx, d.id, cmd.deleteUser(m.devicePin!));
+        commands++;
+      }
+      await tx.deviceUser.upsert({ where: { deviceId_memberId: { deviceId: d.id, memberId: m.id } }, create: { deviceId: d.id, memberId: m.id, allowed }, update: { allowed } });
+    }
+    await audit(tx, { orgId: u.orgId, userId: u.id, action: "device.sync", entity: "Device", entityId: d.id, after: { members: members.length, allowed: allowedCount, removed: members.length - allowedCount, commands } });
+  });
+  return { members: members.length, commands, device: d.name ?? d.serial };
+}
+
+/** Assign (or clear) a member's RFID card and push it to the devices. */
+export async function assignCard(u: CurrentUser, memberId: string, cardInput: string) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false } });
+  if (!m) throw new UserError("Member not found.");
+  const card = cardInput.trim();
+  if (card !== "" && !/^\d{1,20}$/.test(card)) throw new UserError("Type the number printed on the card (digits only).", "card");
+  if (card) {
+    const other = await db.member.findFirst({ where: { orgId: u.orgId, cardNo: card, deletedAt: null, id: { not: m.id } }, select: { name: true } });
+    if (other) throw new UserError(`This card is already assigned to ${other.name}.`, "card");
+  }
+  const today = todayIso();
+  const [sum, frozen, rules, devices] = await Promise.all([
+    summarize([m.id], today),
+    frozenBlocks([m.id], today),
+    getAccessRules(u.orgId),
+    db.device.findMany({ where: { orgId: u.orgId, approved: true } }),
+  ]);
+  const allowed = !entryBlock({ suspended: m.suspended, ...sum.get(m.id)! }, rules, today) && !frozen.has(m.id);
+  try {
+    await db.$transaction(async (tx) => {
+      const pin = m.devicePin ?? String(await nextNumber(tx, u.orgId, "devicePin", 1001));
+      await tx.member.update({ where: { id: m.id }, data: { devicePin: pin, cardNo: card || null } });
+      await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.rfid-card", entity: "Member", entityId: m.id, before: { card: m.cardNo }, after: { card: card || null } });
+      if (allowed) {
+        for (const d of devices) {
+          await queue(tx, d.id, cmd.addUser(pin, m.name, card));
+          await tx.deviceUser.upsert({ where: { deviceId_memberId: { deviceId: d.id, memberId: m.id } }, create: { deviceId: d.id, memberId: m.id, allowed: true }, update: { allowed: true } });
+        }
+      }
+    });
+  } catch (e) {
+    if ((e as { code?: string }).code === "P2002") throw new UserError("This card is already assigned to another member.", "card");
+    throw e;
+  }
+  return { card: card || null };
+}
+
+/** Run a punch's checks for a member without touching attendance, devices or notifications; logs one "Test" row. */
+export async function testScan(u: CurrentUser, memberId: string) {
+  const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false } });
+  if (!m) throw new UserError("Member not found.");
+  if (!m.devicePin && !m.cardNo) throw new UserError(`${m.name} is not on any device yet. Enrol them or assign a card first.`);
+  const d = await db.device.findFirst({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } });
+  if (!d) throw new UserError("Add a device first.");
+  const now = new Date();
+  const today = todayIso();
+  const rules = await getAccessRules(u.orgId);
+  const s = (await summarize([m.id], today)).get(m.id)!;
+  let block = (await frozenBlocks([m.id], today)).get(m.id) ?? entryBlock({ suspended: m.suspended, ...s }, rules, today, nowHHMM(now)) ?? null;
+  let reason = `Test scan by ${u.name}`;
+  if (!block) {
+    const open = await db.attendance.findFirst({ where: { memberId: m.id, date: fromIso(today), checkOut: null }, orderBy: { checkIn: "desc" } });
+    if (open) {
+      if (now.getTime() - open.checkIn.getTime() >= 20 * 60_000) reason = `Would check out · test by ${u.name}`;
+      else block = passbackBlock(rules, nowHHMM(open.checkIn));
+    }
+  }
+  await db.accessLog.create({ data: { deviceId: d.id, branchId: d.branchId, memberId: m.id, pin: m.devicePin ?? "", method: "Test", result: block ? "DENIED" : "ALLOWED", reason: block ?? reason, at: now } });
+  return { name: m.name, allowed: !block, reason: block };
 }

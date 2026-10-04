@@ -113,7 +113,7 @@ export async function updateStaff(u: CurrentUser, id: string, input: StaffInput)
       await tx.userBranch.createMany({ data: input.branchIds.map((branchId) => ({ userId: id, branchId })) });
       // A password reset signs the person out everywhere.
       if (passwordHash) await tx.session.deleteMany({ where: { userId: id } });
-      await audit(tx, { orgId: u.orgId, userId: u.id, action: "staff.update", entity: "User", entityId: id, before: safe(before), after: { ...safe(after), branchIds: input.branchIds, passwordReset: !!passwordHash } });
+      await audit(tx, { orgId: u.orgId, userId: u.id, action: input.roleId !== before.roleId ? "staff.role" : "staff.update", entity: "User", entityId: id, before: safe(before), after: { ...safe(after), branchIds: input.branchIds, passwordReset: !!passwordHash } });
     });
   } catch (e) {
     if (isUniqueViolation(e)) throw new UserError("Someone already uses this email.", "email");

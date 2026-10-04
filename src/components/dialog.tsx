@@ -22,11 +22,11 @@ export function Dialog({ kicker, title, note, close, error, width = 480, childre
   );
 }
 
-export const DialogButtons = ({ close, label }: { close: string; label: string }) => (
+export const DialogButtons = ({ close, label, cancelLabel = "Cancel", danger }: { close: string; label: string; cancelLabel?: string; danger?: boolean }) => (
   <div className="flex justify-end gap-2.5">
     <Link href={close} className={`${btn} border-line hover:bg-fg/7`} scroll={false}>
-      Cancel
+      {cancelLabel}
     </Link>
-    <button className={`${btn} border-transparent bg-accent text-accent-ink hover:bg-accent-hover`}>{label}</button>
+    <button className={`${btn} border-transparent ${danger ? "bg-alert-700 text-white hover:opacity-90" : "bg-accent text-accent-ink hover:bg-accent-hover"}`}>{label}</button>
   </div>
 );

@@ -4,6 +4,7 @@ import type { CurrentUser } from "@/lib/auth/current";
 import { addDays, daysBetween } from "@/lib/domain/dates";
 import { monthEnd, monthsBack, periodRange, type PeriodKey } from "@/lib/domain/periods";
 import { memberScope } from "./members";
+import { frozenMemberIds } from "./freeze";
 import { listReceivables } from "./billing";
 import { profitAndLoss } from "./accounting";
 import { fromIso, todayIso, toIso } from "./time";
@@ -210,7 +211,7 @@ export async function dashboardData(u: CurrentUser, period: PeriodKey, custom: {
       .map((i) => ({ memberId: i.member.id, name: i.member.name, number: i.number, overdueDays: i.overdueDays, due: toIso(i.dueDate), balance: i.balance })),
     expiring: [...exp7].sort((a, b) => a.daysLeft! - b.daysLeft!).slice(0, 6),
     risk,
-    branches: u.branch === "ALL" && u.branches.length > 1 ? await branchComparison(u, range, today, M, open, payRange, fin) : null,
+    branches: u.branch === "ALL" && u.branches.length > 1 ? await branchComparison(u, range, today, M, recv?.list ?? null) : null,
     frontDesk: u.role === "Receptionist" ? await frontDesk(u, today, M, open) : null,
     trainer: u.role === "Trainer" ? await trainerView(u, today, M) : null,
   };
@@ -224,17 +225,17 @@ async function branchComparison(
   range: Range,
   today: string,
   M: DashMember[],
-  open: { branchId: string; balance: number }[],
-  payments: { amount: number; branchId: string }[],
-  fin: boolean,
+  recvList: { branchId: string; balance: number }[] | null,
 ) {
-  const [checkins, expenses] = await Promise.all([
+  const [checkins, expenses, payments, open] = await Promise.all([
     db.attendance.groupBy({ by: ["branchId"], where: { branchId: { in: u.branchIds }, date: fromIso(today) }, _count: true }),
-    fin ? db.expense.groupBy({ by: ["branchId"], where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: false, date: between(range) }, _sum: { amount: true } }) : [],
+    db.expense.groupBy({ by: ["branchId"], where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: false, date: between(range) }, _sum: { amount: true } }),
+    db.payment.groupBy({ by: ["branchId"], where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "SUCCESS", date: between(range) }, _sum: { amount: true } }),
+    recvList ? Promise.resolve(recvList) : listReceivables(u).then((r) => r.list),
   ]);
   return u.branches.filter((b) => b.active).map((b) => {
     const mine = M.filter((m) => m.branchId === b.id);
-    const col = sum(payments.filter((p) => p.branchId === b.id), (p) => p.amount);
+    const col = payments.find((p) => p.branchId === b.id)?._sum.amount ?? 0;
     const ex = expenses.find((e) => e.branchId === b.id)?._sum.amount ?? 0;
     return {
       id: b.id,
@@ -253,10 +254,11 @@ async function branchComparison(
 
 /** The front desk's cards (prototype roleDash, Receptionist). */
 async function frontDesk(u: CurrentUser, today: string, M: DashMember[], open: { dueDate: Date; balance: number }[]) {
-  const [att, followUps, bookings] = await Promise.all([
+  const [att, followUps, bookings, frozenIds] = await Promise.all([
     db.attendance.findMany({ where: { branchId: { in: u.branchIds }, date: fromIso(today) }, select: { checkOut: true } }),
     db.lead.count({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, stage: { notIn: ["Won", "Lost"] }, followUpOn: { lte: fromIso(today) } } }),
     db.booking.count({ where: { date: fromIso(today), status: { not: "Cancelled" }, classSlot: { orgId: u.orgId, branchId: { in: u.branchIds } } } }),
+    frozenMemberIds(M.map((m) => m.id), today),
   ]);
   return {
     checkins: att.length,
@@ -265,6 +267,7 @@ async function frontDesk(u: CurrentUser, today: string, M: DashMember[], open: {
     newToday: M.filter((m) => m.joined === today).length,
     followUps,
     bookings,
+    frozen: frozenIds.size,
     birthdays: M.filter((m) => m.dob?.slice(5) === today.slice(5)).length,
   };
 }

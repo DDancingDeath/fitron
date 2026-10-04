@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { saveMember } from "./actions";
 import { Button, Card, Field, Input, LinkButton, Notice, Select, Textarea } from "@/components/ui";
+import { Avatar, memberPhotoUrl } from "@/components/avatar";
 import { GENDERS, SOURCES } from "@/lib/validation/member";
 
 type Values = Partial<Record<string, string | null>>;
@@ -56,6 +57,17 @@ export function MemberForm({ id, values = {}, trainers }: { id?: string; values?
                 <option key={s}>{s}</option>
               ))}
             </Select>
+          </Field>
+          <Field label="Photo" hint="JPG, PNG or WebP, up to 5 MB. Optional." error={e.photo}>
+            <div className="flex flex-wrap items-center gap-3">
+              {values.photoKey && id && <Avatar name={values.name ?? ""} src={memberPhotoUrl(id, values.photoKey)} className="size-16 text-xl" />}
+              <input type="file" name="photo" accept="image/jpeg,image/png,image/webp" className="max-w-full text-sm" />
+            </div>
+            {values.photoKey && id && (
+              <label className="mt-1 flex items-center gap-2 text-sm">
+                <input type="checkbox" name="removePhoto" /> Remove photo
+              </label>
+            )}
           </Field>
         </div>
       </Card>

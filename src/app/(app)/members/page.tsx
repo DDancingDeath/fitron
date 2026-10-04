@@ -78,6 +78,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
         </div>
       </div>
 
+      {str("msg") && <Notice tone="ok">{str("msg")}</Notice>}
       {str("error") && <Notice tone="alert">{str("error")}</Notice>}
 
       <AutoFilter className="flex flex-wrap items-end gap-2.5">
@@ -198,7 +199,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
                   <div className="text-sm font-semibold">
                     {d.name} <span className="text-xs font-normal text-muted">{d.code}</span>
                   </div>
-                  <div className="text-xs text-muted">{d.erasedAt ? `Personal data erased ${fmtStamp(d.erasedAt)}` : `Deleted ${fmtStamp(d.deletedAt)} by ${d.deletedBy}`}</div>
+                  <div className="text-xs text-muted">{d.erasedAt ? `Personal data erased ${fmtStamp(d.erasedAt)}` : `Deleted ${fmtStamp(d.deletedAt)} by ${d.deletedBy}${d.deleteReason ? ` · ${d.deleteReason}` : ""}`}</div>
                 </div>
                 {!d.erasedAt && (
                   <form action={bringBackMember.bind(null, d.id)}>

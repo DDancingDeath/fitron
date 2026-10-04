@@ -1,18 +1,22 @@
 import Link from "next/link";
 import { headers } from "next/headers";
-import { ArrowsClockwiseIcon, DoorOpenIcon, FingerprintIcon, InfoIcon, LockKeyIcon, MagnifyingGlassIcon, PlusIcon, ScanSmileyIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowsClockwiseIcon, DoorOpenIcon, FingerprintIcon, IdentificationCardIcon, InfoIcon, LockKeyIcon, MagnifyingGlassIcon, PlayCircleIcon, PlusIcon, ScanSmileyIcon, TrashIcon } from "@phosphor-icons/react/dist/ssr";
 import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { isDeviceOnline, listDevices, recentAccess } from "@/lib/services/biometric";
 import { getAccessRules } from "@/lib/services/attendance";
-import { memberScope } from "@/lib/services/members";
+import { memberScope, summarize } from "@/lib/services/members";
+import { membershipStatus } from "@/lib/domain/membership";
+import { Dialog, DialogButtons } from "@/components/dialog";
+import { LiveRefresh } from "@/components/live-refresh";
+import { MemberStatus } from "@/components/status";
 import { fromIso, todayIso } from "@/lib/services/time";
 import { AutoFilter } from "@/components/auto-filter";
 import { Button, Field, Input, LinkButton, Notice, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Tag } from "@/components/tag";
 import { fmtStamp, fmtTime } from "@/lib/format";
-import { openDoorAction, removeDeviceAction, saveDeviceAction, saveRulesAction, syncAction } from "./actions";
+import { assignCardAction, enrolAction, eraseAction, openDoorAction, removeDeviceAction, saveDeviceAction, saveRulesAction, syncDeviceAction, testScanAction } from "./actions";
 
 export const metadata = { title: "Biometric & doors · Fitron" };
 
@@ -24,33 +28,46 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
   const sp = await searchParams;
   const s = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const q = s("q")?.trim();
-  const [devices, log, branches, rules, today, enrolled] = await Promise.all([
+  const day = fromIso(todayIso());
+  const here = `/settings/devices${q ? `?${new URLSearchParams({ q })}` : ""}`;
+  const base = { ...memberScope(u), walkIn: false };
+  const [devices, log, branches, rules, entries, denied, total, enrolled, members] = await Promise.all([
     listDevices(u),
     recentAccess(u, 40),
     db.branch.findMany({ where: { id: { in: u.branchIds } }, orderBy: { createdAt: "asc" } }),
     getAccessRules(u.orgId),
-    db.accessLog.groupBy({ by: ["result"], where: { branchId: { in: u.branchIds }, at: { gte: fromIso(todayIso()) } }, _count: { _all: true } }),
-    db.member.findMany({ where: { ...memberScope(u), walkIn: false }, select: { id: true } }).then((ms) => db.biometricTemplate.groupBy({ by: ["memberId", "type"], where: { memberId: { in: ms.map((m) => m.id) } }, _count: { _all: true } })),
+    db.accessLog.count({ where: { branchId: { in: u.branchIds }, at: { gte: day }, result: "ALLOWED", method: { not: "Test" } } }),
+    db.accessLog.count({ where: { branchId: { in: u.branchIds }, at: { gte: day }, result: "DENIED", method: { not: "Test" } } }),
+    db.member.count({ where: base }),
+    db.member.findMany({ where: base, select: { id: true, cardNo: true } }).then(async (ms) => {
+      const withTpl = new Set((await db.biometricTemplate.groupBy({ by: ["memberId"], where: { memberId: { in: ms.map((m) => m.id) } } })).map((t) => t.memberId));
+      return ms.filter((m) => m.cardNo || withTpl.has(m.id)).length;
+    }),
+    db.member.findMany({
+      where: { ...base, ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { code: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] } : {}) },
+      select: { id: true, code: true, name: true, devicePin: true, cardNo: true, biometricConsentAt: true, suspended: true },
+      orderBy: { name: "asc" },
+      take: 30,
+    }),
   ]);
-  const members = await db.member.findMany({
-    where: { ...memberScope(u), walkIn: false, ...(q ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { code: { contains: q, mode: "insensitive" } }, { phone: { contains: q } }] } : { id: { in: [...new Set(enrolled.map((e) => e.memberId))] } }) },
-    select: { id: true, code: true, name: true, devicePin: true, biometricConsentAt: true, suspended: true },
-    orderBy: { name: "asc" },
-    take: 30,
-  });
+  const ids = members.map((m) => m.id);
+  const [sums, tpls] = await Promise.all([summarize(ids), db.biometricTemplate.groupBy({ by: ["memberId", "type"], where: { memberId: { in: ids } }, _count: { _all: true } })]);
+  const enrolId = s("enrol");
+  const cardId = s("card");
+  const enrolMember = enrolId ? members.find((m) => m.id === enrolId) ?? (await db.member.findFirst({ where: { ...base, id: enrolId }, select: { id: true, name: true, biometricConsentAt: true } })) : null;
+  const cardMember = cardId ? members.find((m) => m.id === cardId) ?? (await db.member.findFirst({ where: { ...base, id: cardId }, select: { id: true, name: true, cardNo: true } })) : null;
+  const qs = (p: Record<string, string>) => `/settings/devices?${new URLSearchParams({ ...p, ...(q ? { q } : {}) })}`;
+  const enrolDevices = enrolId ? devices.filter((d) => d.approved && d.branchId && u.branchIds.includes(d.branchId)) : [];
+  const kind = s("kind") === "FACE" ? "FACE" : "FP";
   const host = (await headers()).get("host") ?? "your-fitron-domain";
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
   const isOnline = (d: { lastSeenAt: Date | null }) => isDeviceOnline(d);
-  const count = (r: string) => today.find((x) => x.result === r)?._count._all ?? 0;
-  const tpl = (id: string, type: string) => {
-    const e = enrolled.find((x) => x.memberId === id && x.type === type);
-    return e ? (e._count as { _all: number })._all : 0;
-  };
+  const tpl = (id: string, type: string) => tpls.find((x) => x.memberId === id && x.type === type)?._count._all ?? 0;
   const stats: [string, string, boolean?][] = [
     ["Devices online", `${devices.filter(isOnline).length} / ${devices.length}`],
-    ["Entries today", String(count("ALLOWED"))],
-    ["Refused today", String(count("DENIED")), count("DENIED") > 0],
-    ["Members enrolled", String(new Set(enrolled.map((e) => e.memberId)).size)],
+    ["Members enrolled", `${enrolled} / ${total}`],
+    ["Entries today", String(entries)],
+    ["Denied today", String(denied), denied > 0],
   ];
 
   return (
@@ -59,17 +76,9 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
         <div>
           <div className="text-xs tracking-[0.04em] text-muted uppercase">Access control</div>
           <h1 className="mt-1 text-[28px] lg:text-[40px]">Biometric &amp; doors</h1>
-          <div className="mt-1 text-sm text-muted">Face, fingerprint and card entry with automatic door rules</div>
+          <div className="mt-1 text-sm text-muted">Face, fingerprint and RFID entry with automatic door rules</div>
         </div>
         <div className="flex flex-wrap items-center gap-2.5">
-          {devices.length > 0 && (
-            <form action={syncAction}>
-              <Button>
-                <ArrowsClockwiseIcon size={16} weight="duotone" />
-                Sync members
-              </Button>
-            </form>
-          )}
           <LinkButton href="/settings/devices?add=1#add" variant="primary">
             <PlusIcon size={17} weight="duotone" />
             Add device
@@ -77,7 +86,7 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
         </div>
       </div>
       {s("saved") && <Notice tone="ok">{s("saved")}</Notice>}
-      {s("error") && <Notice tone="alert">{s("error")}</Notice>}
+      {s("error") && !enrolId && !cardId && <Notice tone="alert">{s("error")}</Notice>}
 
       <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
         {stats.map(([k, v, alert]) => (
@@ -157,6 +166,12 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
                     Open door
                   </Button>
                 </form>
+                <form action={syncDeviceAction.bind(null, d.id)}>
+                  <Button variant="ghost">
+                    <ArrowsClockwiseIcon size={16} weight="duotone" />
+                    Sync
+                  </Button>
+                </form>
                 <form action={removeDeviceAction.bind(null, d.id)}>
                   <ConfirmButton variant="ghost" className="text-alert-700" confirm="Remove this device? It stops letting members in until it is added again.">
                     Remove
@@ -177,9 +192,10 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
           <form action={saveRulesAction} className="flex flex-col">
             {(
               [
+                ["blockExpired", "Block expired memberships after the grace period", rules.blockExpired],
+                ["blockDues", "Block members whose unpaid balance is above the limit", rules.blockDues],
                 ["blockSuspended", "Block suspended members", rules.blockSuspended],
-                ["blockExpired", "Block expired memberships", rules.blockExpired],
-                ["blockDues", "Block members with dues over the limit", rules.blockDues],
+                ["antiPassback", "Anti-passback: no second entry without an exit", rules.antiPassback],
               ] as const
             ).map(([name, label, on]) => (
               <label key={name} className="flex cursor-pointer items-center justify-between gap-3 border-b border-line py-[11px] text-sm">
@@ -194,10 +210,10 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
               <Field label="Dues limit (₹)">
                 <Input name="duesLimit" inputMode="decimal" defaultValue={rules.duesLimit / 100} />
               </Field>
-              <Field label="Gym opens at" hint="Empty = open all hours">
+              <Field label="Doors open" hint="Empty = open all hours">
                 <Input name="hoursFrom" type="time" defaultValue={rules.hoursFrom ?? ""} />
               </Field>
-              <Field label="Gym closes at">
+              <Field label="Doors close">
                 <Input name="hoursTo" type="time" defaultValue={rules.hoursTo ?? ""} />
               </Field>
             </div>
@@ -205,16 +221,17 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
               <Button variant="primary">Save rules</Button>
             </div>
           </form>
-          <div className="text-xs text-muted">The same rules apply at the front desk. A refused member is told why; staff can still let someone in with a reason, which is logged.</div>
+          <div className="text-xs text-muted">Rules are pushed to every device and still apply if the internet drops. A refused member sees the reason on the device; the front desk is notified.</div>
         </section>
       </div>
 
       <section className={box}>
         <div className="flex items-center justify-between gap-3">
-          <h3 className="text-[17px]">Access log</h3>
+          <h3 className="text-[17px]">Live access log</h3>
           <span className="flex items-center gap-1.5 text-xs text-muted">
             <span className="size-2 rounded-full bg-accent shadow-[0_0_6px_var(--color-accent)]" />
-            Latest punches first
+            Updates as members scan
+            <LiveRefresh />
           </span>
         </div>
         {log.length === 0 ? (
@@ -229,7 +246,9 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
                 </span>
                 <div className="min-w-0">
                   <div className="text-sm font-semibold">
-                    {l.member ? (
+                    {!l.member && l.method === "Remote" ? (
+                      "Staff"
+                    ) : l.member ? (
                       <Link href={`/members/${l.member.id}`} className="hover:text-accent">
                         {l.member.name}
                       </Link>
@@ -243,7 +262,7 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
                     {l.reason ? ` · ${l.reason}` : ""}
                   </div>
                 </div>
-                <Tag label={l.result === "ALLOWED" ? "Allowed" : l.result === "DENIED" ? "Refused" : "Unknown"} />
+                <Tag label={l.result === "ALLOWED" ? "Granted" : l.result === "DENIED" ? "Denied" : "Unknown"} />
               </div>
             ))}
           </div>
@@ -254,7 +273,7 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h3 className="text-[17px]">Member enrolment</h3>
-            <div className="mt-0.5 text-xs text-muted">Enrol from the member&apos;s profile after taking written consent; they then look at the camera or place a finger three times.</div>
+            <div className="mt-0.5 text-xs text-muted">Press Face or Finger, then the member looks at the camera or places a finger three times.</div>
           </div>
           <AutoFilter className="relative w-full max-w-[280px]">
             <MagnifyingGlassIcon size={16} weight="duotone" className="absolute top-1/2 left-3 -translate-y-1/2 text-muted" />
@@ -262,13 +281,13 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
           </AutoFilter>
         </div>
         {members.length === 0 ? (
-          <p className="text-sm text-muted">{q ? "No member matches." : "Nobody enrolled yet. Search for a member to enrol them."}</p>
+          <p className="text-sm text-muted">{q ? "No member matches." : "No members yet. Add members first, then enrol them here."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className={cx(TABLE, "min-w-[720px]")}>
               <thead>
                 <tr>
-                  {["Member", "Device PIN", "Face", "Fingerprint", "Consent"].map((h) => (
+                  {["Member", "Status", "Face", "Fingerprint", "RFID card"].map((h) => (
                     <th key={h} className={TH}>
                       {h}
                     </th>
@@ -286,20 +305,42 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
                         <div className="font-semibold">{m.name}</div>
                         <div className="text-xs text-muted">{m.code}</div>
                       </td>
-                      <td className={TD}>{m.devicePin ?? "—"}</td>
+                      <td className={TD}>
+                        <MemberStatus status={membershipStatus({ suspended: m.suspended, latestEnd: sums.get(m.id)!.latestEnd, outstanding: sums.get(m.id)!.outstanding, today: todayIso() })} />
+                      </td>
                       <td className={cx(TD, "whitespace-nowrap", face ? "text-accent" : "text-muted")}>
                         <ScanSmileyIcon size={16} weight="duotone" className="mr-1 inline" />
-                        {face ? "Enrolled" : "Not enrolled"}
+                        {face ? "Enrolled" : "—"}
                       </td>
                       <td className={cx(TD, "whitespace-nowrap", fp ? "text-accent" : "text-muted")}>
                         <FingerprintIcon size={16} weight="duotone" className="mr-1 inline" />
-                        {fp ? `${fp} finger${fp === 1 ? "" : "s"}` : "Not enrolled"}
+                        {fp ? "Enrolled" : "—"}
                       </td>
-                      <td className={cx(TD, "text-[13px] whitespace-nowrap")}>{m.biometricConsentAt ? fmtStamp(m.biometricConsentAt) : "—"}</td>
+                      <td className={cx(TD, "text-[13px] whitespace-nowrap")}>{m.cardNo ?? "—"}</td>
                       <td className={cx(TD, "text-right")}>
-                        <LinkButton href={`/members/${m.id}?tab=attendance#biometric`} variant="ghost">
-                          Enrol
-                        </LinkButton>
+                        <span className="inline-flex gap-0.5">
+                          <Link href={`${qs({ enrol: m.id, kind: "FACE" })}#enrol`} title="Enrol face" aria-label="Enrol face" className="inline-flex size-9 items-center justify-center rounded-md text-fg hover:bg-fg/7">
+                            <ScanSmileyIcon size={18} weight="duotone" />
+                          </Link>
+                          <Link href={`${qs({ enrol: m.id, kind: "FP" })}#enrol`} title="Enrol fingerprint" aria-label="Enrol fingerprint" className="inline-flex size-9 items-center justify-center rounded-md text-fg hover:bg-fg/7">
+                            <FingerprintIcon size={18} weight="duotone" />
+                          </Link>
+                          <Link href={`${qs({ card: m.id })}#card`} title="Assign RFID card" aria-label="Assign RFID card" className="inline-flex size-9 items-center justify-center rounded-md text-fg hover:bg-fg/7">
+                            <IdentificationCardIcon size={18} weight="duotone" />
+                          </Link>
+                          <form action={testScanAction.bind(null, m.id)}>
+                            <button title="Test a scan at the door" aria-label="Test a scan at the door" className="inline-flex size-9 items-center justify-center rounded-md text-fg hover:bg-fg/7">
+                              <PlayCircleIcon size={18} weight="duotone" />
+                            </button>
+                          </form>
+                          {(m.devicePin || m.biometricConsentAt || m.cardNo) && (
+                            <form action={eraseAction.bind(null, m.id)}>
+                              <ConfirmButton variant="ghost" title="Remove biometric data" aria-label="Remove biometric data" className="size-9 !min-h-0 !px-0 text-alert-700" confirm="Face and fingerprint templates and the RFID card are deleted from all devices. Attendance history is kept.">
+                                <TrashIcon size={18} weight="duotone" />
+                              </ConfirmButton>
+                            </form>
+                          )}
+                        </span>
                       </td>
                     </tr>
                   );
@@ -309,6 +350,54 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
           </div>
         )}
       </section>
+
+      {enrolMember && (
+        <Dialog kicker={enrolMember.name} title={kind === "FACE" ? "Enrol face" : "Enrol fingerprint"} close={here} error={s("error")} note={enrolDevices.length ? `The member then looks at the camera / places a finger three times on the device.` : undefined}>
+          {enrolDevices.length === 0 ? (
+            <>
+              <p className="m-0 text-sm">No device yet. Add a device first.</p>
+              <div className="flex justify-end">
+                <LinkButton href={here}>Cancel</LinkButton>
+              </div>
+            </>
+          ) : (
+            <form action={enrolAction} id="enrol" className="flex flex-col gap-3.5">
+              <input type="hidden" name="memberId" value={enrolMember.id} />
+              <input type="hidden" name="kind" value={kind} />
+              <input type="hidden" name="q" value={q ?? ""} />
+              <Field label="Device">
+                <Select name="deviceId" defaultValue={enrolDevices[0].id}>
+                  {enrolDevices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name ?? d.serial}
+                      {isOnline(d) ? "" : " (offline)"}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              {!enrolMember.biometricConsentAt && (
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="checkbox" name="consent" className="mt-0.5 size-4" />
+                  <span>The member has given written consent to store their fingerprint or face for gym entry, and knows they can ask for it to be deleted.</span>
+                </label>
+              )}
+              <DialogButtons close={here} label={kind === "FACE" ? "Enrol face" : "Enrol fingerprint"} />
+            </form>
+          )}
+        </Dialog>
+      )}
+      {cardMember && (
+        <Dialog kicker={cardMember.name} title="RFID card" close={here} error={s("error")} note="Leave it empty to take the card away.">
+          <form action={assignCardAction} id="card" className="flex flex-col gap-3.5">
+            <input type="hidden" name="memberId" value={cardMember.id} />
+            <input type="hidden" name="q" value={q ?? ""} />
+            <Field label="Card number">
+              <Input name="card" inputMode="numeric" placeholder="Tap card on the device or type the number" defaultValue={s("card") && "cardNo" in cardMember ? (cardMember.cardNo ?? "") : ""} autoFocus />
+            </Field>
+            <DialogButtons close={here} label="Save card" />
+          </form>
+        </Dialog>
+      )}
     </div>
   );
 }

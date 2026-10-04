@@ -53,6 +53,7 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
   const rulesText = [
     rules.blockExpired ? `expired blocked after ${rules.graceDays} grace days` : "expired allowed",
     rules.blockDues ? `dues above ${formatRupees(rules.duesLimit)} blocked` : "dues not blocked",
+    rules.antiPassback ? "anti-passback on" : "re-entry allowed",
     rules.hoursFrom && rules.hoursTo ? `hours ${fmtClock(rules.hoursFrom)} – ${fmtClock(rules.hoursTo)}` : "open all hours",
   ].join(" · ");
 
