@@ -11,7 +11,7 @@ import { applyDeliveryStatus, sendTemplate } from "./whatsapp";
 import { applyRazorpayEvent, autopayStats, changeMandate, createMandate, listMandates, retryDemoDebit, runAutopayDay } from "./autopay";
 import { runDailyJobs } from "./jobs";
 import { listNotifications } from "./notifications";
-import { istInstant, todayIso } from "./time";
+import { fromIso, istInstant, todayIso } from "./time";
 import { runRules } from "./wa-automation";
 
 describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
@@ -107,6 +107,26 @@ describe.skipIf(!hasDb)("WhatsApp, autopay and daily jobs (database)", () => {
     const stats = await autopayStats(admin, await listMandates(admin));
     expect(stats.debits.get(md.id)).toBe(1);
     expect(stats.collected).toBeGreaterThanOrEqual(118000);
+  });
+
+  it("failed demo debits are retried by the daily run after the gap, then halted when retries run out", async () => {
+    const mk = async (retries: number, updatedDaysAgo: number) => {
+      const m = await newMember();
+      await sellMembership(admin, m.id, { planId, startDate: today, discount: 0, includeRegFee: false, payAmount: 118000, payMethod: "UPI" });
+      const md = await createMandate(admin, { memberId: m.id, planId });
+      await db.autopayMandate.update({ where: { id: md.id }, data: { status: "Failed", retries, updatedAt: fromIso(addDays(today, -updatedDaysAgo)) } });
+      return md.id;
+    };
+    const [retry, exhausted, fresh] = await Promise.all([mk(0, 3), mk(3, 3), mk(0, 0)]);
+    const r = await runAutopayDay(gym.org.id, today);
+    expect(r.retried).toBeGreaterThanOrEqual(1);
+    expect(r.halted).toBeGreaterThanOrEqual(1);
+    expect(await db.autopayMandate.findUniqueOrThrow({ where: { id: retry } })).toMatchObject({ status: "Active", retries: 0 });
+    expect(await db.membership.count({ where: { memberId: (await db.autopayMandate.findUniqueOrThrow({ where: { id: retry } })).memberId, type: "AUTOPAY" } })).toBe(1);
+    const h = await db.autopayMandate.findUniqueOrThrow({ where: { id: exhausted } });
+    expect(h).toMatchObject({ status: "Halted", lastResult: "Retries exhausted. Collect by hand." });
+    expect(await db.notification.count({ where: { orgId: gym.org.id, type: "AUTOPAY", text: { contains: h.code } } })).toBe(1);
+    expect((await db.autopayMandate.findUniqueOrThrow({ where: { id: fresh } })).status).toBe("Failed");
   });
 
   it("Razorpay webhooks: signature check, charge renews once, failure alerts", async () => {

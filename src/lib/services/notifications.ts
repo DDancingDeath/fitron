@@ -14,6 +14,7 @@ export const NOTIFICATION_PERMS = {
   WA_FAILED: "whatsapp.send",
   AUTOPAY: "autopay.manage",
   JOB_FAILED: "settings.manage",
+  AI_BRIEF: "ai.use",
   BILLING: "settings.manage",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_PERMS;

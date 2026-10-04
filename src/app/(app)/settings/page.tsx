@@ -8,22 +8,24 @@ import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, unlinkAction } from "./actions";
+import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
 import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
 import { reminderSchedule } from "@/lib/services/reminders";
 import { LinkWatcher } from "./link-watcher";
 import { Dialog } from "@/components/dialog";
 import { ConfirmButton } from "@/components/confirm-button";
-import { PaperPlaneTiltIcon, QrCodeIcon, WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
+import { PaperPlaneTiltIcon, PlugsIcon, QrCodeIcon, WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
 import { fmtClock, fmtShort, fmtTime } from "@/lib/format";
 import { providerReady } from "@/lib/integrations/whatsapp";
 import { getAccessRules } from "@/lib/services/attendance";
 import { JOBS, recentRuns } from "@/lib/services/jobs";
 import { todayIso } from "@/lib/services/time";
 import { EXPIRY_CHIPS, expiryChipLabel, scheduledJobRows } from "@/lib/domain/reminders";
-import { getAutopayMode } from "@/lib/services/autopay";
+import { getAutopaySettings } from "@/lib/services/autopay";
+import { getAiSettings } from "@/lib/services/ai-settings";
+import { autopayStatusText, deviceStatusText } from "@/lib/domain/integrations";
+import { canOpen } from "@/lib/nav";
 import { providerStatus } from "@/lib/integrations/whatsapp";
-import { razorpayReady } from "@/lib/integrations/razorpay";
 import Link from "next/link";
 import { appUrl } from "@/lib/services/accounts";
 import { PARTNER_SHARE } from "@/lib/domain/pricing";
@@ -45,11 +47,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             reminders: "reminders",
             whatsapp: "wa",
             autopay: "int",
+            ai: "int",
             branches: "branches",
           } as Record<string, string>
         )[section ?? ""];
   const tab = ["gym", "billing", "reminders", "wa", "int", "branches"].includes(asked ?? "") ? asked! : "gym";
-  const [gym, tax, nextInvoice, numbering, branches, wa, autopayMode] = await Promise.all([
+  const [gym, tax, nextInvoice, numbering, branches, wa, autopay] = await Promise.all([
     getGymProfile(u.orgId),
     getTax(u.orgId),
     nextInvoiceNumber(u.orgId),
@@ -63,7 +66,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       orderBy: { createdAt: "asc" },
     }),
     getWaSettings(u.orgId),
-    getAutopayMode(u.orgId),
+    getAutopaySettings(u.orgId),
   ]);
   const waStatus = await providerStatus(wa.mode);
   const reminders =
@@ -85,7 +88,19 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         })()
       : null;
   const trainerCode = tab === "gym" ? (await db.organization.findUniqueOrThrow({ where: { id: u.orgId }, select: { trainerCode: true } })).trainerCode : null;
-  const rzpMissing = razorpayReady();
+  const integrations =
+    tab === "int"
+      ? await (async () => {
+          const [ai, devices] = await Promise.all([getAiSettings(u.orgId), db.device.findMany({ where: { orgId: u.orgId, approved: true, branchId: { in: u.branchIds } }, orderBy: { createdAt: "asc" } })]);
+          const now = new Date();
+          const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
+          return {
+            ai,
+            devices: devices.map((d) => ({ id: d.id, name: `${d.name ?? d.serial} · ${branchName(d.branchId)}`, status: deviceStatusText(d, now) })),
+            posters: branches.filter((b) => u.branchIds.includes(b.id)).map((b) => ({ id: b.id, name: `Front desk QR poster · ${b.name}`, status: "Active" })),
+          };
+        })()
+      : null;
 
   return (
     <div className="flex flex-col gap-7 pt-4">
@@ -302,21 +317,27 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           )}
         </div>
       )}
-      {tab === "int" && (
-        <div className="grid max-w-[960px] gap-10 lg:grid-cols-2">
-          <Panel title="UPI Autopay (Razorpay)">
-            <form action={saveAutopay} className="flex flex-col gap-3 text-sm">
-              <Field label="Mode">
-                <Select name="mode" defaultValue={autopayMode}>
-                  <option value="demo">Demo: simulate approvals and debits</option>
-                  <option value="live">Live: Razorpay Subscriptions</option>
-                </Select>
-              </Field>
-              <p className={rzpMissing ? "text-muted" : "text-ok"}>
-                {rzpMissing
-                  ? `Live mode needs ${rzpMissing.replace(" are not set on the server.", "")} on the server, and a Razorpay webhook to /api/webhooks/razorpay.`
-                  : "Razorpay keys are set on the server."}
-              </p>
+      {tab === "int" && integrations && (
+        <div className="flex max-w-[900px] flex-col gap-10">
+          <Panel title="UPI autopay" id="autopay">
+            <form action={saveAutopay} className="flex flex-col gap-[18px] text-sm">
+              <div className="grid gap-x-6 gap-y-[18px] sm:grid-cols-2">
+                <Field label="Mode" className="sm:col-span-2 sm:max-w-[520px]">
+                  <Select name="mode" key={autopay.mode} defaultValue={autopay.mode}>
+                    <option value="demo">Demo — simulated inside Fitron</option>
+                    <option value="live">Live — Razorpay UPI Autopay</option>
+                  </Select>
+                </Field>
+                <Field label="Autopay provider">
+                  <Input value="Razorpay UPI Autopay" disabled readOnly aria-label="Autopay provider" />
+                </Field>
+                <Field label="Retries on failure">
+                  <Input name="retries" type="number" min={0} max={5} step={1} required defaultValue={autopay.retries} />
+                </Field>
+                <Field label="Days between retries">
+                  <Input name="retryGap" type="number" min={1} max={7} step={1} required defaultValue={autopay.retryGap} />
+                </Field>
+              </div>
               <p className="text-muted">Existing mandates keep the mode they were created in.</p>
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary">Save</Button>
@@ -325,11 +346,72 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 </Link>
               </div>
             </form>
-          </Panel>
-          <Panel title="Fitron AI">
-            <p className="text-sm text-muted">
-              The assistant uses the Anthropic API. Set ANTHROPIC_API_KEY on the server to switch it on; it only reads what each person&apos;s role can see and never sends anything without their OK.
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+              <form action={testAutopayConnection}>
+                <Button disabled={!u.has("autopay")} title={u.has("autopay") ? undefined : "UPI autopay is on the Professional plan."}>
+                  <PlugsIcon size={16} weight="duotone" />
+                  Test connection
+                </Button>
+              </form>
+              <span className={autopay.mode === "live" && autopay.connOk === false ? "text-alert" : autopay.mode === "live" && autopay.connOk ? "text-ok" : "text-muted"} data-testid="autopay-status">
+                {autopayStatusText(autopay, autopay.mode)}
+              </span>
+            </div>
+            <p className="text-xs text-muted">
+              Live mode uses your own Razorpay account: set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET on the server and add /api/webhooks/razorpay as a webhook in the Razorpay dashboard. Members approve once in any UPI
+              app; Razorpay sends the NPCI pre-debit notice, charges on the renewal date and retries; Fitron records each renewal automatically.
             </p>
+          </Panel>
+          <Panel title="Check-in devices" id="devices">
+            <div className="flex flex-col text-sm">
+              {integrations.devices.length === 0 && <p className="m-0 mb-2 text-muted">No biometric or QR device yet — front-desk check-in works without one.</p>}
+              {[...integrations.devices, ...integrations.posters].map((d) => (
+                <div key={d.id} className="flex items-center justify-between gap-3 border-b border-line py-[9px]">
+                  <span>{d.name}</span>
+                  <span className="text-right text-muted">{d.status}</span>
+                </div>
+              ))}
+            </div>
+            {canOpen(u, "/settings/devices") && (
+              <div>
+                <Link href="/settings/devices" className="text-sm text-accent underline">
+                  Manage devices
+                </Link>
+              </div>
+            )}
+          </Panel>
+          <Panel title="Fitron AI" id="ai">
+            {!u.has("ai") && (
+              <Notice>
+                Fitron AI is on the Professional plan.{" "}
+                <Link href="/settings/billing?upgrade=ai" className="font-semibold underline">
+                  See plans
+                </Link>
+              </Notice>
+            )}
+            <form action={saveAi} className="flex flex-col gap-3.5 text-[15px]">
+              <label className="flex items-center gap-2.5">
+                <input type="checkbox" name="enabled" defaultChecked={integrations.ai.enabled} disabled={!u.has("ai")} className="size-[18px] accent-accent" />
+                Enable Fitron AI assistant
+              </label>
+              <label className="flex items-center gap-2.5">
+                <input type="checkbox" name="dailyBrief" defaultChecked={integrations.ai.dailyBrief} disabled={!u.has("ai")} className="size-[18px] accent-accent" />
+                Show the daily brief on the dashboard
+              </label>
+              <div>
+                <label className="flex items-center gap-2.5">
+                  <input type="checkbox" name="autoWinback" defaultChecked={integrations.ai.autoWinback} disabled={!u.has("ai")} className="size-[18px] accent-accent" />
+                  Suggest win-back messages for members at risk
+                </label>
+                <p className="m-0 mt-1 pl-7 text-xs text-muted">Drafts a win-back message for staff to confirm. Automatic sending is set per template in WhatsApp › Templates.</p>
+              </div>
+              <p className="m-0 text-sm text-muted">Fitron AI reads data only for the branch and role you are signed in with. It never sends a message or records money without a staff member confirming.</p>
+              {u.has("ai") && (
+                <div>
+                  <Button variant="primary">Save</Button>
+                </div>
+              )}
+            </form>
           </Panel>
         </div>
       )}

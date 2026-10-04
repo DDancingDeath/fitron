@@ -12,6 +12,7 @@ import {
   HourglassMediumIcon,
   PackageIcon,
   RepeatIcon,
+  SparkleIcon,
   UsersThreeIcon,
   WarningCircleIcon,
 } from "@phosphor-icons/react/dist/ssr";
@@ -36,6 +37,7 @@ const TYPE: Record<string, [string, Icon]> = {
   WA_FAILED: ["WhatsApp failed", WarningCircleIcon],
   AUTOPAY: ["Autopay", RepeatIcon],
   JOB_FAILED: ["Daily job failed", GearSixIcon],
+  AI_BRIEF: ["Fitron AI brief", SparkleIcon],
   BILLING: ["Fitron billing", ArrowsClockwiseIcon],
 };
 const ALERTING = /fail|^Low |override/i;

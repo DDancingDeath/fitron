@@ -25,6 +25,9 @@ async function rzp<T>(method: "GET" | "POST", path: string, body?: unknown, acco
   return json;
 }
 
+/** "Test connection": the cheapest authenticated call. A wrong key surfaces as Razorpay's own description. */
+export const pingRazorpay = () => rzp<{ items?: unknown[] }>("GET", "/plans?count=1");
+
 /** A plan that charges `amount` paise every `months` months. */
 export const createPlan = (amount: number, months: number, name: string) =>
   rzp<{ id: string }>("POST", "/plans", { period: "monthly", interval: months, item: { name, amount, currency: "INR" } }).then((p) => p.id);

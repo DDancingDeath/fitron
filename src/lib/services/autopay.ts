@@ -7,20 +7,50 @@ import type { Prisma } from "@/generated/prisma/client";
 import { addDays } from "@/lib/domain/dates";
 import { invoiceTotals } from "@/lib/domain/billing";
 import { rupeesText } from "@/lib/domain/whatsapp";
-import { createPlan, createSubscription, razorpayReady, subscriptionAction } from "@/lib/integrations/razorpay";
+import { createPlan, createSubscription, pingRazorpay, razorpayReady, subscriptionAction } from "@/lib/integrations/razorpay";
+import { withAutopayDefaults, type AutopaySettings } from "@/lib/domain/integrations";
 import { audit } from "./audit";
 import { sellMembership, suggestedStart } from "./billing";
 import { UserError } from "./errors";
 import { memberScope } from "./members";
 import { nextNumber } from "./sequence";
 import { notify } from "./notifications";
-import { getSetting } from "./settings";
+import { getSetting, putSetting } from "./settings";
 import { getTax } from "./tax";
 import { fromIso, toIso, todayIso } from "./time";
 import { sendTemplate } from "./whatsapp";
 
 export type AutopayMode = "demo" | "live";
 export const getAutopayMode = async (orgId: string): Promise<AutopayMode> => ((await getSetting<{ mode?: AutopayMode }>(orgId, "autopay"))?.mode === "live" ? "live" : "demo");
+
+/** Settings › Integrations & AI › UPI autopay: mode, retries and the last connection check. */
+export const getAutopaySettings = async (orgId: string): Promise<AutopaySettings> => withAutopayDefaults(await getSetting<Partial<AutopaySettings>>(orgId, "autopay"));
+
+const webhookSet = () => !!process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+
+/**
+ * "Test connection": in live mode, one authenticated GET to Razorpay with the gym's server keys.
+ * The result is stored on the setting (audited, never the secret); the page only shows what was stored.
+ */
+export async function checkAutopayConnection(u: CurrentUser) {
+  const s = await getAutopaySettings(u.orgId);
+  if (s.mode !== "live") return s;
+  const checkedAt = new Date().toISOString();
+  const missing = razorpayReady();
+  let result: Partial<AutopaySettings>;
+  if (missing) result = { connOk: false, error: missing, webhookOk: false, checkedAt };
+  else {
+    try {
+      await pingRazorpay();
+      result = { connOk: true, keyId: process.env.RAZORPAY_KEY_ID?.trim(), webhookOk: webhookSet(), error: undefined, checkedAt };
+    } catch (e) {
+      result = { connOk: false, error: e instanceof Error ? e.message : String(e), webhookOk: webhookSet(), checkedAt };
+    }
+  }
+  // JSON drops undefined, so a cleared error really goes away.
+  await putSetting(u, "autopay", JSON.parse(JSON.stringify(result)));
+  return { ...s, ...result };
+}
 
 const scope = (u: CurrentUser): Prisma.AutopayMandateWhereInput => ({ orgId: u.orgId, branchId: { in: u.branchIds } });
 
@@ -218,7 +248,25 @@ export async function runAutopayDay(orgId: string, today = todayIso()) {
     const r = await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}`, amount: m.amount });
     if (r === "renewed") charged++;
   }
-  return { charged };
+  // Failed demo debits: retried every `retryGap` days up to `retries` times (Settings › Integrations & AI), then halted.
+  const settings = await getAutopaySettings(orgId);
+  const failed = await db.autopayMandate.findMany({ where: { orgId, mode: "demo", status: "Failed" } });
+  let retried = 0;
+  let halted = 0;
+  for (const m of failed) {
+    if (m.retries >= settings.retries) {
+      await db.$transaction(async (tx) => {
+        await update(tx, orgId, null, m.id, { status: "Halted", lastResult: "Retries exhausted. Collect by hand." }, "autopay.halted");
+        await notify(tx, { orgId, branchId: m.branchId, type: "AUTOPAY", text: `Autopay ${m.code} stopped after failed retries. Collect the renewal at the desk.`, link: `/autopay/${m.id}` });
+      });
+      halted++;
+      continue;
+    }
+    if (toIso(m.updatedAt) > addDays(today, -settings.retryGap)) continue;
+    const r = await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}_retry${m.retries}`, amount: m.amount });
+    if (r === "renewed") retried++;
+  }
+  return { charged, retried, halted };
 }
 
 /** The Autopay screen's numbers (prototype KPIs): debits due in a week, collected in 30 days, debits per mandate. */

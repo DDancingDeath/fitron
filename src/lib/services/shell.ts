@@ -5,6 +5,7 @@ import { formatInr } from "@/lib/domain/billing";
 import { addDays } from "@/lib/domain/dates";
 import { memberScope } from "./members";
 import { unreadCount } from "./notifications";
+import { aiOn } from "./ai-settings";
 import { fromIso, todayIso, toIso } from "./time";
 
 export type NavCounts = Partial<Record<"renewals" | "receivables" | "notifications" | "ai" | "leads", number>>;
@@ -16,7 +17,7 @@ export async function navCounts(u: CurrentUser): Promise<NavCounts> {
     u.can("memberships.renew") ? renewalsDue(u, today) : undefined,
     u.can("invoices.view") ? openInvoices(u) : undefined,
     unreadCount(u),
-    u.can("ai.use")
+    u.can("ai.use") && (await aiOn(u.orgId))
       ? db.member.count({ where: { ...memberScope(u), walkIn: false, suspended: false, riskScore: { gte: 60 } } })
       : undefined,
     u.can("leads.manage")

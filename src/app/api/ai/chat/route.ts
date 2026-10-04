@@ -4,6 +4,7 @@ import { aiReady } from "@/lib/integrations/anthropic";
 import { chat, type ChatEvent } from "@/lib/services/ai";
 import { localChat } from "@/lib/services/ai-local";
 import { rateLimit } from "@/lib/rate-limit";
+import { AI_OFF_MESSAGE, aiOn } from "@/lib/services/ai-settings";
 
 // Fitron AI chat. Streams newline-delimited JSON events: tool progress, text, proposals, done.
 export const maxDuration = 120;
@@ -22,6 +23,7 @@ export async function POST(req: Request) {
   if (u.planBlocked) return Response.json({ error: PLAN_ENDED }, { status: 402 });
   if (!u.has("ai")) return Response.json({ error: "Fitron AI is on the Professional plan. A Super Admin can upgrade in Settings › Plan & billing." }, { status: 402 });
   if (!u.can("ai.use")) return Response.json({ error: "Your role doesn't include Fitron AI." }, { status: 403 });
+  if (!(await aiOn(u.orgId))) return Response.json({ error: AI_OFF_MESSAGE }, { status: 403 });
   if (!rateLimit(`ai:${u.id}`, 15, 60_000)) return Response.json({ error: "That's a lot of questions in a minute. Wait a moment and try again." }, { status: 429 });
   const parsed = body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Bad request." }, { status: 400 });

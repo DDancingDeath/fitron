@@ -17,6 +17,8 @@ import {
 import type { Icon } from "@phosphor-icons/react";
 import { requireUser } from "@/lib/auth/current";
 import { dashboardData, type Dashboard } from "@/lib/services/dashboard";
+import { getAiSettings } from "@/lib/services/ai-settings";
+import { dailyBrief, type Alert } from "@/lib/services/insights";
 import { PERIODS, isPeriod, monthLabel, type PeriodKey } from "@/lib/domain/periods";
 import { Notice, cx } from "@/components/ui";
 import { fmtMonthShort, fmtShort, formatRupees, initials } from "@/lib/format";
@@ -54,6 +56,11 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   const showPeriods = role !== "Receptionist" && role !== "Trainer";
   const period: PeriodKey = showPeriods && isPeriod(s("p")) ? (s("p") as PeriodKey) : "month";
   const d = await dashboardData(u, period, { from: s("from"), to: s("to") });
+  // Fitron AI on the dashboard: the org-wide switches from Settings › Integrations & AI, on top of role and plan.
+  const ai = u.can("ai.use") ? await getAiSettings(u.orgId) : null;
+  const aiOn = !!ai?.enabled;
+  const brief: Alert[] | null = aiOn && ai!.dailyBrief ? await dailyBrief(u, d.today) : null;
+  const winback = aiOn && ai!.autoWinback && u.can("whatsapp.send");
 
   const hour = Number(new Date().toLocaleString("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }));
   const greet = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
@@ -76,6 +83,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <div className="flex flex-col gap-7">
       {sp.denied && <Notice tone="alert">Your role doesn&apos;t have access to that page.</Notice>}
+      {sp.ai === "off" && <Notice>Fitron AI is switched off. A Super Admin can turn it on in Settings › Integrations &amp; AI.</Notice>}
       {typeof sp.locked === "string" && sp.locked in FEATURES && (
         <Notice tone="accent">
           {FEATURES[sp.locked as Feature].label} is on the {planFor(sp.locked as Feature).name} plan. Ask a Super Admin to upgrade in Settings › Plan &amp; billing.
@@ -160,6 +168,30 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
       </div>
 
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+        {brief && (
+          <Section
+            title={
+              <>
+                <Image src="/fitron-mark.png" alt="" width={22} height={22} className="rounded-full" />
+                Today&apos;s brief
+              </>
+            }
+            titleSize="text-[17px]"
+            sub="Fitron AI · what needs attention today"
+            action={<GhostLink href="/ai">Open Fitron AI</GhostLink>}
+          >
+            {brief.map((a, i) => {
+              const Row = a.href ? Link : "div";
+              return (
+                <Row key={i} href={a.href!} className="flex w-full flex-col gap-0.5 border-b border-line-soft py-[9px] text-left">
+                  <span className={cx("text-sm font-semibold", a.tone === "alert" && "text-alert", a.tone === "accent" && "text-accent-strong")}>{a.title}</span>
+                  <span className="text-xs text-muted">{a.detail}</span>
+                </Row>
+              );
+            })}
+            {brief.length === 0 && <p className="m-0 text-sm text-muted">Nothing needs attention right now.</p>}
+          </Section>
+        )}
         {d.fin && cfg.charts && (
           <>
             <Section title="Revenue and expenses" sub="Last 12 months" legend={[["var(--accent)", "Revenue"], ["#4a4338", "Expenses"]]}>
@@ -231,7 +263,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             }
             titleSize="text-[17px]"
             sub="Fitron AI · scored from visits, expiry and dues"
-            action={u.can("ai.use") ? <GhostLink href="/ai">Ask Fitron AI</GhostLink> : undefined}
+            action={aiOn ? <GhostLink href="/ai">{winback ? "Review win-back messages" : "Ask Fitron AI"}</GhostLink> : undefined}
           >
             {d.risk.map((o) => (
               <PersonRow key={o.id} href={profile(o.id)} name={o.name} sub={o.sub}>
