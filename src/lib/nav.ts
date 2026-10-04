@@ -33,6 +33,8 @@ export type NavItem = {
   label: string;
   icon: NavIcon;
   perm?: Permission;
+  /** Visible when the person has any of these. */
+  anyPerm?: Permission[];
   /** The plan feature this section needs (src/lib/domain/features.ts); locked on plans without it. */
   feature?: Feature;
   /** Set by the layout when the gym's plan doesn't open this section: shown with a lock, leads to the plans. */
@@ -91,7 +93,7 @@ export const NAV: NavGroup[] = [
     items: [
       { href: "/plans", label: "Plans & offers", icon: "plans", perm: "plans.manage" },
       { href: "/settings/devices", label: "Biometric & doors", icon: "biometric", perm: "settings.manage", feature: "biometric" },
-      { href: "/staff", label: "Staff & roles", icon: "staff", perm: "staff.manage", feature: "staff" },
+      { href: "/staff", label: "Staff & roles", icon: "staff", anyPerm: ["staff.manage", "payroll.manage"], feature: "staff" },
       { href: "/audit", label: "Audit log", icon: "audit", perm: "audit.view" },
       { href: "/settings", label: "Settings", icon: "settings", perm: "settings.manage" },
     ],
@@ -104,7 +106,7 @@ export function canOpen(u: { can: (p: Permission) => boolean; has: (f: Feature) 
   for (const g of NAV)
     for (const i of g.items) {
       const roots = [i.href, ...(i.also ?? [])];
-      if (roots.some((r) => path === r || path.startsWith(`${r}/`))) return (!i.perm || u.can(i.perm)) && (!i.feature || u.has(i.feature));
+      if (roots.some((r) => path === r || path.startsWith(`${r}/`))) return (!i.perm || u.can(i.perm)) && (!i.anyPerm || i.anyPerm.some((p) => u.can(p))) && (!i.feature || u.has(i.feature));
     }
   return true;
 }

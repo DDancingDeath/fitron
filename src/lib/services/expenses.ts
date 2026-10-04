@@ -66,6 +66,7 @@ export async function voidExpense(u: CurrentUser, id: string, reason: string) {
   if (before.status === "VOID") throw new UserError("Already voided.");
   if (before.purchaseId) throw new UserError("This expense is part of a purchase bill. Cancel the bill instead.");
   if (before.assetId) throw new UserError("This is an asset's purchase. Remove the asset instead.");
+  if (await db.salaryPayment.findFirst({ where: { expenseId: id }, select: { id: true } })) throw new UserError("This expense is a salary payment. Salary records can't be voided from here.");
   await db.$transaction(async (tx) => {
     await assertMonthOpen(tx, u, before.branchId, toIso(before.date));
     const after = await tx.expense.update({ where: { id }, data: { status: "VOID", voidReason: reason } });

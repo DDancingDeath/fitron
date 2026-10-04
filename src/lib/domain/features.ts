@@ -81,6 +81,7 @@ export const PERMISSION_FEATURE: Partial<Record<Permission, Feature>> = {
   "months.unlock": "accounting",
   "whatsapp.send": "whatsapp",
   "staff.manage": "staff",
+  "payroll.manage": "staff",
   "attendance.manage": "attendance",
   "classes.manage": "classes",
   "leads.manage": "leads",

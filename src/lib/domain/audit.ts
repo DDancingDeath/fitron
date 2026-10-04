@@ -4,7 +4,7 @@ export type Severity = "High" | "Medium" | "Low";
 /** Reversals, cancellations, deletions, restores, unlocks, overrides and role or access changes. */
 export const HIGH_WORDS = ["reverse", "cancel", "delete", "remove", "unlock", "void", "override", "role", "deactivate", "erase", "restore"];
 /** Edits to existing records, locks and settings. */
-export const MEDIUM_WORDS = ["update", "lock", "setting", "suspend", "price", "transfer"];
+export const MEDIUM_WORDS = ["update", "lock", "setting", "suspend", "price", "transfer", "payroll", "salary"];
 
 export function severityOf(action: string, entity = ""): Severity {
   const a = `${action} ${entity}`.toLowerCase();
@@ -17,7 +17,7 @@ const MODULES: [string, string[]][] = [
   ["Members", ["Member", "Membership", "Document", "ProgressLog"]],
   ["Invoices", ["Invoice"]],
   ["Payments", ["Payment", "AutopayMandate"]],
-  ["Accounts", ["Expense", "MonthLock", "Asset", "Purchase"]],
+  ["Accounts", ["Expense", "MonthLock", "Asset", "Purchase", "SalaryPayment"]],
   ["Attendance", ["Attendance", "ClassSlot", "Booking"]],
   ["POS", ["Product"]],
   ["Leads", ["Lead"]],
