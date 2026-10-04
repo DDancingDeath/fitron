@@ -101,7 +101,7 @@ export default async function ClassesPage({ searchParams }: PageProps<"/classes"
                 <Link
                   key={k}
                   href={href({ view: k === "list" ? "list" : undefined, msg: undefined })}
-                  className={cx("px-3.5 py-[7px] text-[13px]", (k === "list") === list ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}
+                  className={cx("px-3.5 py-[7px] text-[13px] leading-[normal]", (k === "list") === list ? "bg-accent text-accent-ink" : "hover:bg-fg/7")}
                 >
                   {label}
                 </Link>
@@ -274,7 +274,7 @@ export default async function ClassesPage({ searchParams }: PageProps<"/classes"
                   </span>
                 )}
               </div>
-              <div className="h-2 rounded bg-fg/15">
+              <div className="h-2 rounded bg-neutral-300">
                 <div className={cx("h-full rounded", sel.held >= sel.slot.capacity ? "bg-alert-700" : "bg-accent")} style={{ width: pct(sel.held, sel.slot.capacity) }} />
               </div>
             </div>

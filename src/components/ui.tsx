@@ -138,7 +138,7 @@ export function Segmented({ options, current }: { options: { key: string; label:
   return (
     <div className="inline-flex flex-wrap self-start overflow-hidden rounded-md border border-line">
       {options.map((o) => (
-        <Link key={o.key} href={o.href} className={cx("px-3 py-[7px] text-[13px]", o.key === current ? "bg-accent text-accent-ink" : "text-fg hover:bg-fg/7")}>
+        <Link key={o.key} href={o.href} className={cx("px-3.5 py-[7px] text-[13px] leading-[normal]", o.key === current ? "bg-accent text-accent-ink" : "text-fg hover:bg-fg/7")}>
           {o.label}
         </Link>
       ))}

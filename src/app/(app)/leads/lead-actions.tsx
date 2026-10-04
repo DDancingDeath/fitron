@@ -12,17 +12,17 @@ const icon = "grid size-8 place-items-center rounded-md text-accent hover:bg-acc
 const small = "inline-flex items-center rounded-md px-2.5 py-[5px] text-[12.5px] font-semibold whitespace-nowrap disabled:opacity-45";
 
 /** Call, WhatsApp, next stage, Join and Lost for one lead, as on the prototype's board. */
-export function LeadActions({ id, stage, phone, message, showLose = true }: { id: string; stage: LeadStage; phone: string; message: string; showLose?: boolean }) {
+export function LeadActions({ id, stage, phone, message, showLose = true, card = false }: { id: string; stage: LeadStage; phone: string; message: string; showLose?: boolean; card?: boolean }) {
   const [pending, start] = useTransition();
   const digits = phone.replace(/\D/g, "").slice(-10);
   const next = NEXT_LABEL[stage];
   const open = stage !== "Won" && stage !== "Lost";
   if (!open) return null;
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className={card ? "flex w-full items-center gap-1.5" : "inline-flex items-center gap-1"}>
       <button
         type="button"
-        className={icon}
+        className={`${icon} ${card ? "size-[34px]!" : ""}`}
         title="Call"
         aria-label="Call"
         disabled={pending}
@@ -35,7 +35,7 @@ export function LeadActions({ id, stage, phone, message, showLose = true }: { id
       </button>
       <button
         type="button"
-        className={icon}
+        className={`${icon} ${card ? "size-[34px]!" : ""}`}
         title="WhatsApp"
         aria-label="WhatsApp"
         disabled={pending}
@@ -46,6 +46,7 @@ export function LeadActions({ id, stage, phone, message, showLose = true }: { id
       >
         <WhatsappLogoIcon weight="duotone" />
       </button>
+      {card && <span className="flex-1" />}
       {next && (
         <button type="button" disabled={pending} onClick={() => start(() => advanceLeadAction(id, stage))} className={`${small} border border-line hover:bg-fg/7`}>
           {next}
@@ -57,7 +58,7 @@ export function LeadActions({ id, stage, phone, message, showLose = true }: { id
       {showLose && (
         <button
           type="button"
-          className={`${icon} text-alert-700 hover:bg-alert-soft`}
+          className={`${icon} ${card ? "size-[34px]!" : ""} text-alert-700 hover:bg-alert-soft`}
           title="Mark lost"
           aria-label="Mark lost"
           disabled={pending}

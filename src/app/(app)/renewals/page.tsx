@@ -63,7 +63,7 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
       {msg && <Notice tone="ok">{msg}</Notice>}
       <div className="grid auto-cols-[minmax(104px,1fr)] grid-flow-col gap-2.5 overflow-x-auto">
         {BUCKETS.map(([k, label, test]) => (
-          <Link key={k} href={`/renewals?w=${k}`} className={cx("rounded-md px-3.5 py-3 text-left", k === cur[0] ? "bg-accent text-accent-ink" : "bg-surface text-fg hover:bg-surface-2")}>
+          <Link key={k} href={`/renewals?w=${k}`} className={cx("rounded-md px-3.5 py-3 text-left leading-[normal]", k === cur[0] ? "bg-accent text-accent-ink" : "bg-surface text-fg hover:bg-surface-2")}>
             <div className="text-xs">{label}</div>
             <div className="text-[26px] font-semibold">{withDays.filter((m) => test(m.days)).length}</div>
           </Link>
