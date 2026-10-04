@@ -6,13 +6,13 @@ const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).jo
 type Variant = "primary" | "default" | "danger" | "ghost";
 // The prototype's .btn classes: primary (gold), secondary (hairline border), ghost (gold text), plus danger.
 const btn: Record<Variant, string> = {
-  primary: "border border-transparent px-[18px] bg-accent text-accent-ink hover:bg-accent-hover",
+  primary: "border border-transparent px-[18px] bg-accent text-accent-ink hover:bg-accent-hover active:bg-accent-700",
   default: "border border-line px-[18px] text-fg hover:bg-fg/7 active:bg-fg/14",
   danger: "border border-alert/50 px-[18px] text-alert hover:bg-alert-soft",
-  ghost: "border border-transparent px-1.5 text-accent hover:bg-accent/10",
+  ghost: "border border-transparent px-1.5 text-accent hover:bg-accent/10 active:bg-accent/18",
 };
 const btnBase =
-  "inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md text-sm leading-tight font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md text-sm leading-[1.2] font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-45";
 
 export function Button({ variant = "default", className, ...p }: ComponentProps<"button"> & { variant?: Variant }) {
   return <button className={cx(btnBase, btn[variant], className)} {...p} />;
@@ -62,14 +62,14 @@ export function Card({ className, children, title, action, id }: { className?: s
 
 export type Tone = "neutral" | "accent" | "alert" | "ok";
 const tones: Record<Tone, string> = {
-  neutral: "bg-surface-2 text-muted",
+  neutral: "bg-neutral-100 text-neutral-800",
   accent: "bg-accent-soft text-accent-strong",
   alert: "bg-alert-soft text-alert-strong",
   ok: "bg-ok-soft text-ok",
 };
 // The prototype's .tag: small, nearly square chips.
 export function Badge({ tone = "neutral", children }: { tone?: Tone; children: ReactNode }) {
-  return <span className={cx("inline-flex items-center rounded-sm px-2.5 py-[3px] text-[11px] tracking-[0.02em] whitespace-nowrap", tones[tone])}>{children}</span>;
+  return <span className={cx("inline-flex items-center rounded-[1.5px] px-2.5 py-[3px] text-[11px] tracking-[0.02em] whitespace-nowrap", tones[tone])}>{children}</span>;
 }
 
 /** Page title as in the prototype: a small uppercase kicker above a large serif heading. */
@@ -99,7 +99,7 @@ export { cx };
 // The prototype's .table: uppercase small headers, hairline rows, a faint hover.
 export const TABLE = "w-full border-collapse text-sm";
 export const TH = "border-b border-line p-2.5 text-left text-[11px] font-normal tracking-[0.08em] whitespace-nowrap text-fg/60 uppercase";
-export const TD = "border-b border-line-soft p-2.5 align-middle";
+export const TD = "border-b border-fg/8 p-2.5 align-middle";
 export const TR = "hover:bg-fg/4";
 
 /** "Showing 1–12 of 64" with Previous and Next, as under every prototype list. */

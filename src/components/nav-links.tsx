@@ -62,7 +62,7 @@ const ICONS: Record<NavIcon, Icon> = {
 
 const within = (path: string, href: string) => path === href || path.startsWith(href + "/");
 
-export function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigate?: () => void }) {
+export function NavLinks({ groups, onNavigate, drawer }: { groups: NavGroup[]; onNavigate?: () => void; drawer?: boolean }) {
   const path = usePathname();
   // The most specific match wins, so /settings/devices lights up "Biometric & doors" rather than "Settings".
   const all = groups.flatMap((g) => g.items);
@@ -84,12 +84,12 @@ export function NavLinks({ groups, onNavigate }: { groups: NavGroup[]; onNavigat
                 onClick={onNavigate}
                 aria-current={on ? "page" : undefined}
                 title={i.locked ? "Not in your plan yet. Tap to see plans." : undefined}
-                className={cx("flex items-center gap-2.5 rounded-md px-2 py-[7px] text-sm hover:bg-accent-soft", on ? "bg-accent-soft text-accent-strong" : i.locked ? "text-muted" : "text-fg")}
+                className={cx(drawer ? "py-[11px] text-[15px]" : "py-[7px] text-sm", "flex items-center gap-2.5 rounded-md px-2 leading-[normal] hover:bg-accent-soft", on ? "bg-accent-soft text-accent-strong" : i.locked ? "text-muted" : "text-fg")}
               >
-                <I size={18} weight="duotone" className="shrink-0" />
+                <I size={drawer ? 19 : 18} weight="duotone" className="shrink-0" />
                 <span className="flex-1">{i.label}</span>
                 {i.locked && <LockSimpleIcon size={14} weight="duotone" className="shrink-0 text-muted" aria-label="Needs a bigger plan" />}
-                {!!i.badge && <span className="min-w-5 rounded-full bg-alert-soft px-1.5 py-px text-center text-[11px] text-alert-strong">{i.badge > 99 ? "99+" : i.badge}</span>}
+                {!!i.badge && !drawer && <span className="min-w-5 rounded-full bg-alert-soft px-1.5 py-px text-center text-[11px] text-alert-strong">{i.badge > 99 ? "99+" : i.badge}</span>}
               </Link>
             );
           })}

@@ -109,7 +109,7 @@ export function CreateAccountForm({ plan, cycle, googleOn }: { plan: string; cyc
                 <a href="/privacy#dpa" target="_blank" className="underline">Data Processing terms</a> under the DPDP Act, 2023.
               </span>
             </label>
-            <Button variant="primary" disabled={checking} className="min-h-12">{checking ? "Checking…" : "Continue"}</Button>
+            <Button variant="primary" disabled={checking} className="py-[11px] text-[15px]">{checking ? "Checking…" : "Continue"}</Button>
           </form>
           <p className="text-xs text-muted">The first account becomes Super Admin. Add staff later in Staff &amp; roles.</p>
         </>
@@ -160,7 +160,7 @@ export function CreateAccountForm({ plan, cycle, googleOn }: { plan: string; cyc
           </div>
           <div className="flex gap-2">
             <Button type="button" variant="ghost" onClick={() => { setErr(""); setLogo(null); setStep(1); }}>Back</Button>
-            <Button variant="primary" disabled={creating} className="min-h-12 flex-1">{creating ? "Creating your console…" : "Create account and open Fitron"}</Button>
+            <Button variant="primary" disabled={creating} className="flex-1 py-[11px] text-[15px]">{creating ? "Creating your console…" : "Create account and open Fitron"}</Button>
           </div>
         </form>
       )}

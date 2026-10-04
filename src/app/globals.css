@@ -36,6 +36,19 @@
   --neutral-200: #28241d;
   --neutral-800: #cfc6b4;
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.65);
+  --accent-200: #3d321a;
+  --accent-300: #5c4a22;
+  --accent-400: #8a6612;
+  --alert-200: #561a31;
+  --neutral-100: #1f1c16;
+  --neutral-300: #352f26;
+  --neutral-400: #4a4338;
+  --neutral-500: #6b6355;
+  --neutral-600: #8a8172;
+  --neutral-700: #a99f8c;
+  --neutral-900: #e8e1d2;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.55);
   color-scheme: dark;
 }
 
@@ -67,6 +80,19 @@
   --neutral-200: #e6e0d3;
   --neutral-800: #3f382c;
   --shadow-lg: 0 12px 32px rgba(40, 30, 10, 0.14);
+  --accent-200: #eedcaa;
+  --accent-300: #e0c47a;
+  --accent-400: #c9a24a;
+  --alert-200: #f9c6d8;
+  --neutral-100: #f0ece2;
+  --neutral-300: #d6cebd;
+  --neutral-400: #b9af9b;
+  --neutral-500: #978c77;
+  --neutral-600: #766c59;
+  --neutral-700: #5d5444;
+  --neutral-900: #27221a;
+  --shadow-sm: 0 1px 2px rgba(40, 30, 10, 0.08);
+  --shadow-md: 0 3px 10px rgba(40, 30, 10, 0.1);
   color-scheme: light;
 }
 
@@ -96,6 +122,17 @@
   --color-alert-700: var(--alert-700);
   --color-neutral-200: var(--neutral-200);
   --color-neutral-800: var(--neutral-800);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-alert-200: var(--alert-200);
+  --color-neutral-100: var(--neutral-100);
+  --color-neutral-300: var(--neutral-300);
+  --color-neutral-400: var(--neutral-400);
+  --color-neutral-500: var(--neutral-500);
+  --color-neutral-600: var(--neutral-600);
+  --color-neutral-700: var(--neutral-700);
+  --color-neutral-900: var(--neutral-900);
   --font-serif: var(--font-source-serif);
   /* The prototype's corners are nearly square: 1px, 2px, 4px. */
   --radius-sm: 1px;
@@ -103,6 +140,8 @@
   --radius-lg: 4px;
   --radius-xl: 4px;
   --radius-2xl: 6px;
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
   --shadow-lg: var(--shadow-lg);
 }
 
@@ -118,11 +157,42 @@ body {
   font-family: var(--font-source-serif), Georgia, serif;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-weight: 600;
+/* The prototype's base type scale (Broadsheet styles.css): 15px / 1.55 body, tight 600-weight headings. */
+@layer base {
+  body {
+    font-size: 15px;
+    line-height: 1.55;
+    font-weight: 400;
+  }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.015em;
+  }
+  :focus {
+    outline: none;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+@keyframes fitronTourBar {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
 }
 
 input,

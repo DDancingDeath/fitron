@@ -2,10 +2,10 @@
 
 import { switchBranch } from "@/app/(app)/actions";
 
-export function BranchSwitcher({ branches, value }: { branches: { id: string; name: string }[]; value: string }) {
+export function BranchSwitcher({ branches, value, drawer }: { branches: { id: string; name: string }[]; value: string; drawer?: boolean }) {
   if (branches.length < 2) return null;
   return (
-    <form action={switchBranch} className="hidden sm:block">
+    <form action={switchBranch} className={drawer ? "block" : "hidden sm:block"}>
       <select
         key={value}
         name="branch"
@@ -13,7 +13,7 @@ export function BranchSwitcher({ branches, value }: { branches: { id: string; na
         aria-label="Branch"
         title="Branch"
         onChange={(e) => e.currentTarget.form?.requestSubmit()}
-        className="min-h-9 min-w-[170px] rounded-md border border-line bg-surface px-2.5 text-sm text-fg hover:border-fg/45 focus:border-accent focus:outline-none"
+        className={`min-h-9 rounded-md ${drawer ? "w-full" : "min-w-[170px]"} border border-line bg-surface px-2.5 text-sm text-fg hover:border-fg/45 focus:border-accent focus:outline-none`}
       >
         {branches.map((b) => (
           <option key={b.id} value={b.id}>

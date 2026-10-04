@@ -30,9 +30,9 @@ export function LoginForm({ next }: { next?: string }) {
         <Field label="Password" error={state?.errors?.password}>
           <Input name="password" type="password" autoComplete="current-password" required />
         </Field>
-        <Link href="/forgot-password" className="self-end text-[13px] text-accent no-underline">Forgot password?</Link>
+        <Link href="/forgot-password" className="self-start py-1 text-[13px] text-accent no-underline">Forgot password?</Link>
       </div>
-      <Button variant="primary" disabled={pending} className="min-h-12">
+      <Button variant="primary" disabled={pending} className="py-[11px] text-[15px]">
         {pending ? "Signing in…" : "Sign in"}
       </Button>
     </form>
