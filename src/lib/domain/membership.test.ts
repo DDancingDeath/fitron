@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { membershipStatus } from "./membership";
+import { defaultPlanFor, membershipStatus } from "./membership";
 
 const today = "2026-09-27";
 const base = { suspended: false, outstanding: 0, today };
@@ -24,5 +24,22 @@ describe("membershipStatus", () => {
 
   it("is PAYMENT_PENDING with a balance and more than 7 days left", () => {
     expect(membershipStatus({ ...base, latestEnd: "2026-12-31", outstanding: 1 })).toBe("PAYMENT_PENDING");
+  });
+});
+
+describe("defaultPlanFor", () => {
+  const plans = [
+    { id: "m1", months: 1, price: 150000 },
+    { id: "q1", months: 3, price: 400000 },
+    { id: "q2", months: 3, price: 450000 },
+    { id: "y1", months: 12, price: 1200000 },
+  ];
+  it("picks the first plan of the default duration", () => {
+    expect(defaultPlanFor(plans, 3)?.id).toBe("q1");
+    expect(defaultPlanFor(plans, 12)?.id).toBe("y1");
+  });
+  it("picks nothing when no plan has that duration, so the form keeps its first plan", () => {
+    expect(defaultPlanFor(plans, 6)).toBeUndefined();
+    expect(defaultPlanFor([], 1)).toBeUndefined();
   });
 });

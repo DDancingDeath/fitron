@@ -99,8 +99,30 @@ export async function connectorResults(ids: string[]): Promise<Record<string, { 
   }
 }
 
+export type ConnectorStatus = { state: string; number?: string; qr?: string; sentToday?: number; cap?: number };
+
+/** The connector's link state and, while it waits for a scan, the current QR code (data URL). */
+export async function connectorStatus(): Promise<ConnectorStatus> {
+  const base = env("WA_CONNECTOR_URL").replace(/\/$/, "");
+  const h = { "x-fitron-key": env("WA_CONNECTOR_KEY") };
+  const st = (await (await fetch(`${base}/status`, { headers: h, signal: AbortSignal.timeout(10_000) })).json()) as ConnectorStatus;
+  if (st.state === "ready") return st;
+  const qr = (await (await fetch(`${base}/qr`, { headers: h, signal: AbortSignal.timeout(10_000) })).json()) as { qr?: string; state?: string };
+  return { ...st, state: qr.state ?? st.state ?? "starting", qr: qr.qr };
+}
+
+/** "Unlink": the connector signs out of WhatsApp. Errors are ignored; the app forgets the link either way. */
+export async function connectorLogout() {
+  if (providerReady("connector")) return;
+  try {
+    await fetch(`${env("WA_CONNECTOR_URL").replace(/\/$/, "")}/logout`, { method: "POST", headers: { "Content-Type": "application/json", "x-fitron-key": env("WA_CONNECTOR_KEY") }, body: "{}", signal: AbortSignal.timeout(10_000) });
+  } catch {
+    // The connector may already be off.
+  }
+}
+
 /** Connection check for Settings: who we'd send as, or why we can't. */
-export async function providerStatus(mode: WaMode): Promise<{ ok: boolean; text: string; qr?: string }> {
+export async function providerStatus(mode: WaMode): Promise<{ ok: boolean; text: string; qr?: string; number?: string; name?: string }> {
   if (mode === "demo") return { ok: true, text: "Demo mode: messages are logged in Fitron and not sent." };
   const missing = providerReady(mode);
   if (missing) return { ok: false, text: missing };
@@ -109,14 +131,11 @@ export async function providerStatus(mode: WaMode): Promise<{ ok: boolean; text:
       const res = await fetch(`${graph()}/${env("WHATSAPP_PHONE_NUMBER_ID")}?fields=display_phone_number,verified_name,quality_rating`, { headers: { Authorization: `Bearer ${env("WHATSAPP_TOKEN")}` }, signal: AbortSignal.timeout(10_000) });
       const j = (await res.json()) as { display_phone_number?: string; verified_name?: string; quality_rating?: string; error?: { message?: string } };
       if (!res.ok) return { ok: false, text: j.error?.message ?? `WhatsApp API returned ${res.status}` };
-      return { ok: true, text: `Connected as ${j.verified_name ?? "?"} (${j.display_phone_number ?? "?"}), quality ${j.quality_rating ?? "unknown"}.` };
+      return { ok: true, text: `Connected as ${j.verified_name ?? "?"} (${j.display_phone_number ?? "?"}), quality ${j.quality_rating ?? "unknown"}.`, number: j.display_phone_number, name: j.verified_name };
     }
-    const base = env("WA_CONNECTOR_URL").replace(/\/$/, "");
-    const h = { "x-fitron-key": env("WA_CONNECTOR_KEY") };
-    const st = (await (await fetch(`${base}/status`, { headers: h, signal: AbortSignal.timeout(10_000) })).json()) as { state?: string; number?: string; sentToday?: number; cap?: number };
+    const st = await connectorStatus();
     if (st.state === "ready") return { ok: true, text: `Linked to ${st.number ?? "the gym phone"}. ${st.sentToday ?? 0} of ${st.cap ?? 250} sent today.` };
-    const qr = (await (await fetch(`${base}/qr`, { headers: h, signal: AbortSignal.timeout(10_000) })).json()) as { qr?: string };
-    return { ok: false, text: `Not linked yet (${st.state ?? "starting"}). Scan the QR from WhatsApp › Linked devices on the gym phone.`, qr: qr.qr };
+    return { ok: false, text: `Not linked yet (${st.state}). Scan the QR from WhatsApp › Linked devices on the gym phone.`, qr: st.qr };
   } catch (e) {
     return { ok: false, text: `Couldn't reach the provider: ${e instanceof Error ? e.message : String(e)}` };
   }

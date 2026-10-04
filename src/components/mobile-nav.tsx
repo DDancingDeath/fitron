@@ -6,7 +6,7 @@ import type { NavGroup } from "@/lib/nav";
 import { NavLinks } from "./nav-links";
 import { SideLogo } from "./side-logo";
 
-export function MobileNav({ groups, orgName, branchName }: { groups: NavGroup[]; orgName: string; branchName: string }) {
+export function MobileNav({ groups, orgName, branchName, logo }: { groups: NavGroup[]; orgName: string; branchName: string; logo?: string | null }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="flex min-w-0 flex-1 items-center gap-2 lg:hidden">
@@ -21,7 +21,7 @@ export function MobileNav({ groups, orgName, branchName }: { groups: NavGroup[];
           <div className="flex h-full w-72 flex-col gap-5 overflow-y-auto border-r border-line-soft bg-surface px-3.5 pb-6">
             <div className="mt-3 flex items-start justify-between">
               <span className="block w-[180px]">
-                <SideLogo />
+                <SideLogo src={logo} name={orgName} />
               </span>
               <button type="button" onClick={() => setOpen(false)} className="grid size-11 place-items-center" aria-label="Close menu">
                 <XIcon size={20} />

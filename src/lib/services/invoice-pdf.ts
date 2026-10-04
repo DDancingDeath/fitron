@@ -1,8 +1,9 @@
 import "server-only";
 import type { CurrentUser } from "@/lib/auth/current";
 import { getInvoice } from "./billing";
-import { getSetting } from "./settings";
+import { getGymProfile } from "./settings";
 import { getTax } from "./tax";
+import { readGymLogo } from "./gym-logo";
 import { renderInvoicePdf } from "@/lib/pdf/invoice";
 import { fmtDate } from "@/lib/format";
 import { INVOICE_STATUS_LABEL } from "@/components/invoice-status";
@@ -11,10 +12,21 @@ import { INVOICE_STATUS_LABEL } from "@/components/invoice-status";
 export async function invoicePdf(u: CurrentUser, id: string) {
   const inv = await getInvoice(u, id);
   if (!inv) return null;
-  const [gym, tax] = await Promise.all([getSetting<{ name?: string }>(u.orgId, "gym"), getTax(u.orgId)]);
+  const [gym, tax, logo] = await Promise.all([getGymProfile(u.orgId), getTax(u.orgId), readGymLogo(u.orgId).catch(() => null)]);
   const m = inv.member;
   const bytes = await renderInvoicePdf({
-    gym: { name: gym?.name ?? inv.org.name, address: inv.branch.address, phone: inv.branch.phone, gstin: inv.branch.gstin, sac: tax.sac },
+    gym: {
+      name: gym.name || inv.org.name,
+      tagline: gym.tagline || undefined,
+      address: gym.address || inv.branch.address,
+      phone: gym.phone || inv.branch.phone,
+      email: gym.email || undefined,
+      // A branch's own registration wins; else the gym-level one from Billing & GST.
+      gstin: inv.branch.gstin || tax.gstin || null,
+      sac: tax.sac,
+      instagram: gym.instagram || undefined,
+      logo: logo && (logo.mime === "image/png" || logo.mime === "image/jpeg") ? { bytes: logo.body, mime: logo.mime } : null,
+    },
     number: inv.number,
     date: fmtDate(inv.date),
     dueDate: fmtDate(inv.dueDate),

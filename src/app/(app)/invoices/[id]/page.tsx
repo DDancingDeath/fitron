@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
 import { getInvoice } from "@/lib/services/billing";
+import { getGymProfile } from "@/lib/services/settings";
+import { getTax } from "@/lib/services/tax";
 import { todayIso } from "@/lib/services/time";
 import { Badge, Card, LinkButton, Notice, PageHeader } from "@/components/ui";
 import { InvoiceStatusBadge } from "@/components/invoice-status";
@@ -16,6 +18,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
   const { created } = await searchParams;
   const inv = await getInvoice(u, id);
   if (!inv) notFound();
+  const [profile, tax] = await Promise.all([getGymProfile(u.orgId), getTax(u.orgId)]);
+  // What the PDF prints as "From": a branch's own GSTIN wins over the gym-level one.
+  const from = [profile.name, profile.address || inv.branch.address, (inv.branch.gstin || tax.gstin) && `GSTIN ${inv.branch.gstin || tax.gstin}`].filter(Boolean).join(" · ");
   const cancelled = inv.status === "CANCELLED";
   const half = inv.gstType === "CGST+SGST";
 
@@ -33,6 +38,9 @@ export default async function InvoicePage({ params, searchParams }: PageProps<"/
               `${inv.member.name} (${inv.member.code})`
             )}
             · {fmtDate(inv.date)} <InvoiceStatusBadge status={inv.status} overdueDays={inv.overdueDays} />
+            <span className="basis-full text-xs text-muted" data-testid="invoice-from">
+              From {from}
+            </span>
           </span>
         }
         actions={

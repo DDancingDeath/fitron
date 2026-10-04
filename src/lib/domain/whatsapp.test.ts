@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TEMPLATES, placeholders, render, rupeesText, waNumber } from "./whatsapp";
+import { DEFAULT_TEMPLATES, placeholders, REMINDER_KEYS, render, rupeesText, waNumber } from "./whatsapp";
 
 describe("whatsapp templates", () => {
   it("fills variables and blanks unknown ones", () => {
@@ -11,6 +11,12 @@ describe("whatsapp templates", () => {
   it("every default template only uses known variables", () => {
     const known = new Set(["member_name", "member_id", "plan_name", "start_date", "expiry_date", "amount", "pending_amount", "invoice_number", "gym_name", "link", "class_name", "class_time"]);
     for (const t of DEFAULT_TEMPLATES) for (const v of placeholders(t.body)) expect(known.has(v), `${t.key}: ${v}`).toBe(true);
+  });
+  it("has a 15-day expiry reminder ahead of the 7-day one, off until the pill is turned on, de-duplicated like the others", () => {
+    expect(REMINDER_KEYS).toContain("exp15");
+    const keys = DEFAULT_TEMPLATES.map((t) => t.key);
+    expect(keys.indexOf("exp15")).toBe(keys.indexOf("exp7") - 1);
+    expect(DEFAULT_TEMPLATES.find((t) => t.key === "exp15")).toMatchObject({ name: "Expiry reminder · 15 days", trigger: "15 days before expiry", autoSend: false });
   });
   it("normalises Indian mobiles", () => {
     expect(waNumber("98765 43210")).toBe("919876543210");

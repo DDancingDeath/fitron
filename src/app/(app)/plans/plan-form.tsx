@@ -20,7 +20,8 @@ export type PlanValues = {
 
 const rs = (paise?: number) => (paise == null ? "" : String(paise / 100));
 
-export function PlanForm({ id, values }: { id?: string; values?: PlanValues }) {
+/** `defaultMonths` is the gym's default membership duration (Settings › Reminders), used for a new plan. */
+export function PlanForm({ id, values, defaultMonths }: { id?: string; values?: PlanValues; defaultMonths?: number }) {
   const [state, action, pending] = useActionState(savePlan.bind(null, id ?? null), undefined);
   const e = state?.errors ?? {};
   const sent = state?.values as Record<string, string> | undefined;
@@ -42,7 +43,7 @@ export function PlanForm({ id, values }: { id?: string; values?: PlanValues }) {
             </Select>
           </Field>
           <Field label="Duration (months)" error={e.months}>
-            <Input name="months" type="number" min={1} max={60} defaultValue={pick("months", values?.months ?? 1)} required />
+            <Input name="months" type="number" min={1} max={60} defaultValue={pick("months", values?.months ?? defaultMonths ?? 1)} required />
           </Field>
           <Field label="Price (₹)" error={e.price}>
             <Input name="price" inputMode="decimal" defaultValue={pick("price", rs(values?.price))} required />

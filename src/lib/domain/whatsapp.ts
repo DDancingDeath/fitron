@@ -1,16 +1,19 @@
 // WhatsApp templates from the prototype, and how they're filled in.
 
+import { defaultRule, toColumns } from "./wa-rules";
+
 export const VARS = ["member_name", "member_id", "plan_name", "start_date", "expiry_date", "amount", "pending_amount", "invoice_number", "gym_name", "link", "class_name", "class_time"] as const;
 export type TemplateVars = Partial<Record<(typeof VARS)[number], string>>;
 
 /** Reminder templates are skipped if the same one went to the member inside the de-dup window (rule 5). */
-export const REMINDER_KEYS = ["due", "exp7", "exp3", "exp1", "expired", "birthday", "autopay", "winback"];
+export const REMINDER_KEYS = ["due", "exp15", "exp7", "exp3", "exp1", "expired", "birthday", "autopay", "winback"];
 
 export const DEFAULT_TEMPLATES: { key: string; name: string; trigger: string; autoSend: boolean; body: string }[] = [
   { key: "welcome", name: "Welcome message", trigger: "New membership sold", autoSend: true, body: "Hi {{member_name}}, welcome to {{gym_name}}!\n\nYour member ID is {{member_id}}.\nPlan: {{plan_name}}\nValid: {{start_date}} to {{expiry_date}}\n\nSee you on the floor." },
   { key: "payment", name: "Payment confirmation", trigger: "Payment received", autoSend: true, body: "Hi {{member_name}}, we have received ₹{{amount}} against invoice {{invoice_number}}. Balance due: ₹{{pending_amount}}.\n\nThank you,\n{{gym_name}}" },
   { key: "invoice", name: "Invoice PDF", trigger: "Invoice created (PDF attached)", autoSend: false, body: "Hi {{member_name}}, your invoice {{invoice_number}} for ₹{{amount}} is attached as a PDF.\n\n{{gym_name}}" },
   { key: "due", name: "Payment reminder", trigger: "Balance pending (daily job)", autoSend: true, body: "Hi {{member_name}}, a balance of ₹{{pending_amount}} is pending on invoice {{invoice_number}}. Please pay at the front desk or by UPI.\n\n{{gym_name}}" },
+  { key: "exp15", name: "Expiry reminder · 15 days", trigger: "15 days before expiry", autoSend: false, body: "Hi {{member_name}}, your {{gym_name}} membership ends on {{expiry_date}}, 15 days from now.\n\nPlan: {{plan_name}}\nRenewal amount: ₹{{amount}}\n\nRenew any time at the front desk or reply to this message." },
   { key: "exp7", name: "Expiry reminder · 7 days", trigger: "7 days before expiry", autoSend: true, body: "Hi {{member_name}},\n\nYour {{gym_name}} membership is expiring on {{expiry_date}}.\n\nMembership plan: {{plan_name}}\nRenewal amount: ₹{{amount}}\n\nPlease contact us or visit the gym to renew." },
   { key: "exp3", name: "Expiry reminder · 3 days", trigger: "3 days before expiry", autoSend: true, body: "Hi {{member_name}}, your gym membership will expire in 3 days ({{expiry_date}}). Renewal amount: ₹{{amount}}.\n\n{{gym_name}}" },
   { key: "exp1", name: "Expiry reminder · 1 day", trigger: "1 day before expiry", autoSend: true, body: "Hi {{member_name}}, your membership expires tomorrow. Renew {{plan_name}} for ₹{{amount}} at the front desk or reply to this message.\n\n{{gym_name}}" },
@@ -23,6 +26,9 @@ export const DEFAULT_TEMPLATES: { key: string; name: string; trigger: string; au
   { key: "birthday", name: "Birthday wishes", trigger: "On birthday (daily job)", autoSend: true, body: "Happy birthday, {{member_name}}! Everyone at {{gym_name}} wishes you a strong year ahead." },
   { key: "campaign", name: "Custom message", trigger: "Sent by staff", autoSend: false, body: "Hi {{member_name}}, " },
 ];
+
+/** The default templates with their automation rule columns, as listTemplates creates them. */
+export const defaultTemplateRows = () => DEFAULT_TEMPLATES.map((t) => ({ ...t, ...toColumns(defaultRule(t.key)) }));
 
 /** Variables in the order they first appear, for Cloud API template parameters ({{1}}, {{2}}…). */
 export const placeholders = (body: string) => [...new Set([...body.matchAll(/\{\{\s*([a-z_]+)\s*\}\}/g)].map((m) => m[1]!))];

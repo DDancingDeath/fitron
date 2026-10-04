@@ -12,6 +12,7 @@ describe.skipIf(!hasDb)("reminders (database)", () => {
   let gym: Awaited<ReturnType<typeof makeGym>>;
   let owing: string;
   let ending: string;
+  let fortnight: string;
 
   beforeAll(async () => {
     gym = await makeGym();
@@ -24,10 +25,13 @@ describe.skipIf(!hasDb)("reminders (database)", () => {
     // Make the unpaid invoice overdue.
     await db.invoice.update({ where: { id: sale.invoice.id }, data: { dueDate: new Date(`${addDays(today, -10)}T00:00:00Z`) } });
     await sellMembership(admin, ending, { planId: plan.id, startDate: addDays(today, -28), discount: 10000, includeRegFee: false, payAmount: 140000, payMethod: "UPI" });
+    fortnight = (await createMember(admin, { name: "Ends In Two Weeks", gender: "Male", phone: "9876522003", source: "Walk-in", tags: [] })).id;
+    // A one-month plan starting so that it ends in exactly 15 days.
+    await sellMembership(admin, fortnight, { planId: plan.id, startDate: addDays(addDays(today, 15), -29), discount: 0, includeRegFee: false, payAmount: 0 });
   });
 
   it("picks the expiry template by days left", () => {
-    expect([expiryKey(7), expiryKey(5), expiryKey(3), expiryKey(1), expiryKey(0), expiryKey(-4)]).toEqual(["exp7", "exp7", "exp3", "exp1", "expired", "expired"]);
+    expect([expiryKey(15), expiryKey(10), expiryKey(8), expiryKey(7), expiryKey(5), expiryKey(3), expiryKey(1), expiryKey(0), expiryKey(-4)]).toEqual(["exp15", "exp15", "exp15", "exp7", "exp7", "exp3", "exp1", "expired", "expired"]);
   });
 
   it("sends a due reminder once, then skips repeats within the window", async () => {
@@ -44,5 +48,15 @@ describe.skipIf(!hasDb)("reminders (database)", () => {
     const end = (await summarize([ending])).get(ending)!.latestEnd!;
     expect(last?.templateKey).toBe(expiryKey(daysBetween(end, todayIso())));
     expect((await renewalAmounts([ending])).get(ending)).toBe(140000);
+  });
+
+  it("sends the 15-day reminder to a member whose membership ends in 15 days", async () => {
+    const desk = await gym.user("Receptionist", [gym.a.id]);
+    expect(daysBetween((await summarize([fortnight])).get(fortnight)!.latestEnd!, todayIso())).toBe(15);
+    expect(await remindRenewal(desk, fortnight)).toBe(true);
+    const msg = await db.whatsAppMessage.findFirst({ where: { memberId: fortnight }, orderBy: { sentAt: "desc" } });
+    expect(msg).toMatchObject({ templateKey: "exp15", status: "Logged" });
+    expect(msg!.body).toContain("15 days from now");
+    expect((await lastRenewalReminders([fortnight])).get(fortnight)?.templateKey).toBe("exp15");
   });
 });

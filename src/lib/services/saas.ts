@@ -4,14 +4,16 @@ import type { CurrentUser } from "@/lib/auth/current";
 import type { Prisma } from "@/generated/prisma/client";
 import { addDays, daysBetween } from "@/lib/domain/dates";
 import { findPlan } from "@/lib/domain/pricing";
-import { branchPrice, gymTerms, nextPeriod, planPrice, planStanding, planWritable, standings, type Cycle, type GymTerms, type PlanStanding, type Standing } from "@/lib/domain/saas";
+import { branchPrice, gymTerms, longDate, nextPeriod, planPrice, planStanding, planWritable, reminderSubject, renewalReminder, standings, type Cycle, type GymTerms, type PlanStanding, type Standing, type SubscriptionSettings } from "@/lib/domain/saas";
 import { createOrder, fitronKeyId, verifyCheckout } from "@/lib/integrations/razorpay";
 import { cleanUtr, fitronAdmins, fitronUpi, qrSvg, upiLink } from "@/lib/integrations/upi";
 import { sendEmail } from "@/lib/integrations/email";
 import { audit } from "./audit";
 import { isUniqueViolation, UserError } from "./errors";
 import { notify } from "./notifications";
-import { getSetting } from "./settings";
+import { getGymProfile, getSetting } from "./settings";
+import { getSubscriptionSettings, gymWhatsAppNumber, renewalEmails } from "./subscription";
+import { sendGymWhatsApp } from "./whatsapp";
 import { fromIso, toIso, todayIso } from "./time";
 
 type Tx = Prisma.TransactionClient | typeof db;
@@ -339,43 +341,69 @@ export async function applyFitronBillingEvent(ev: RzpEvent) {
 export async function getBillingInvoice(u: CurrentUser, id: string) {
   const sub = await db.branchSubscription.findFirst({ where: { id, orgId: u.orgId, status: "PAID" } });
   if (!sub) return null;
-  const [branch, gym, anyGstin] = await Promise.all([
+  const [branch, gym, tax, anyGstin, cfg] = await Promise.all([
     sub.branchId ? db.branch.findUnique({ where: { id: sub.branchId } }) : null,
-    getSetting<{ name?: string }>(u.orgId, "gym"),
+    getGymProfile(u.orgId),
+    getSetting<{ gstin?: string }>(u.orgId, "tax"),
     db.branch.findFirst({ where: { orgId: u.orgId, gstin: { not: null } }, orderBy: { createdAt: "asc" } }),
+    getSubscriptionSettings(u.orgId),
   ]);
   const buyer = branch?.gstin ? branch : anyGstin;
-  return { sub, branch, buyer: { name: gym?.name ?? u.orgName, gstin: buyer?.gstin ?? null, address: buyer?.address ?? branch?.address ?? "" }, seller: fitronSeller() };
+  // Settings › Subscription › Billing details come first; the gym profile and branches fill in what is blank.
+  return {
+    sub,
+    branch,
+    buyer: {
+      name: cfg.legalName || gym.name || u.orgName,
+      gstin: cfg.gstin || buyer?.gstin || tax?.gstin || null,
+      address: cfg.address || gym.address || buyer?.address || branch?.address || "",
+      email: cfg.billingEmail || "",
+    },
+    seller: fitronSeller(),
+  };
 }
 
-function planReminder(plan: GymPlan, today: string) {
-  const s = plan.standing;
-  if (plan.checking) return "";
-  if (s.kind === "TRIAL" && [3, 1].includes(daysBetween(s.until, today) + 1)) return `Your FITRON free trial ends on ${s.until}. Choose a plan to keep adding members and invoices.`;
-  if (s.kind === "PAID" && [7, 3, 1].includes(daysBetween(s.until, today))) return `Your ${plan.name} plan ends on ${s.until}. Renew to keep everything running.`;
-  if (s.kind === "GRACE" && s.until === addDays(today, -1)) return `Your ${plan.name} plan has ended. The gym becomes read-only on ${s.readOnlyFrom} unless renewed.`;
-  if (s.kind === "LAPSED" && s.since === today) return "Your FITRON plan has ended and the gym is now read-only. Your records are safe; renew to switch it back on.";
-  return "";
-}
+type ReminderCounts = { sent: number; whatsapp: number; email: number };
 
-/** Daily: warn the owner before the plan or an extra branch's period ends, during grace, and when it turns read-only. */
-export async function billingReminders(orgId: string, today: string) {
-  const { branches } = await branchStandings(orgId, today);
-  let sent = 0;
-  const planText = planReminder(await gymPlan(orgId, today), today);
-  if (planText) {
-    await db.$transaction((tx) => notify(tx, { orgId, type: "BILLING", text: planText, link: "/settings/billing" }));
-    sent++;
+/** One reminder on every channel the gym switched on: the bell, WhatsApp to the gym number, email to the billing email. */
+async function deliverReminder(orgId: string, cfg: SubscriptionSettings, text: string, branchId: string | null, n: ReminderCounts) {
+  await db.$transaction((tx) => notify(tx, { orgId, branchId, type: "BILLING", text, link: "/settings/billing" }));
+  n.sent++;
+  if (cfg.whatsapp) {
+    const to = await gymWhatsAppNumber(orgId);
+    if (to) {
+      const m = await sendGymWhatsApp({ orgId, key: "fitron_renewal", to, body: `${text}\n\nPay in FITRON › Settings › Plan & billing.` }).catch((e) => (console.error("Renewal WhatsApp failed", e), null));
+      if (m && m.status !== "Failed") n.whatsapp++;
+    }
   }
+  if (cfg.email) {
+    const link = `${process.env.APP_URL?.trim() || "https://fitron.in"}/settings/billing`;
+    for (const to of await renewalEmails(orgId, cfg)) {
+      const ok = await sendEmail({ to, subject: reminderSubject(text), text: `Hi,\n\n${text}\n\nPay in Settings › Plan & billing: ${link}\n\nFITRON\nhello@fitron.in` })
+        .then(() => true)
+        .catch((e) => (console.error("Renewal email failed", e), false));
+      if (ok) n.email++;
+    }
+  }
+}
+
+/**
+ * Daily: warn the gym before the plan or an extra branch's period ends (as many days ahead as
+ * Settings › Subscription says, and again the day before), during grace, and when it turns read-only.
+ */
+export async function billingReminders(orgId: string, today: string): Promise<ReminderCounts> {
+  const [cfg, plan, { branches }] = await Promise.all([getSubscriptionSettings(orgId), gymPlan(orgId, today), branchStandings(orgId, today)]);
+  const n: ReminderCounts = { sent: 0, whatsapp: 0, email: 0 };
+  const r = renewalReminder(plan.standing, plan.name, today, cfg.remindDays, plan.checking);
+  if (r) await deliverReminder(orgId, cfg, r.text, null, n);
   for (const b of branches) {
     const s: Standing = b.standing;
     let text = "";
-    if (s.kind === "PAID" && [7, 3, 1].includes(daysBetween(s.until, today))) text = `${b.name}'s extra-branch plan ends on ${s.until}. Renew to keep it running.`;
-    if (s.kind === "GRACE") text = `${b.name}'s extra-branch plan has ended. It becomes read-only on ${s.readOnlyFrom} unless renewed.`;
+    if (s.kind === "PAID" && [cfg.remindDays, 1].includes(daysBetween(s.until, today))) text = `${b.name}'s extra-branch plan ends in ${daysBetween(s.until, today) === 1 ? "1 day" : `${daysBetween(s.until, today)} days`} (${longDate(s.until)}). Renew to keep it running.`;
+    if (s.kind === "GRACE") text = `${b.name}'s extra-branch plan has ended. It becomes read-only on ${longDate(s.readOnlyFrom)} unless renewed.`;
     if (s.kind === "READ_ONLY" && s.since === today) text = `${b.name} is now read-only: no new members or invoices until its extra-branch plan is renewed.`;
     if (!text) continue;
-    await db.$transaction((tx) => notify(tx, { orgId, branchId: b.id, type: "BILLING", text, link: "/settings/billing" }));
-    sent++;
+    await deliverReminder(orgId, cfg, text, b.id, n);
   }
-  return { sent };
+  return n;
 }

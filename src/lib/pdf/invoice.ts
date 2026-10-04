@@ -4,6 +4,7 @@ import path from "node:path";
 import { PDFDocument, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { formatInr } from "@/lib/domain/billing";
+import { gymInitials } from "@/lib/domain/tax";
 
 const FONT_DIR = path.join(process.cwd(), "node_modules/dejavu-fonts-ttf/ttf");
 let fonts: Promise<[Uint8Array, Uint8Array]> | undefined;
@@ -11,7 +12,18 @@ const loadFonts = () =>
   (fonts ??= Promise.all([readFile(path.join(FONT_DIR, "DejaVuSans.ttf")), readFile(path.join(FONT_DIR, "DejaVuSans-Bold.ttf"))]));
 
 export type InvoicePdfData = {
-  gym: { name: string; address: string; phone: string; gstin?: string | null; sac?: string };
+  gym: {
+    name: string;
+    tagline?: string;
+    address: string;
+    phone: string;
+    email?: string;
+    gstin?: string | null;
+    sac?: string;
+    instagram?: string;
+    /** The uploaded gym logo; without one a monogram block is drawn. */
+    logo?: { bytes: Uint8Array; mime: "image/png" | "image/jpeg" } | null;
+  };
   number: string;
   date: string;
   dueDate: string;
@@ -34,6 +46,8 @@ const INK = rgb(0.12, 0.11, 0.08);
 const MUTED = rgb(0.43, 0.4, 0.34);
 const GOLD = rgb(0.54, 0.4, 0.07);
 const LINE = rgb(0.89, 0.88, 0.85);
+const DARK = rgb(0.125, 0.118, 0.114);
+const MONO_GOLD = rgb(0.94, 0.83, 0.53);
 
 /** A4 GST invoice. Same content as the invoice screen. */
 export async function renderInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
@@ -57,11 +71,35 @@ export async function renderInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     p.drawText(s, { x: o.align === "right" ? x - w : x, y: yy, size, font, color: o.color ?? INK });
   };
 
-  // Header
-  text(page, d.gym.name, M, y - 4, { font: bold, size: 18 });
-  text(page, "TAX INVOICE", M + W, y - 2, { font: bold, size: 12, color: GOLD, align: "right" });
-  y -= 22;
-  for (const l of [d.gym.address, `Phone ${d.gym.phone}`, d.gym.gstin ? `GSTIN ${d.gym.gstin}` : ""].filter(Boolean)) {
+  // Header: the gym's logo (or a monogram), its name and tagline, with the From lines under them.
+  const LOGO = 64;
+  let logoDrawn = false;
+  if (d.gym.logo) {
+    try {
+      const img = d.gym.logo.mime === "image/png" ? await doc.embedPng(d.gym.logo.bytes) : await doc.embedJpg(d.gym.logo.bytes);
+      const fit = Math.min(LOGO / img.width, LOGO / img.height);
+      const w = img.width * fit;
+      const h = img.height * fit;
+      page.drawImage(img, { x: M + (LOGO - w) / 2, y: y - LOGO + (LOGO - h) / 2, width: w, height: h });
+      logoDrawn = true;
+    } catch {
+      // An image pdf-lib can't read: fall back to the monogram.
+    }
+  }
+  if (!logoDrawn) {
+    page.drawRectangle({ x: M, y: y - LOGO, width: LOGO, height: LOGO, color: DARK, borderWidth: 0 });
+    const mono = gymInitials(d.gym.name);
+    const mw = bold.widthOfTextAtSize(mono, 24);
+    text(page, mono, M + (LOGO - mw) / 2, y - LOGO / 2 - 8, { font: bold, size: 24, color: MONO_GOLD });
+  }
+  const nx = M + LOGO + 14;
+  const name = d.gym.name.toUpperCase();
+  text(page, name, nx, y - 18, { font: bold, size: 18 });
+  if (d.gym.tagline) text(page, d.gym.tagline, nx, y - 32, { size: 8, color: GOLD });
+  text(page, d.tax > 0 ? "TAX INVOICE" : "INVOICE", M + W, y - 2, { font: bold, size: 12, color: GOLD, align: "right" });
+  y -= LOGO + 14;
+  const contact = [d.gym.phone ? `Phone ${d.gym.phone}` : "", d.gym.email ?? ""].filter(Boolean).join(" · ");
+  for (const l of [...d.gym.address.split(/\r?\n/).map((x) => x.trim()), contact, d.gym.gstin ? `GSTIN ${d.gym.gstin}` : ""].filter(Boolean)) {
     text(page, l, M, y, { size: 9, color: MUTED });
     y -= 12;
   }
@@ -146,7 +184,18 @@ export async function renderInvoicePdf(d: InvoicePdfData): Promise<Uint8Array> {
     }
   }
 
+  // Thanks and the signatory, as the prototype's invoice ends.
+  y -= 26;
+  if (y < M + 40) {
+    page = doc.addPage([595.28, 841.89]);
+    y = page.getHeight() - M;
+  }
+  text(page, `Thank you for choosing ${d.gym.name}.`, M, y, { size: 10 });
+  page.drawLine({ start: { x: M + W - 190, y: y - 2 }, end: { x: M + W, y: y - 2 }, thickness: 0.7, color: INK });
+  text(page, `Authorised signatory · ${d.gym.name}`, M + W, y - 13, { size: 8.5, color: MUTED, align: "right" });
+
   const foot = d.gym.sac ? `SAC ${d.gym.sac} · ` : "";
-  text(page, `${foot}This is a computer-generated invoice.`, M, M - 10, { size: 8, color: MUTED });
+  if (d.gym.instagram) text(page, d.gym.instagram, M, M - 10, { size: 8, color: MUTED });
+  text(page, `${foot}Computer-generated invoice · no signature required · Powered by Fitron`, M + W, M - 10, { size: 8, color: MUTED, align: "right" });
   return doc.save();
 }

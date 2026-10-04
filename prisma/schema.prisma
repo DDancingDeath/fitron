@@ -79,29 +79,29 @@ model Branch {
 // ── Staff and roles ────────────────────────────────────────────────────────
 
 model User {
-  id           String       @id @default(cuid())
-  orgId        String
-  org          Organization @relation(fields: [orgId], references: [id])
-  name         String
-  email        String       @unique
-  phone        String
-  passwordHash String
-  roleId       String
-  role         Role         @relation(fields: [roleId], references: [id])
-  branches     UserBranch[]
-  sessions     Session[]
-  ptRate       Int          @default(0)
-  shift        String?
+  id              String       @id @default(cuid())
+  orgId           String
+  org             Organization @relation(fields: [orgId], references: [id])
+  name            String
+  email           String       @unique
+  phone           String
+  passwordHash    String
+  roleId          String
+  role            Role         @relation(fields: [roleId], references: [id])
+  branches        UserBranch[]
+  sessions        Session[]
+  ptRate          Int          @default(0)
+  shift           String?
   /// Profile photo in private storage; set by the user on My profile
-  photoKey     String?
-  active       Boolean      @default(true)
-  lastLoginAt  DateTime?    @db.Timestamptz
+  photoKey        String?
+  active          Boolean      @default(true)
+  lastLoginAt     DateTime?    @db.Timestamptz
   /// Null until the user clicks the link in the verification email
-  emailVerifiedAt DateTime? @db.Timestamptz
-  authTokens   AuthToken[]
-  createdAt    DateTime     @default(now()) @db.Timestamptz
-  updatedAt    DateTime     @updatedAt @db.Timestamptz
-  deletedAt    DateTime?    @db.Timestamptz
+  emailVerifiedAt DateTime?    @db.Timestamptz
+  authTokens      AuthToken[]
+  createdAt       DateTime     @default(now()) @db.Timestamptz
+  updatedAt       DateTime     @updatedAt @db.Timestamptz
+  deletedAt       DateTime?    @db.Timestamptz
 }
 
 /// One-time links sent by email. `id` is the SHA-256 of the token in the link.
@@ -674,6 +674,7 @@ model MembershipFreeze {
 
   @@index([memberId])
 }
+
 model Notification {
   id        String       @id @default(cuid())
   orgId     String
@@ -693,20 +694,31 @@ model Notification {
 // ── WhatsApp ───────────────────────────────────────────────────────────────
 
 model WhatsAppTemplate {
-  id               String       @id @default(cuid())
-  orgId            String
-  org              Organization @relation(fields: [orgId], references: [id])
+  id                 String       @id @default(cuid())
+  orgId              String
+  org                Organization @relation(fields: [orgId], references: [id])
   /// welcome, payment, invoice, due, exp7, exp3, exp1, expired, renewal, autopay, mandate, class, birthday, campaign
-  key              String
-  name             String
-  trigger          String
-  body             String
+  key                String
+  name               String
+  trigger            String
+  body               String
   /// Approved template name in Meta Business Manager (Cloud API). Without it, Cloud API can only reply inside 24 h.
-  metaTemplateName String?
-  language         String       @default("en")
+  metaTemplateName   String?
+  language           String       @default("en")
   /// Sent automatically when its trigger happens.
-  autoSend         Boolean      @default(true)
-  updatedAt        DateTime     @updatedAt @db.Timestamptz
+  autoSend           Boolean      @default(true)
+  /// Automation rule: event | before_expiry | after_expiry | dues_age | no_visit | birthday | before_debit | manual
+  ruleWhen           String       @default("manual")
+  ruleDays           Int          @default(0)
+  /// "HH:MM" Indian time the daily run sends it.
+  ruleTime           String       @default("07:00")
+  rulePlanId         String?
+  ruleGender         String?
+  /// Paise; 0 = any balance.
+  ruleMinDue         Int          @default(0)
+  ruleMaxPerWeek     Int          @default(3)
+  ruleExcludeAutopay Boolean      @default(false)
+  updatedAt          DateTime     @updatedAt @db.Timestamptz
 
   @@unique([orgId, key])
 }
@@ -725,16 +737,19 @@ model WhatsAppMessage {
   /// demo | cloud | connector
   provider          String
   providerMessageId String?
-  /// Logged (demo, not sent) | Queued | Sent | Delivered | Read | Failed
+  /// Scheduled (held by quiet hours or the rule's send time) | Logged (demo, not sent) | Queued | Sent | Delivered | Read | Failed
   status            String
   error             String?
   sentById          String?
   sentAt            DateTime     @default(now()) @db.Timestamptz
+  /// When a Scheduled message may go out.
+  scheduledFor      DateTime?    @db.Timestamptz
   deliveredAt       DateTime?    @db.Timestamptz
   readAt            DateTime?    @db.Timestamptz
 
   @@index([memberId, templateKey, sentAt])
   @@index([orgId, sentAt])
+  @@index([orgId, status, scheduledFor])
   @@index([providerMessageId])
 }
 
@@ -766,11 +781,11 @@ model AutopayMandate {
   createdAt      DateTime       @default(now()) @db.Timestamptz
   updatedAt      DateTime       @updatedAt @db.Timestamptz
   events         AutopayEvent[]
+  /// The member's UPI ID the mandate debits, e.g. riya@okicici (shown on the Autopay screen).
+  vpa            String?
 
   @@unique([orgId, code])
   @@index([status, nextDebitOn])
-  /// The member's UPI ID the mandate debits, e.g. riya@okicici (shown on the Autopay screen).
-  vpa            String?
 }
 
 /// Every webhook we accept, once. The provider event id makes replays harmless.
@@ -1059,25 +1074,25 @@ model BranchSubscription {
 
 /// A file kept against a member (ID proof, medical form, waiver…). Replacing or deleting keeps the old row.
 model MemberDocument {
-  id            String    @id @default(cuid())
-  orgId         String
-  memberId      String
+  id           String    @id @default(cuid())
+  orgId        String
+  memberId     String
   /// ID proof | Address proof | Medical | Waiver | Photo | Other
-  kind          String
-  title         String
-  fileName      String
-  mime          String
-  size          Int
-  storageKey    String    @unique
+  kind         String
+  title        String
+  fileName     String
+  mime         String
+  size         Int
+  storageKey   String    @unique
   /// ACTIVE | REPLACED | DELETED
-  status        String    @default("ACTIVE")
+  status       String    @default("ACTIVE")
   /// The newer file that replaced this one
-  replacedById  String?
-  uploadedById  String
-  createdAt     DateTime  @default(now()) @db.Timestamptz
-  deletedAt     DateTime? @db.Timestamptz
-  deletedById   String?
-  deleteReason  String?
+  replacedById String?
+  uploadedById String
+  createdAt    DateTime  @default(now()) @db.Timestamptz
+  deletedAt    DateTime? @db.Timestamptz
+  deletedById  String?
+  deleteReason String?
 
   @@index([memberId, status])
 }
@@ -1135,37 +1150,37 @@ model Offer {
 
 /// One AI Trainer member. Signs in with an email link or Google; no password.
 model TrainerMember {
-  id              String    @id @default(cuid())
-  email           String    @unique
-  name            String    @default("")
+  id               String        @id @default(cuid())
+  email            String        @unique
+  name             String        @default("")
   /// Tier the member is on or picked: ai-pro | ai-premium
-  plan            String    @default("ai-pro")
+  plan             String        @default("ai-pro")
   /// MONTHLY | YEARLY
-  cycle           String    @default("MONTHLY")
+  cycle            String        @default("MONTHLY")
   /// Set once, when the member starts the free trial
-  trialEndsAt     DateTime? @db.Timestamptz
+  trialEndsAt      DateTime?     @db.Timestamptz
   /// Last day of the latest confirmed payment's period
-  paidUntil       DateTime? @db.Date
+  paidUntil        DateTime?     @db.Date
   /// The member asked not to renew
-  planCancelled   Boolean   @default(false)
+  planCancelled    Boolean       @default(false)
   /// What the app keeps for the member: onboarding answers, weekly split, day schedule, settings, look
-  profile         Json      @default("{}")
-  onboardedAt     DateTime? @db.Timestamptz
-  consentedAt     DateTime? @db.Timestamptz
-  emailVerifiedAt DateTime? @db.Timestamptz
+  profile          Json          @default("{}")
+  onboardedAt      DateTime?     @db.Timestamptz
+  consentedAt      DateTime?     @db.Timestamptz
+  emailVerifiedAt  DateTime?     @db.Timestamptz
   /// EMAIL | GOOGLE: how the account was first created
-  signupVia       String    @default("EMAIL")
-  createdAt       DateTime  @default(now()) @db.Timestamptz
-  updatedAt       DateTime  @updatedAt @db.Timestamptz
-  lastSeenAt      DateTime? @db.Timestamptz
+  signupVia        String        @default("EMAIL")
+  createdAt        DateTime      @default(now()) @db.Timestamptz
+  updatedAt        DateTime      @updatedAt @db.Timestamptz
+  lastSeenAt       DateTime?     @db.Timestamptz
   /// After the account is deleted: sha256 of its old email, so the same email can't get a second free trial
   deletedEmailHash String?
   /// Gym Partnership: the gym this member linked to with its trainer code, and their record there when one matched
-  orgId        String?
-  org          Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
-  gymMemberId  String?       @unique
-  gymMember    Member?       @relation(fields: [gymMemberId], references: [id], onDelete: SetNull)
-  gymLinkedAt  DateTime?     @db.Timestamptz
+  orgId            String?
+  org              Organization? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  gymMemberId      String?       @unique
+  gymMember        Member?       @relation(fields: [gymMemberId], references: [id], onDelete: SetNull)
+  gymLinkedAt      DateTime?     @db.Timestamptz
 
   sessions TrainerSession[]
   pushes   TrainerPush[]
@@ -1314,6 +1329,7 @@ model TrainerPush {
 
   @@index([memberId])
 }
+
 /// Exercise form videos for the AI Trainer, one link per exercise in the app's library
 model TrainerContent {
   /// The exercise's name as the app shows it
@@ -1323,6 +1339,7 @@ model TrainerContent {
   updatedBy String?
   updatedAt DateTime @updatedAt @db.Timestamptz
 }
+
 model TrainerCoachUsage {
   memberId String
   date     DateTime @db.Date

@@ -208,25 +208,17 @@ export async function applyRazorpayEvent(eventId: string, ev: RzpEvent) {
 }
 
 /**
- * Daily: the WhatsApp debit notice a day ahead (both modes), and in demo mode the debit itself.
- * Live debits come from Razorpay webhooks.
+ * Daily, in demo mode: the debit itself on the renewal date. Live debits come from Razorpay
+ * webhooks. The debit notice a day ahead is the "Autopay debit notice" template's rule (reminders.autopay).
  */
 export async function runAutopayDay(orgId: string, today = todayIso()) {
-  const tomorrow = addDays(today, 1);
-  const notices = await db.autopayMandate.findMany({ where: { orgId, status: "Active", nextDebitOn: fromIso(tomorrow) } });
-  let noticed = 0;
-  for (const m of notices) {
-    const plan = await db.membershipPlan.findUnique({ where: { id: m.planId }, select: { name: true } });
-    const r = await sendTemplate({ orgId, memberId: m.memberId, key: "autopay", auto: true, vars: { amount: rupeesText(m.amount), plan_name: plan?.name ?? "" } }).catch(() => null);
-    if (r) noticed++;
-  }
   const due = await db.autopayMandate.findMany({ where: { orgId, mode: "demo", status: "Active", nextDebitOn: { lte: fromIso(today) } } });
   let charged = 0;
   for (const m of due) {
     const r = await recordCharge(m.id, { paymentId: `demo_${m.code}_${today}`, amount: m.amount });
     if (r === "renewed") charged++;
   }
-  return { noticed, charged };
+  return { charged };
 }
 
 /** The Autopay screen's numbers (prototype KPIs): debits due in a week, collected in 30 days, debits per mandate. */

@@ -8,10 +8,13 @@ import { PLANS } from "@/lib/domain/pricing";
 import { branchPrice, GRACE_DAYS, gymPlanCards, type PlanStanding, type Standing } from "@/lib/domain/saas";
 import { PlanCards } from "@/components/plan-cards";
 import { FEATURES, planFor, type Feature } from "@/lib/domain/features";
-import { Badge, Card, Empty, Notice, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, cx, Empty, Field, Input, LinkButton, Notice, PageHeader, Select, TABLE, TD, TH, TR } from "@/components/ui";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtDate, formatInr } from "@/lib/format";
+import { getSubscriptionSettings, gymWhatsAppNumber } from "@/lib/services/subscription";
+import { REMIND_DAYS } from "@/lib/domain/saas";
 import { PayButton } from "./pay-button";
+import { saveBillingDetails, saveRenewalReminders } from "./actions";
 
 export const metadata = { title: "Plan & billing · Fitron" };
 
@@ -31,14 +34,25 @@ function PlanBadge({ s, checking }: { s: PlanStanding; checking: boolean }) {
   return <Badge tone="alert">Ended · read-only</Badge>;
 }
 
-const STATUS: Record<string, string> = { PAID: "", SUBMITTED: " · being checked", REJECTED: " · not matched" };
+const STATUS: Record<string, string> = { PAID: "", SUBMITTED: "Being checked", REJECTED: "Not matched" };
+const REMIND_LABEL: Record<number, string> = { 14: "14 days before", 7: "7 days before", 3: "3 days before", 1: "1 day before" };
+/** "919000000001" → "+91 9000000001" */
+const showNumber = (n: string) => `+${n.slice(0, 2)} ${n.slice(2)}`;
 const prices = (f: (c: "MONTHLY" | "YEARLY") => { total: number }) => ({ MONTHLY: f("MONTHLY").total, YEARLY: f("YEARLY").total });
 
 export default async function BillingPage({ searchParams }: PageProps<"/settings/billing">) {
   const u = await requirePermission("settings.manage");
   const sp = await searchParams;
   const upgrade = typeof sp.upgrade === "string" && sp.upgrade in FEATURES ? (sp.upgrade as Feature) : null;
-  const [{ branches, freeSlots, terms }, history, plan, members] = await Promise.all([branchStandings(u.orgId), billingHistory(u), gymPlan(u.orgId), activeMemberCount(db, u.orgId)]);
+  const [{ branches, freeSlots, terms }, history, plan, members, sub, gymNumber] = await Promise.all([
+    branchStandings(u.orgId),
+    billingHistory(u),
+    gymPlan(u.orgId),
+    activeMemberCount(db, u.orgId),
+    getSubscriptionSettings(u.orgId),
+    gymWhatsAppNumber(u.orgId),
+  ]);
+  const paidTotal = history.filter((h) => h.status === "PAID").reduce((a, h) => a + h.total, 0);
   const upi = fitronUpi();
   const demo = !upi && !fitronKeyId();
   const admin = isFitronAdmin(u.email);
@@ -54,6 +68,8 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
       <PageHeader title="Plan & billing" subtitle="Your FITRON Gym Accounting plan, extra branches and payments to FITRON. Prices are plus 18% GST." />
       <SectionTabs u={u} tabs={SETTINGS_TABS} current="/settings/billing" />
       <div className="mb-4 flex flex-col gap-2">
+        {typeof sp.saved === "string" && <Notice tone="ok">Saved. Changes are recorded in the audit log.</Notice>}
+        {typeof sp.error === "string" && <Notice tone="alert">{sp.error}</Notice>}
         {upgrade && (
           <Notice tone="accent">
             <strong>{FEATURES[upgrade].label}</strong> is on the <strong>{planFor(upgrade).name}</strong> plan ({FEATURES[upgrade].card}). Your gym is on {plan.name}. Pick {planFor(upgrade).name} below; it opens as soon as the payment is confirmed.
@@ -84,6 +100,7 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
                   <strong>{plan.name}</strong> · {plan.cycle === "YEARLY" ? "yearly" : "monthly"} · {members} active member{members === 1 ? "" : "s"}
                   {terms.memberLimit !== null ? ` of ${terms.memberLimit}` : ", no limit"} · {branches.length} branch{branches.length === 1 ? "" : "es"}
                 </p>
+                <p className="text-muted">Total paid to FITRON: {formatInr(paidTotal)}</p>
                 {s.kind === "LAPSED" && !plan.checking && <p className="text-alert">Your plan has ended, so no new members or invoices can be added. Nothing is deleted; paying switches it back on at once.</p>}
                 {s.kind === "GRACE" && <p className="text-muted">Your paid period ended on {fmtDate(s.until)}. Renew before {fmtDate(s.readOnlyFrom)} to keep adding members and invoices.</p>}
                 <PlanCards plans={gymPlanCards()} current={plan.key} labels={{ current: renewing ? "Renew" : "Pay", other: "Switch" }} />
@@ -114,39 +131,112 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
               ))}
             </ul>
           </Card>
-          <Card title="Payments to FITRON">
+          <Card title="Renewal reminders">
+            <p className="mb-4 text-sm text-muted">FITRON reminds you before your plan or trial ends so the account never locks by surprise.</p>
+            <form action={saveRenewalReminders} className="flex flex-col gap-4">
+              <Field label="Remind me" className="max-w-[260px]">
+                <Select name="remindDays" defaultValue={String(sub.remindDays)}>
+                  {REMIND_DAYS.map((d) => (
+                    <option key={d} value={d}>
+                      {REMIND_LABEL[d]}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <label className="flex flex-wrap items-center gap-2.5 text-sm">
+                <input type="checkbox" name="whatsapp" defaultChecked={sub.whatsapp} className="size-[18px] accent-accent" />
+                WhatsApp reminder to the gym number
+                <span className="text-muted">{gymNumber ? `· to ${showNumber(gymNumber)}` : "· add a phone in Gym profile first"}</span>
+              </label>
+              <label className="flex flex-wrap items-center gap-2.5 text-sm">
+                <input type="checkbox" name="email" defaultChecked={sub.email} className="size-[18px] accent-accent" />
+                Email reminder to the billing email
+                <span className="text-muted">{sub.billingEmail ? `· to ${sub.billingEmail}` : "· to every Super Admin's sign-in email until a billing email is set"}</span>
+              </label>
+              <div>
+                <Button variant="primary">Save</Button>
+              </div>
+            </form>
+            <p className="mt-4 text-xs text-muted">
+              Reminders are also shown in the bell and on this page. Sent by the daily job &quot;Plan and branch renewal reminders&quot; (
+              <Link href="/settings/jobs" className="underline">
+                Settings › Daily jobs
+              </Link>
+              ).
+            </p>
+          </Card>
+          <Card title="Billing details">
+            <p className="mb-4 text-sm text-muted">Printed on your FITRON receipts. Add your GSTIN to claim input tax credit.</p>
+            <form action={saveBillingDetails} className="flex flex-col gap-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Legal / business name">
+                  <Input name="legalName" defaultValue={sub.legalName} placeholder="Power Haus Gym" maxLength={120} />
+                </Field>
+                <Field label="GSTIN (optional)">
+                  <Input name="gstin" defaultValue={sub.gstin} placeholder="20ABCDE1234F1Z5" maxLength={15} className="uppercase" />
+                </Field>
+                <Field label="Billing email">
+                  <Input name="billingEmail" type="email" defaultValue={sub.billingEmail} placeholder="accounts@yourgym.in" maxLength={120} />
+                </Field>
+                <Field label="Billing address">
+                  <Input name="address" defaultValue={sub.address} placeholder="C-7, Sector 4, City Centre, Bokaro" maxLength={300} />
+                </Field>
+              </div>
+              <div>
+                <Button variant="primary">Save</Button>
+              </div>
+            </form>
+            <p className="mt-3 text-xs text-muted">Leave the name blank to use your gym name; leave the GSTIN blank to use the GSTIN of your first branch.</p>
+          </Card>
+          <Card title="Payment history">
             {history.length === 0 ? (
-              <Empty>No payments yet.</Empty>
+              <Empty>No payments yet. Your receipts will appear here.</Empty>
             ) : (
-              <ul className="divide-y divide-line text-sm">
-                {history.map((h) => {
-                  const what = h.kind === "PLAN" ? `${PLANS.find((p) => p.key === h.plan)?.name ?? h.plan} plan` : `Extra branch${h.branchId ? ` · ${branches.find((b) => b.id === h.branchId)?.name ?? ""}` : " · not used yet"}`;
-                  const line = (
-                    <>
-                      <span>
-                        {h.invoiceNo ?? paymentRef(h.id)} · {what} · {h.cycle === "YEARLY" ? "Yearly" : "Monthly"}
-                        {h.periodStart ? ` · ${fmtDate(h.periodStart)} to ${fmtDate(h.periodEnd)}` : ""}
-                        {h.utr ? ` · UTR ${h.utr}` : ""}
-                        {h.mode === "DEMO" ? " · demo" : ""}
-                        <span className={h.status === "REJECTED" ? "text-alert" : "text-muted"}>{STATUS[h.status]}</span>
-                        {h.rejectReason && <span className="block text-alert">{h.rejectReason}</span>}
-                      </span>
-                      <span className="tabular-nums">{formatInr(h.total)}</span>
-                    </>
-                  );
-                  return (
-                    <li key={h.id}>
-                      {h.status === "PAID" ? (
-                        <Link href={`/settings/billing/${h.id}`} className="flex flex-wrap justify-between gap-2 py-2 hover:text-accent">
-                          {line}
-                        </Link>
-                      ) : (
-                        <div className="flex flex-wrap justify-between gap-2 py-2">{line}</div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
+              <div className="overflow-x-auto">
+                <table className={TABLE}>
+                  <thead>
+                    <tr>
+                      <th className={TH}>Receipt</th>
+                      <th className={TH}>Date</th>
+                      <th className={TH}>Plan</th>
+                      <th className={TH}>UTR</th>
+                      <th className={TH}>Valid till</th>
+                      <th className={cx(TH, "text-right")}>Amount</th>
+                      <th className={TH} />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((h) => {
+                      const what =
+                        h.kind === "PLAN"
+                          ? `${PLANS.find((p) => p.key === h.plan)?.name ?? h.plan} plan · ${h.cycle === "YEARLY" ? "Yearly" : "Monthly"}`
+                          : `Extra branch · ${h.branchId ? (branches.find((b) => b.id === h.branchId)?.name ?? "") : "not used yet"}`;
+                      return (
+                        <tr key={h.id} className={TR}>
+                          <td className={cx(TD, "whitespace-nowrap")}>{h.invoiceNo ?? paymentRef(h.id)}</td>
+                          <td className={cx(TD, "whitespace-nowrap")}>{fmtDate(h.paidAt ?? h.submittedAt ?? h.createdAt)}</td>
+                          <td className={TD}>
+                            {what}
+                            {h.mode === "DEMO" ? " · demo" : ""}
+                            {STATUS[h.status] && <div className={h.status === "REJECTED" ? "text-alert" : "text-muted"}>{STATUS[h.status]}</div>}
+                            {h.rejectReason && <div className="text-alert">{h.rejectReason}</div>}
+                          </td>
+                          <td className={cx(TD, "tabular-nums")}>{h.utr ?? (h.mode === "LIVE" && h.razorpayPaymentId ? `Razorpay ${h.razorpayPaymentId}` : "—")}</td>
+                          <td className={cx(TD, "whitespace-nowrap")}>{h.status === "PAID" ? fmtDate(h.periodEnd) : "—"}</td>
+                          <td className={cx(TD, "text-right font-semibold tabular-nums")}>{formatInr(h.total)}</td>
+                          <td className={cx(TD, "text-right")}>
+                            {h.status === "PAID" && (
+                              <LinkButton href={`/settings/billing/${h.id}`} variant="ghost">
+                                Receipt
+                              </LinkButton>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
         </div>

@@ -1,115 +1,243 @@
 import "server-only";
 import { db } from "@/lib/db";
 import type { CurrentUser } from "@/lib/auth/current";
-import { addDays, daysBetween } from "@/lib/domain/dates";
+import type { Prisma } from "@/generated/prisma/client";
+import { daysBetween } from "@/lib/domain/dates";
 import { invoiceState } from "@/lib/domain/billing";
+import { render, rupeesText, waNumber, type TemplateVars } from "@/lib/domain/whatsapp";
+import { inQuietHours, isScheduled, matchRule, ruleText, skipReason, type MemberFacts } from "@/lib/domain/wa-rules";
+import { fmtClock } from "@/lib/format";
 import { audit } from "./audit";
-import { JOBS } from "./jobs";
+import { UserError } from "./errors";
 import { summarize } from "./members";
 import { getSetting } from "./settings";
-import { fromIso, toIso, todayIso } from "./time";
-import { getWaSettings, listTemplates, type WaSettings } from "./whatsapp";
+import { istClock, todayIso, toIso } from "./time";
+import { deliverMessage, getWaSettings, listTemplates, memberVars, queueTemplate, templateRule, type WaSettings } from "./whatsapp";
 
 /**
- * "Today's automation" on the WhatsApp screen (prototype): what the daily reminder rules will send today
- * and what they will skip, worked out the same way the daily job does, without sending anything.
+ * The WhatsApp rule engine (prototype A.autoMatch / A.autoRun): which members each scheduled
+ * template reaches today, who is skipped and why, and the runs that send them. The same code
+ * serves "Today's automation", Preview & run, Send due now and the daily jobs.
  */
 
-export const EXPIRY_KEYS: Record<string, number> = { exp7: 7, exp3: 3, exp1: 1, expired: 0 };
-const REMINDER_JOBS = ["reminders.expiry", "reminders.dues", "reminders.birthday", "reminders.winback"];
-type Row = { key: string; send: number; skipped: number };
+type Template = Awaited<ReturnType<typeof listTemplates>>[number];
+export type Cand = { memberId: string; name: string; code: string; planName: string; phone: string; vars: TemplateVars };
+export type Skip = { cand: Cand; why: string };
+export type Match = { send: Cand[]; skipped: Skip[] };
+export type PreviewRow = { key: string; name: string; time: string; send: Cand[]; skipped: Skip[] };
+export type Run = { ts: string; key: string; name: string; matched: number; sent: number; skipped: number; held: number; by: string | null };
 
-/** The rule behind each template in words, as the prototype's template cards show it. */
-export function ruleText(key: string, trigger: string, s: WaSettings) {
-  if (key in EXPIRY_KEYS) {
-    const d = EXPIRY_KEYS[key]!;
-    if (!s.expiryDays.includes(d)) return "Off · turn this day on in WhatsApp settings";
-    return `Daily · ${d === 0 ? "on the expiry date" : `${d} day${d === 1 ? "" : "s"} before expiry`} · skips members on UPI autopay`;
-  }
-  if (key === "due") return s.dueEveryDays ? `Daily · every ${s.dueEveryDays} days while a balance is overdue` : "Off · turn it on in WhatsApp settings";
-  if (key === "birthday") return s.birthdays ? "Daily · on the member's birthday" : "Off · turn it on in WhatsApp settings";
-  if (key === "autopay") return "Daily · the day before each UPI autopay debit";
-  if (key === "winback") return "Daily · active members who haven't visited for 14 days · once a month";
-  if (key === "campaign") return "Sent by staff from New campaign";
-  return `When it happens · ${trigger}`;
+/** The reminder jobs whose finish counts as an automation run. */
+export const REMINDER_JOBS = ["reminders.expiry", "reminders.dues", "reminders.birthday", "reminders.winback", "reminders.autopay"];
+
+/** The rule in words for a template card; plan names come from the gym's plans. */
+export function ruleSentence(t: Template, settings: WaSettings, plans: Map<string, string>) {
+  const text = ruleText(templateRule(t), t.trigger, t.rulePlanId ? plans.get(t.rulePlanId) : undefined);
+  return t.key === "due" && !settings.dueEveryDays ? `${text} · off (payment reminder interval is 0 under Settings › Reminders)` : text;
 }
 
-export async function automationPreview(u: CurrentUser, today = todayIso()): Promise<Row[]> {
-  const s = await getWaSettings(u.orgId);
-  const tpls = new Map((await listTemplates(u.orgId)).map((t) => [t.key, t]));
-  const on = (k: string) => tpls.get(k)?.autoSend ?? false;
-  const members = await db.member.findMany({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null, walkIn: false, suspended: false }, select: { id: true, dob: true, phone: true, whatsapp: true } });
+type Facts = { member: { id: string; name: string; code: string; phone: string; whatsapp: string | null; gender: string }; facts: MemberFacts; vars: TemplateVars };
+type Ctx = { settings: WaSettings; templates: Template[]; plans: Map<string, string>; members: Facts[]; recent: { memberId: string | null; templateKey: string; sentAt: Date; sentById: string | null }[]; now: Date };
+
+/** Everything the rules look at, loaded once for the gym (or the user's branches). */
+async function loadFacts(orgId: string, branchIds: string[] | null, today: string, now: Date): Promise<Ctx> {
+  const [settings, templates, plans, members] = await Promise.all([
+    getWaSettings(orgId),
+    listTemplates(orgId),
+    db.membershipPlan.findMany({ where: { orgId }, select: { id: true, name: true } }),
+    db.member.findMany({
+      where: { orgId, ...(branchIds ? { branchId: { in: branchIds } } : {}), deletedAt: null, walkIn: false, suspended: false },
+      select: { id: true, name: true, code: true, phone: true, whatsapp: true, gender: true, dob: true, createdAt: true },
+    }),
+  ]);
   const ids = members.map((m) => m.id);
-  const sums = await summarize(ids, today);
-  const autopay = new Set((await db.autopayMandate.findMany({ where: { memberId: { in: ids }, status: "Active" }, select: { memberId: true } })).map((m) => m.memberId));
-  const recent = await db.whatsAppMessage.findMany({ where: { memberId: { in: ids }, sentAt: { gte: new Date(Date.now() - Math.max(s.dedupDays, s.dueEveryDays || 0) * 86_400_000) }, status: { not: "Failed" } }, select: { memberId: true, templateKey: true, sentAt: true } });
-  const sentWithin = (memberId: string, key: string, days: number) => recent.some((r) => r.memberId === memberId && r.templateKey === key && r.sentAt.getTime() >= Date.now() - days * 86_400_000);
-  const noNumber = (m: (typeof members)[number]) => !(m.whatsapp ?? m.phone);
-  const out: Row[] = [];
-
-  for (const [key, d] of Object.entries(EXPIRY_KEYS)) {
-    if (!on(key) || !s.expiryDays.includes(d)) continue;
-    let send = 0;
-    let skipped = 0;
-    for (const m of members) {
-      const end = sums.get(m.id)?.latestEnd;
-      if (!end || daysBetween(end, today) !== d) continue;
-      if (autopay.has(m.id) || noNumber(m) || sentWithin(m.id, key, s.dedupDays)) skipped++;
-      else send++;
-    }
-    out.push({ key, send, skipped });
+  const [sums, current, mandates, invoices, visits, recent] = await Promise.all([
+    summarize(ids, today),
+    db.membership.findMany({ where: { memberId: { in: ids }, status: "VALID" }, orderBy: { endDate: "desc" }, distinct: ["memberId"], select: { memberId: true, planId: true } }),
+    db.autopayMandate.findMany({ where: { memberId: { in: ids }, status: "Active" }, select: { memberId: true, nextDebitOn: true, amount: true, planId: true } }),
+    db.invoice.findMany({ where: { memberId: { in: ids }, status: "ISSUED" }, orderBy: { dueDate: "asc" }, select: { memberId: true, number: true, total: true, dueDate: true, payments: { select: { amount: true, status: true } } } }),
+    db.attendance.findMany({ where: { memberId: { in: ids } }, orderBy: { date: "desc" }, distinct: ["memberId"], select: { memberId: true, date: true } }),
+    db.whatsAppMessage.findMany({
+      where: { orgId, memberId: { in: ids }, status: { not: "Failed" }, sentAt: { gte: new Date(now.getTime() - Math.max(settings.dedupDays, settings.dueEveryDays, 30) * 86_400_000) } },
+      select: { memberId: true, templateKey: true, sentAt: true, sentById: true },
+    }),
+  ]);
+  const planOf = new Map(current.map((c) => [c.memberId, c.planId]));
+  const planName = new Map(plans.map((p) => [p.id, p.name]));
+  const mandate = new Map(mandates.map((m) => [m.memberId, m]));
+  const oldest = new Map<string, { number: string; dueDate: string }>();
+  for (const inv of invoices) {
+    const st = invoiceState({ total: inv.total, cancelled: false, dueDate: toIso(inv.dueDate) }, inv.payments as { amount: number; status: "SUCCESS" | "REVERSED" }[], today);
+    if (st.balance > 0 && !oldest.has(inv.memberId)) oldest.set(inv.memberId, { number: inv.number, dueDate: toIso(inv.dueDate) });
   }
-  if (on("due") && s.dueEveryDays) {
-    const invs = await db.invoice.findMany({ where: { memberId: { in: ids }, status: "ISSUED", dueDate: { lt: fromIso(today) } }, include: { payments: { select: { amount: true, status: true } } } });
-    const owing = new Set(invs.filter((i) => invoiceState({ total: i.total, cancelled: false, dueDate: toIso(i.dueDate) }, i.payments as { amount: number; status: "SUCCESS" | "REVERSED" }[], today).balance > 0).map((i) => i.memberId));
-    let send = 0;
-    let skipped = 0;
-    for (const id of owing) {
-      const m = members.find((x) => x.id === id)!;
-      if (noNumber(m) || sentWithin(id, "due", s.dueEveryDays)) skipped++;
-      else send++;
-    }
-    out.push({ key: "due", send, skipped });
-  }
-  if (on("birthday") && s.birthdays) {
-    const md = today.slice(5);
-    const born = members.filter((m) => m.dob && toIso(m.dob).slice(5) === md);
-    out.push({ key: "birthday", send: born.filter((m) => !noNumber(m) && !sentWithin(m.id, "birthday", s.dedupDays)).length, skipped: born.filter((m) => noNumber(m) || sentWithin(m.id, "birthday", s.dedupDays)).length });
-  }
-  if (on("winback")) {
-    const active = members.filter((m) => (sums.get(m.id)?.latestEnd ?? "") >= today);
-    const seen = new Set((await db.attendance.findMany({ where: { memberId: { in: active.map((m) => m.id) }, date: { gte: fromIso(addDays(today, -14)) } }, select: { memberId: true }, distinct: ["memberId"] })).map((a) => a.memberId));
-    const away = active.filter((m) => !seen.has(m.id));
-    const lately = new Set((await db.whatsAppMessage.findMany({ where: { memberId: { in: away.map((m) => m.id) }, templateKey: "winback", sentAt: { gte: new Date(Date.now() - 30 * 86_400_000) }, status: { not: "Failed" } }, select: { memberId: true } })).map((x) => x.memberId));
-    out.push({ key: "winback", send: away.filter((m) => !noNumber(m) && !lately.has(m.id)).length, skipped: away.filter((m) => noNumber(m) || lately.has(m.id)).length });
-  }
-  if (on("autopay")) {
-    const n = await db.autopayMandate.count({ where: { memberId: { in: ids }, status: "Active", nextDebitOn: fromIso(addDays(today, 1)) } });
-    out.push({ key: "autopay", send: n, skipped: 0 });
-  }
-  return out.filter((r) => r.send || r.skipped);
+  const lastVisit = new Map(visits.map((v) => [v.memberId!, toIso(v.date)]));
+  const facts: Facts[] = members.map((m) => {
+    const s = sums.get(m.id)!;
+    const md = mandate.get(m.id);
+    const inv = oldest.get(m.id);
+    const vars: TemplateVars = {};
+    if (inv) Object.assign(vars, { invoice_number: inv.number, pending_amount: rupeesText(s.outstanding) });
+    if (md) Object.assign(vars, { amount: rupeesText(md.amount), plan_name: planName.get(md.planId) ?? "" });
+    return {
+      member: { id: m.id, name: m.name, code: m.code, phone: m.phone, whatsapp: m.whatsapp, gender: m.gender },
+      facts: {
+        daysLeft: s.latestEnd ? daysBetween(s.latestEnd, today) : null,
+        planId: planOf.get(m.id) ?? null,
+        gender: m.gender,
+        outstanding: s.outstanding,
+        onAutopay: !!md,
+        oldestOverdueDays: inv ? daysBetween(today, inv.dueDate) : null,
+        lastVisitDaysAgo: daysBetween(today, lastVisit.get(m.id) ?? todayIso(m.createdAt)),
+        birthdayToday: !!m.dob && toIso(m.dob).slice(5) === today.slice(5),
+        nextDebitInDays: md?.nextDebitOn ? daysBetween(toIso(md.nextDebitOn), today) : null,
+      },
+      vars: { ...vars, plan_name: vars.plan_name ?? s.planName ?? "" },
+    };
+  });
+  return { settings, templates, plans: planName, members: facts, recent, now };
 }
 
-type Run = { ts: string; sent: number };
+/** The no-repeat window for a template: the dues interval for payment reminders, a month for win-back, else the de-dup days. */
+export const windowDays = (key: string, s: WaSettings) => (key === "due" ? s.dueEveryDays : key === "winback" ? Math.max(s.dedupDays, 30) : s.dedupDays);
 
-/** "Send N due now": the daily reminder rules, run straight away. Repeats are skipped by the no-repeat windows. */
-export async function runAutomationNow(u: CurrentUser, today = todayIso()) {
-  let sent = 0;
-  for (const job of JOBS.filter((j) => REMINDER_JOBS.includes(j.name))) sent += Number((await job.run(u.orgId, today)).sent ?? 0);
-  const runs = ((await getSetting<Run[]>(u.orgId, "wa_auto_runs")) ?? []).slice(0, 9);
-  const value = [{ ts: new Date().toISOString(), sent }, ...runs];
-  await db.setting.upsert({ where: { orgId_key: { orgId: u.orgId, key: "wa_auto_runs" } }, create: { orgId: u.orgId, key: "wa_auto_runs", value }, update: { value } });
-  await db.$transaction((tx) => audit(tx, { orgId: u.orgId, userId: u.id, action: "whatsapp.automation.run", entity: "Setting", entityId: "wa_auto_runs", after: { sent } }));
-  return sent;
+function matchIn(ctx: Ctx, t: Template): Match {
+  const rule = templateRule(t);
+  const out: Match = { send: [], skipped: [] };
+  if (!isScheduled(rule.when)) return out;
+  if (t.key === "due" && !ctx.settings.dueEveryDays) return out;
+  const window = windowDays(t.key, ctx.settings);
+  const scheduled = new Set(ctx.templates.filter((x) => isScheduled(x.ruleWhen)).map((x) => x.key));
+  const weekAgo = ctx.now.getTime() - 7 * 86_400_000;
+  const windowStart = ctx.now.getTime() - window * 86_400_000;
+  for (const { member, facts, vars } of ctx.members) {
+    if (!matchRule({ ...rule, excludeAutopay: false }, facts)) continue;
+    const mine = ctx.recent.filter((r) => r.memberId === member.id);
+    const cand: Cand = { memberId: member.id, name: member.name, code: member.code, planName: vars.plan_name ?? "", phone: member.phone, vars };
+    const why = skipReason(facts, {
+      validNumber: !!waNumber(member.whatsapp ?? member.phone),
+      sentWithinWindow: mine.some((r) => r.templateKey === t.key && r.sentAt.getTime() >= windowStart),
+      autoThisWeek: mine.filter((r) => r.sentById === null && scheduled.has(r.templateKey) && r.sentAt.getTime() >= weekAgo).length,
+      windowDays: window,
+      rule,
+    });
+    if (why) out.skipped.push({ cand, why });
+    else out.send.push(cand);
+  }
+  return out;
 }
 
-/** When the reminders last ran: the daily job, or someone pressing "Send due now". */
+/** Who one template's rule reaches today, and who it skips and why. */
+export async function matchTemplate(orgId: string, branchIds: string[] | null, t: Template, today = todayIso(), now = new Date()) {
+  return matchIn(await loadFacts(orgId, branchIds, today, now), t);
+}
+
+/** "Today's automation": every scheduled template that is on and has someone to send to or skip. */
+export async function automationPreview(u: CurrentUser, today = todayIso(), now = new Date()): Promise<PreviewRow[]> {
+  const ctx = await loadFacts(u.orgId, u.branchIds, today, now);
+  return ctx.templates
+    .filter((t) => t.autoSend && isScheduled(t.ruleWhen))
+    .map((t) => ({ key: t.key, name: t.name, time: fmtClock(t.ruleTime), ...matchIn(ctx, t) }))
+    .filter((r) => r.send.length || r.skipped.length);
+}
+
+/** Preview & run: the match for one template, with the message as its first recipient would get it. */
+export async function previewTemplate(u: CurrentUser, key: string, today = todayIso(), now = new Date()) {
+  const ctx = await loadFacts(u.orgId, u.branchIds, today, now);
+  const t = ctx.templates.find((x) => x.key === key);
+  if (!t) throw new UserError("Template not found.");
+  const match = matchIn(ctx, t);
+  const first = match.send[0];
+  const sample = first ? render(t.body, await memberVars(u.orgId, first.memberId, first.vars)) : "";
+  return { template: t, rule: templateRule(t), ...match, sample };
+}
+
+export type RunResult = { sent: number; skipped: number; held: number; failed: number; heldUntil: Date | null; runs: Run[] };
+
+/**
+ * Runs the rules of the given templates: matches, sends (or holds for quiet hours and the rule's
+ * send time), records a run per template with matches, and audits the call. Jobs pass `by` null.
+ */
+export async function runRules(orgId: string, branchIds: string[] | null, keys: string[], today = todayIso(), now = new Date(), by: { userId: string } | null = null): Promise<RunResult> {
+  const ctx = await loadFacts(orgId, branchIds, today, now);
+  const result: RunResult = { sent: 0, skipped: 0, held: 0, failed: 0, heldUntil: null, runs: [] };
+  for (const t of ctx.templates.filter((x) => keys.includes(x.key))) {
+    const { send, skipped } = matchIn(ctx, t);
+    const run: Run = { ts: now.toISOString(), key: t.key, name: t.name, matched: send.length + skipped.length, sent: 0, skipped: skipped.length, held: 0, by: by?.userId ?? null };
+    for (const c of send) {
+      const r = await queueTemplate({ orgId, memberId: c.memberId, key: t.key, vars: c.vars, userId: by?.userId ?? null, force: true, now, today, rule: templateRule(t), settings: ctx.settings });
+      if (!r) run.skipped++;
+      else if (r.status === "Scheduled") {
+        run.held++;
+        if (r.scheduledFor && (!result.heldUntil || r.scheduledFor < result.heldUntil)) result.heldUntil = r.scheduledFor;
+      } else if (r.status === "Failed") result.failed++;
+      else run.sent++;
+      // The next template sees this send in its weekly count.
+      ctx.recent.push({ memberId: c.memberId, templateKey: t.key, sentAt: now, sentById: by?.userId ?? null });
+    }
+    result.sent += run.sent;
+    result.skipped += run.skipped;
+    result.held += run.held;
+    if (run.matched) result.runs.push(run);
+  }
+  if (result.runs.length) {
+    const previous = ((await getSetting<Run[]>(orgId, "wa_auto_runs")) ?? []).slice(0, 40 - result.runs.length);
+    const value = [...result.runs, ...previous] as unknown as Prisma.InputJsonValue;
+    await db.$transaction(async (tx) => {
+      await tx.setting.upsert({ where: { orgId_key: { orgId, key: "wa_auto_runs" } }, create: { orgId, key: "wa_auto_runs", value }, update: { value } });
+      await audit(tx, { orgId, userId: by?.userId ?? null, action: "whatsapp.automation.run", entity: "Setting", entityId: "wa_auto_runs", after: result.runs });
+    });
+  }
+  return result;
+}
+
+/** The quiet-hours refusal for runs started by hand (prototype A.autoRun). */
+export function assertNotQuiet(s: WaSettings, now: Date) {
+  if (inQuietHours(istClock(now), s.quietFrom, s.quietTo)) throw new UserError(`Quiet hours (${fmtClock(s.quietFrom)} – ${fmtClock(s.quietTo)}). Messages will go out at ${fmtClock(s.quietTo)}.`);
+}
+
+/** "Send N due now": every scheduled template that is on, for the user's branches. */
+export async function runAutomationNow(u: CurrentUser, today = todayIso(), now = new Date()) {
+  assertNotQuiet(await getWaSettings(u.orgId), now);
+  const keys = (await listTemplates(u.orgId)).filter((t) => t.autoSend && isScheduled(t.ruleWhen)).map((t) => t.key);
+  return runRules(u.orgId, u.branchIds, keys, today, now, { userId: u.id });
+}
+
+/** "Send to N now" in Preview & run: one template, whether or not its Auto-send is on. */
+export async function runOne(u: CurrentUser, key: string, today = todayIso(), now = new Date()) {
+  assertNotQuiet(await getWaSettings(u.orgId), now);
+  if (!(await listTemplates(u.orgId)).some((t) => t.key === key)) throw new UserError("Template not found.");
+  return runRules(u.orgId, u.branchIds, [key], today, now, { userId: u.id });
+}
+
+/** When the reminders last ran: the daily job, or someone pressing Send due now / Preview & run. */
 export async function lastAutomationRun(orgId: string) {
   const [job, manual] = await Promise.all([
     db.jobRun.findFirst({ where: { orgId, name: { in: REMINDER_JOBS }, finishedAt: { not: null } }, orderBy: { finishedAt: "desc" }, select: { finishedAt: true } }),
     getSetting<Run[]>(orgId, "wa_auto_runs"),
   ]);
-  const times = [job?.finishedAt?.getTime() ?? 0, manual?.[0] ? Date.parse(manual[0].ts) : 0];
-  const at = Math.max(...times);
-  return { at: at ? new Date(at) : null, runs: manual ?? [] };
+  const runs = (manual ?? []).filter((r) => r && typeof r.ts === "string");
+  const at = Math.max(job?.finishedAt?.getTime() ?? 0, runs[0] ? Date.parse(runs[0].ts) : 0);
+  return { at: at ? new Date(at) : null, runs };
+}
+
+/**
+ * Sends the messages held by quiet hours or a rule's send time once their time has come, unless it
+ * is quiet hours again. Called every 15 minutes (/api/jobs/dispatch) and when the WhatsApp page opens.
+ */
+export async function dispatchScheduled(orgId: string, now = new Date()) {
+  const held = await db.whatsAppMessage.findMany({ where: { orgId, status: "Scheduled" }, orderBy: { scheduledFor: "asc" }, select: { id: true, scheduledFor: true } });
+  const out = { sent: 0, failed: 0, stillHeld: held.length };
+  if (!held.length) return out;
+  const s = await getWaSettings(orgId);
+  if (inQuietHours(istClock(now), s.quietFrom, s.quietTo)) return out;
+  for (const m of held.filter((x) => x.scheduledFor && x.scheduledFor <= now)) {
+    // Claim it first so two dispatchers never send the same message.
+    const claimed = await db.whatsAppMessage.updateMany({ where: { id: m.id, status: "Scheduled" }, data: { status: "Queued", sentAt: now } });
+    if (!claimed.count) continue;
+    out.stillHeld--;
+    const r = await deliverMessage(m.id);
+    if (r.status === "Failed") out.failed++;
+    else out.sent++;
+  }
+  return out;
 }

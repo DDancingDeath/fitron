@@ -6,6 +6,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { simpleAction } from "@/lib/form-action";
 import type { FormState } from "@/lib/validation/common";
 import { changeMandate, createMandate, getAutopayMode, retryDemoDebit, runAutopayDay } from "@/lib/services/autopay";
+import { runRules } from "@/lib/services/wa-automation";
 import { resolveMemberRef } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
 
@@ -66,6 +67,8 @@ export async function runDueAction() {
   const u = await requirePermission("autopay.manage");
   if ((await getAutopayMode(u.orgId)) !== "demo") back("Live debits are run by Razorpay.");
   const r = await runAutopayDay(u.orgId);
+  // The day-ahead notice is the "Autopay debit notice" template's rule; held messages wait for quiet hours to end.
+  const n = await runRules(u.orgId, null, ["autopay"], undefined, undefined, { userId: u.id });
   revalidatePath("/autopay");
-  back(`${r.charged} debit${r.charged === 1 ? "" : "s"} collected · ${r.noticed} pre-debit notice${r.noticed === 1 ? "" : "s"} sent.`);
+  back(`${r.charged} debit${r.charged === 1 ? "" : "s"} collected · ${n.sent} pre-debit notice${n.sent === 1 ? "" : "s"} sent${n.held ? ` · ${n.held} held` : ""}.`);
 }
