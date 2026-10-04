@@ -5,7 +5,7 @@ import { getStaff, listRoles } from "@/lib/services/staff";
 import { PageHeader } from "@/components/ui";
 import { StaffForm } from "../../staff-form";
 
-export const metadata = { title: "Edit staff · Fitron" };
+export const metadata = { title: "Change role · Fitron" };
 
 export default async function EditStaff({ params }: PageProps<"/staff/[id]/edit">) {
   const u = await requirePermission("staff.manage");
@@ -16,7 +16,7 @@ export default async function EditStaff({ params }: PageProps<"/staff/[id]/edit"
   const shown = branches.filter((b) => b.active || held.has(b.id));
   return (
     <>
-      <PageHeader title={`Edit ${s.name}`} />
+      <PageHeader kicker={s.name} title="Change role" />
       <StaffForm id={s.id} values={{ ...s, branchIds: s.branches.map((b) => b.branchId) }} roles={roles} branches={shown} />
     </>
   );

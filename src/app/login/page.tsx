@@ -24,13 +24,13 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const planQ = one(q.plan);
   const plan = findPlan(planQ)?.product === "GYM_ACCOUNTING" ? planQ! : DEFAULT_PLAN;
   const cycle = q.cycle === "YEARLY" || q.cycle === "year" ? "YEARLY" : "MONTHLY";
-  const fromYearly = formatInr(lowestGymPrice("YEARLY")).replace(/\.00$/, "");
+  const fromMonthly = formatInr(lowestGymPrice("MONTHLY")).replace(/\.00$/, "");
   const upHref = `/login?${new URLSearchParams({ tab: "up", ...(planQ ? { plan } : {}), ...(one(q.cycle) ? { cycle } : {}), ...(next ? { next } : {}) })}`;
   const inHref = next ? `/login?${new URLSearchParams({ next })}` : "/login";
   const tab = "rounded-[5px] px-3.5 py-1.5 text-[13px] font-semibold";
   const gMsg = googleMessage(q.google, q.email);
   const stats: [string, string][] = [
-    [fromYearly, "a year, white-labelled"],
+    [fromMonthly, "a month, Starter"],
     ["24/7", "AI coach for members"],
     ["UPI", "autopay and reminders"],
   ];

@@ -292,7 +292,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           </p>
           <Panel title="WhatsApp" id="whatsapp">
             <form action={saveWhatsApp} className="flex flex-col gap-3 text-sm">
-              <Field label="How messages are sent">
+              <Field label="Sending mode">
                 <Select name="mode" key={wa.mode} defaultValue={wa.mode}>
                   <option value="demo">Demo: log only, send nothing</option>
                   <option value="cloud">WhatsApp Cloud API (official)</option>

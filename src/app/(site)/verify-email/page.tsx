@@ -16,7 +16,7 @@ export default async function VerifyEmailPage({ searchParams }: PageProps<"/veri
       <p className="mt-4 mb-8 text-lg text-muted">
         {token
           ? "It has expired or was already used. Send yourself a new one."
-          : `We sent a link to ${sent || "your email"}. Open it to confirm your address, then log in. It can take a minute; check spam too.`}
+          : `We sent a link to ${sent || "your email"}. Open it to confirm your address, then sign in. It can take a minute; check spam too.`}
       </p>
       <EmailForm action={resendLink} email={sent} label="Send a new link" />
       <p className="mt-8 text-sm text-muted">

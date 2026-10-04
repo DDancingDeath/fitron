@@ -58,7 +58,7 @@ export function GymSignupForm({ plan: initialPlan, cycle: initialCycle, google }
           <Input name="email" type="email" value={google.email} readOnly />
         </Field>
       ) : (
-        <Field label="Email" error={e.email} hint="You'll log in with this. We send a link to confirm it.">
+        <Field label="Email" error={e.email} hint="You'll sign in with this. We send a link to confirm it.">
           <Input name="email" type="email" autoComplete="email" defaultValue={v("email")} required />
         </Field>
       )}

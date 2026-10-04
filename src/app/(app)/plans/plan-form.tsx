@@ -56,7 +56,7 @@ export function PlanForm({ id, values, defaultMonths }: { id?: string; values?: 
           </Field>
           <label className="flex items-center gap-2 text-sm sm:col-span-2">
             <input type="checkbox" name="gstApplicable" defaultChecked={sent ? sent.gstApplicable === "on" : (values?.gstApplicable ?? true)} className="size-4 accent-[var(--accent)]" />
-            GST applies to this plan
+            Apply GST when enabled
           </label>
           {PRICE_CATEGORIES.map((c) => (
             <Field key={c} label={`${c} price (₹)`} error={e[`${c.toLowerCase()}Price`]} hint="Leave empty to use the standard price">
@@ -66,7 +66,7 @@ export function PlanForm({ id, values, defaultMonths }: { id?: string; values?: 
           <Field label="Description" error={e.description} className="sm:col-span-2">
             <Textarea name="description" defaultValue={pick("description", values?.description ?? "")} />
           </Field>
-          <Field label="What's included" error={e.features} hint="One per line" className="sm:col-span-2">
+          <Field label="Features" error={e.features} hint="One per line" className="sm:col-span-2">
             <Textarea name="features" defaultValue={pick("features", values?.features.join("\n"))} />
           </Field>
         </div>

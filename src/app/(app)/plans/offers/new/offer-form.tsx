@@ -21,8 +21,8 @@ export function OfferForm({ validTill }: { validTill: string }) {
           </Field>
           <Field label="Discount type" error={e.type}>
             <Select name="type" defaultValue={v("type", "PERCENT")}>
-              <option value="PERCENT">Percent off</option>
-              <option value="FLAT">Rupees off</option>
+              <option value="PERCENT">Percent</option>
+              <option value="FLAT">Flat ₹</option>
             </Select>
           </Field>
           <Field label="Discount" error={e.value} hint="10 for 10%, or an amount in rupees">
@@ -31,7 +31,7 @@ export function OfferForm({ validTill }: { validTill: string }) {
           <Field label="Valid till" error={e.validTill}>
             <Input name="validTill" type="date" defaultValue={v("validTill", validTill)} required />
           </Field>
-          <Field label="Use limit" error={e.usageLimit} hint="Leave empty for no limit">
+          <Field label="Usage limit (optional)" error={e.usageLimit} hint="Leave empty for no limit">
             <Input name="usageLimit" type="number" min={1} defaultValue={v("usageLimit")} />
           </Field>
         </div>

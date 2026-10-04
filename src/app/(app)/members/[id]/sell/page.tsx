@@ -22,7 +22,7 @@ export default async function SellPage({ params }: PageProps<"/members/[id]/sell
   return (
     <>
       <PageHeader
-        title={isNew ? `New membership for ${m.name}` : `Renew ${m.name}`}
+        title={isNew ? `New membership for ${m.name}` : `Renew ${m.name.split(" ")[0]}’s membership`}
         subtitle={
           <span className="flex flex-wrap items-center gap-2">
             {m.code} · {m.planName ? `${m.planName} until ${fmtDate(m.latestEnd)}` : "No membership yet"} <MemberStatus status={m.status} />

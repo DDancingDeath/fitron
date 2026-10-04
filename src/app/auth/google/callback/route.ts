@@ -62,7 +62,7 @@ export async function GET(req: NextRequest) {
 /**
  * Google has verified the email, so an unconfirmed account counts as confirmed now. Its password
  * was never proven to belong to this person (anyone can sign up with someone else's address and
- * wait), so it is replaced and any other sessions end; they can set their own with "Forgot your password?".
+ * wait), so it is replaced and any other sessions end; they can set their own with "Forgot password?".
  */
 async function staffIn(userId: string, verifiedAt: Date | null, next: string) {
   if (!verifiedAt) {

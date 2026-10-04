@@ -77,7 +77,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
     : [
         "Member approves the mandate once in their UPI app (use Approve now in demo mode).",
         "A pre-debit notice goes out on WhatsApp 24 hours before each debit.",
-        "Debits run automatically on the renewal date and create the renewal, invoice and payment.",
+        "Debits run automatically at 6:30 am on the renewal date and create the renewal, invoice and payment.",
         `Failed debits retry ${settings.retries} times, ${settings.retryGap} days apart, then halt for manual collection.`,
       ];
   const missing = live ? razorpayReady() : null;

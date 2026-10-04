@@ -39,7 +39,7 @@ export function MandateForm({ members, plans }: { members: { id: string; label: 
       </div>
       <div>
         <Button variant="primary" disabled={pending}>
-          {pending ? "Setting up…" : "Set up autopay"}
+          {pending ? "Sending…" : "Send approval request"}
         </Button>
       </div>
     </form>

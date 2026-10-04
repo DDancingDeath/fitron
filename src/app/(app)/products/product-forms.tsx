@@ -35,7 +35,7 @@ export function ProductForm({ id, values = {}, categories }: { id?: string; valu
         <Field label="Cost price (₹)" error={e.cost} hint="Updated automatically when you receive stock at a new cost.">
           <Input name="cost" inputMode="decimal" defaultValue={v("cost")} />
         </Field>
-        <Field label="Reorder when stock falls to" error={e.reorderLevel}>
+        <Field label="Reorder level" error={e.reorderLevel}>
           <Input name="reorderLevel" type="number" min={0} defaultValue={v("reorderLevel")} />
         </Field>
         <label className="flex items-center gap-2 text-sm">

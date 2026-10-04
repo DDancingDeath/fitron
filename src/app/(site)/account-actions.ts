@@ -20,7 +20,7 @@ export async function signUpGym(_: FormState, fd: FormData): Promise<FormState> 
   const blocked = await limited(fd, "signup", 5);
   if (blocked) return blocked;
   // Signed up with Google: the email is the one Google verified, and there's no password to pick
-  // (they can set one later with "Forgot your password?").
+  // (they can set one later with "Forgot password?").
   const store = await cookies();
   const google = unsign<{ email: string }>(store.get(GOOGLE_SIGNUP_COOKIE)?.value);
   if (google) {

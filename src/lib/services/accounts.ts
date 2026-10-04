@@ -50,7 +50,7 @@ export async function createGymAccount(d: GymSignup, emailVerified = false) {
   const plan = findPlan(d.plan);
   if (!plan || plan.product !== "GYM_ACCOUNTING") throw new UserError("Pick a Gym Accounting plan.", "plan");
   if (await db.user.findUnique({ where: { email: d.email } })) {
-    throw new UserError("There's already an account with this email. Log in, or reset your password.", "email");
+    throw new UserError("There's already an account with this email. Sign in, or reset your password.", "email");
   }
   // Check the logo first so a bad file fails before anything is created.
   let logo: { bytes: Uint8Array; mime: string; ext: string } | null = null;
@@ -94,7 +94,7 @@ export async function createGymAccount(d: GymSignup, emailVerified = false) {
       return owner;
     });
   } catch (e) {
-    if (isUniqueViolation(e)) throw new UserError("There's already an account with this email. Log in, or reset your password.", "email");
+    if (isUniqueViolation(e)) throw new UserError("There's already an account with this email. Sign in, or reset your password.", "email");
     throw e;
   }
   if (logo) {

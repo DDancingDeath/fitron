@@ -39,7 +39,7 @@ export function ExpenseForm({ categories, today }: { categories: { id: string; n
         <Field label="Amount (₹)" error={e.amount}>
           <Input name="amount" inputMode="decimal" defaultValue={sent?.amount} required />
         </Field>
-        <Field label="Paid by" error={e.method}>
+        <Field label="Payment method" error={e.method}>
           <Select name="method" defaultValue={sent?.method ?? "Cash"}>
             {METHODS.map((m) => (
               <option key={m}>{m}</option>
@@ -52,13 +52,13 @@ export function ExpenseForm({ categories, today }: { categories: { id: string; n
         <Field label="Vendor" error={e.vendor}>
           <Input name="vendor" defaultValue={sent?.vendor} />
         </Field>
-        <Field label="Bill no." error={e.billNo}>
+        <Field label="Invoice / bill no." error={e.billNo}>
           <Input name="billNo" defaultValue={sent?.billNo} />
         </Field>
       </div>
       <div>
         <Button variant="primary" disabled={pending}>
-          {pending ? "Saving…" : "Add expense"}
+          {pending ? "Saving…" : "Save expense"}
         </Button>
       </div>
     </form>
