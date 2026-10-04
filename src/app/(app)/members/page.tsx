@@ -198,16 +198,16 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
                   <div className="text-sm font-semibold">
                     {d.name} <span className="text-xs font-normal text-muted">{d.code}</span>
                   </div>
-                  <div className="text-xs text-muted">
-                    Deleted {fmtStamp(d.deletedAt)} by {d.deletedBy}
-                  </div>
+                  <div className="text-xs text-muted">{d.erasedAt ? `Personal data erased ${fmtStamp(d.erasedAt)}` : `Deleted ${fmtStamp(d.deletedAt)} by ${d.deletedBy}`}</div>
                 </div>
-                <form action={bringBackMember.bind(null, d.id)}>
-                  <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
-                    <ArrowCounterClockwiseIcon weight="duotone" />
-                    Restore
-                  </button>
-                </form>
+                {!d.erasedAt && (
+                  <form action={bringBackMember.bind(null, d.id)}>
+                    <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                      <ArrowCounterClockwiseIcon weight="duotone" />
+                      Restore
+                    </button>
+                  </form>
+                )}
               </div>
             ))}
         </section>

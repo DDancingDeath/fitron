@@ -110,10 +110,11 @@ export async function editRule(u: CurrentUser, key: string, input: RuleInput & {
 
 /** Everything a template can mention about a member right now. */
 export async function memberVars(orgId: string, memberId: string, extra: TemplateVars = {}): Promise<TemplateVars> {
-  const [m, gym, tax] = await Promise.all([
+  const [m, gym, tax, privacy] = await Promise.all([
     db.member.findUniqueOrThrow({ where: { id: memberId } }),
     getSetting<{ name?: string }>(orgId, "gym"),
     getTax(orgId),
+    getSetting<{ officer?: string; email?: string; phone?: string }>(orgId, "privacy"),
   ]);
   const [s, current, org] = await Promise.all([
     summarize([memberId]).then((x) => x.get(memberId)!),
@@ -131,6 +132,9 @@ export async function memberVars(orgId: string, memberId: string, extra: Templat
     amount: rupeesText(renewal),
     pending_amount: rupeesText(s.outstanding),
     gym_name: gym?.name ?? org.name,
+    grievance_officer: privacy?.officer ?? "",
+    grievance_email: privacy?.email ?? "",
+    grievance_phone: privacy?.phone ?? "",
     ...extra,
   };
 }
@@ -164,7 +168,8 @@ export async function prepareMessage(o: SendOpts & { holdUntil?: Date | null }) 
   if (!tpl) throw new UserError("Template not found.");
   if (o.auto && !tpl.autoSend) return null;
   const member = await db.member.findUniqueOrThrow({ where: { id: o.memberId } });
-  if (member.walkIn) return null;
+  // Nothing is ever rendered for the walk-in counter or a member whose personal data was erased (DPDP).
+  if (member.walkIn || member.erasedAt) return null;
   if (!o.force && REMINDER_KEYS.includes(o.key)) {
     const since = new Date(Date.now() - settings.dedupDays * 86_400_000);
     const recent = await db.whatsAppMessage.findFirst({ where: { memberId: o.memberId, templateKey: o.key, sentAt: { gte: since }, status: { not: "Failed" } } });

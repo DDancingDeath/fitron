@@ -46,4 +46,5 @@ export const SETTINGS_TABS: Tab[] = [
   { href: "/settings/billing", label: "Subscription" },
   { href: "/settings?tab=branches", label: "Branches" },
   { href: "/staff?tab=perm", label: "Roles & access", perm: "staff.manage" },
+  { href: "/settings?tab=privacy", label: "Privacy & DPDP" },
 ];

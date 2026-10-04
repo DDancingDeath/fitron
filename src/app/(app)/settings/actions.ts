@@ -8,7 +8,11 @@ import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } fr
 import { getWaSettings, sendTest, setLinked } from "@/lib/services/whatsapp";
 import { connectorLogout, connectorStatus, providerReady } from "@/lib/integrations/whatsapp";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
-import { aiInput, autopayInput, branchInput, gymInput, numberingInput, privacyInput, reminderInput, taxInput } from "@/lib/validation/settings";
+import { aiInput, autopayInput, branchInput, cookieNoticeInput, gymInput, numberingInput, privacyNoticeInput, privacyOfficerInput, reminderInput, taxInput } from "@/lib/validation/settings";
+import { assertCanErase, eraseCheck, eraseMember, findMemberByCode, savePrivacyNotice as storeNotice } from "@/lib/services/privacy";
+import { NOTICE_KEYS, type NoticeKey } from "@/lib/domain/privacy";
+import { todayIso } from "@/lib/services/time";
+import { fmtDate, formatRupees } from "@/lib/format";
 import { checkAutopayConnection } from "@/lib/services/autopay";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
@@ -40,12 +44,66 @@ export async function saveGym(fd: FormData) {
   });
 }
 
-/** Settings › Privacy & DPDP (Setting `privacy`, audited). */
-export async function savePrivacy(fd: FormData) {
+/** Settings › Privacy & DPDP › Grievance Officer and retention (Setting `privacy`, audited). */
+export async function savePrivacyOfficer(fd: FormData) {
   const u = await requirePermission("settings.manage");
-  await save(privacyInput, fd, "privacy", async (v) => {
-    await putSetting(u, "privacy", { officer: v.officer, email: v.email, phone: v.phone ?? "", retainMonths: v.retainMonths });
+  await save(privacyOfficerInput, fd, "privacy", async (v) => {
+    await putSetting(u, "privacy", { officer: v.officer ?? "", email: v.email ?? "", phone: v.phone ?? "", retainMonths: v.retainMonths });
   });
+}
+
+/** The gym's privacy notice: stores only the sections edited away from the template; Reset to template clears them. */
+export async function savePrivacyNotice(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  await save(privacyNoticeInput, fd, "privacy", async (v) => {
+    if (v.reset) await storeNotice(u, null);
+    else await storeNotice(u, Object.fromEntries(NOTICE_KEYS.map((k) => [k, v[`n_${k}`]])) as Record<NoticeKey, string>);
+  });
+}
+
+export async function saveCookieNotice(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  await save(cookieNoticeInput, fd, "privacy", async (v) => {
+    await putSetting(u, "privacy", { cookieNotice: v.cookieNotice, noticeUpdatedAt: todayIso() });
+  });
+}
+
+type EraseLookup = { error: string } | { name: string; code: string; outstanding: number; activeTill: string | null; erased: string | null };
+
+/** What stands in the way of erasing the member typed in Settings › Privacy & DPDP (never throws to the client). */
+export async function lookupForErase(code: string): Promise<EraseLookup> {
+  const u = await requirePermission("settings.manage");
+  try {
+    assertCanErase(u);
+    const m = await findMemberByCode(u, String(code ?? ""));
+    if (!m) return { error: "No member with that ID." };
+    if (m.erasedAt) return { error: `This member's personal data was already erased on ${fmtDate(m.erasedAt)}.` };
+    const c = await eraseCheck(m.id);
+    if (c.outstanding > 0) return { error: `Settle the ${formatRupees(c.outstanding)} balance before erasing.` };
+    if (c.activeTill || c.mandateOpen) return { error: `${m.name} is still a member till ${fmtDate(c.activeTill ?? todayIso())}. End the membership (and any autopay mandate) before erasing.` };
+    return { name: m.name, code: m.code, outstanding: c.outstanding, activeTill: c.activeTill, erased: null };
+  } catch (e) {
+    if (e instanceof UserError) return { error: e.message };
+    throw e;
+  }
+}
+
+/** Erases the member's personal data with a reason; invoices and payments keep only the member ID. */
+export async function eraseMemberAction(_: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("settings.manage");
+  try {
+    assertCanErase(u);
+    const reason = String(fd.get("reason") ?? "").trim();
+    if (reason.length < 3) return { message: "Give a reason.", errors: { reason: ["Give a reason."] } };
+    const m = await findMemberByCode(u, String(fd.get("member") ?? ""));
+    if (!m) return { message: "No member with that ID." };
+    await eraseMember(u, m.id, reason);
+  } catch (e) {
+    if (e instanceof UserError) return { message: e.message };
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  redirect(`/settings?${new URLSearchParams({ tab: "privacy", saved: "privacy", msg: "Personal data erased" })}`);
 }
 
 /** Uploads a new gym logo (a PNG from the crop dialog), or goes back to the default with intent=remove. */

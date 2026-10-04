@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { indianPhone, rupees } from "./common";
 import { memberInput } from "./member";
 import { planInput } from "./plan";
-import { gymInput, taxInput } from "./settings";
+import { cookieNoticeInput, gymInput, privacyOfficerInput, taxInput } from "./settings";
 
 describe("indianPhone", () => {
   it.each([
@@ -99,5 +99,27 @@ describe("taxInput", () => {
     expect(taxInput.safeParse({ ...base, sac: "12" }).success).toBe(false);
     expect(taxInput.safeParse({ ...base, invoicePrefix: "IN V" }).success).toBe(false);
     expect(taxInput.parse({ ...base, sac: "" }).sac).toBeUndefined();
+  });
+});
+
+describe("privacyOfficerInput", () => {
+  it("accepts blanks and defaults retention to 24 months", () => {
+    expect(privacyOfficerInput.parse({ officer: "", email: "", phone: "", retainMonths: "" })).toEqual({ officer: undefined, email: undefined, phone: undefined, retainMonths: 24 });
+  });
+  it("coerces and bounds the retention months", () => {
+    expect(privacyOfficerInput.parse({ officer: " Asha Rao ", email: "Privacy@Gym.in", phone: "98765 43210", retainMonths: "12" })).toEqual({ officer: "Asha Rao", email: "privacy@gym.in", phone: "9876543210", retainMonths: 12 });
+    expect(privacyOfficerInput.parse({ retainMonths: "0" }).retainMonths).toBe(0);
+    expect(privacyOfficerInput.safeParse({ retainMonths: "121" }).success).toBe(false);
+  });
+  it("rejects a bad email and a 9-digit phone", () => {
+    expect(privacyOfficerInput.safeParse({ email: "not-an-email" }).success).toBe(false);
+    expect(privacyOfficerInput.safeParse({ phone: "987654321" }).success).toBe(false);
+  });
+});
+
+describe("cookieNoticeInput", () => {
+  it("needs at least a sentence", () => {
+    expect(cookieNoticeInput.safeParse({ cookieNotice: "short" }).success).toBe(false);
+    expect(cookieNoticeInput.parse({ cookieNotice: "  We use essential storage only.  " }).cookieNotice).toBe("We use essential storage only.");
   });
 });

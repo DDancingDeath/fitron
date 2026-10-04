@@ -14,6 +14,7 @@ import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
 import { getGymProfile, getIdleMinutes } from "@/lib/services/settings";
 import { IdleSignout } from "@/components/idle-signout";
+import { CookieBanner } from "@/components/cookie-banner";
 import { getSubscriptionSettings } from "@/lib/services/subscription";
 import { getAiSettings } from "@/lib/services/ai-settings";
 import { gymLogoUrl } from "@/components/gym-logo";
@@ -120,6 +121,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       </div>
       {u.can("ai.use") && ai.enabled && <AskAi />}
       <IdleSignout minutes={idleMinutes} />
+      <CookieBanner />
     </div>
   );
 }

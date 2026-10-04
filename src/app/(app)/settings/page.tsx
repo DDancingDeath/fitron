@@ -1,6 +1,11 @@
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
-import { getGymProfile, getPrivacy, getSetting } from "@/lib/services/settings";
+import { getGymProfile, getSetting } from "@/lib/services/settings";
+import { countConsented, getPrivacySettings, listPrivacyRequests } from "@/lib/services/privacy";
+import { renderNotice } from "@/lib/domain/privacy";
+import { memberOptions } from "@/lib/services/members";
+import { PrivacyRequestForms } from "./privacy-forms";
+import { ChangeCookieChoice } from "@/components/cookie-banner";
 import { getTax } from "@/lib/services/tax";
 import { nextInvoiceNumber } from "@/lib/services/billing";
 import { Button, Field, Input, LinkButton, Notice, Select, Textarea } from "@/components/ui";
@@ -8,14 +13,14 @@ import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveNumbering, savePrivacy, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
+import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveCookieNotice, saveNumbering, savePrivacyNotice, savePrivacyOfficer, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
 import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
 import { reminderSchedule } from "@/lib/services/reminders";
 import { LinkWatcher } from "./link-watcher";
 import { Dialog } from "@/components/dialog";
 import { ConfirmButton } from "@/components/confirm-button";
 import { PaperPlaneTiltIcon, PlugsIcon, QrCodeIcon, WhatsappLogoIcon } from "@phosphor-icons/react/dist/ssr";
-import { fmtClock, fmtShort, fmtTime } from "@/lib/format";
+import { fmtClock, fmtDate, fmtShort, fmtStamp, fmtTime } from "@/lib/format";
 import { providerReady } from "@/lib/integrations/whatsapp";
 import { getAccessRules } from "@/lib/services/attendance";
 import { JOBS, recentRuns } from "@/lib/services/jobs";
@@ -88,7 +93,13 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           };
         })()
       : null;
-  const privacy = tab === "privacy" ? await getPrivacy(u.orgId) : null;
+  const privacy =
+    tab === "privacy"
+      ? await (async () => {
+          const [settings, consent, requests, options] = await Promise.all([getPrivacySettings(u.orgId), countConsented(u), listPrivacyRequests(u), memberOptions(u)]);
+          return { settings, consent, requests, options, notice: renderNotice(settings, gym.name) };
+        })()
+      : null;
   const trainerCode = tab === "gym" ? (await db.organization.findUniqueOrThrow({ where: { id: u.orgId }, select: { trainerCode: true } })).trainerCode : null;
   const integrations =
     tab === "int"
@@ -418,26 +429,85 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </div>
       )}
       {tab === "privacy" && privacy && (
-        <Panel title="Privacy & DPDP" className="max-w-[560px]">
-          <p className="text-sm text-muted">Members can ask who handles their data. The grievance officer is named on the member consent and in data requests.</p>
-          <form action={savePrivacy} className="flex flex-col gap-[18px]">
-            <Field label="Grievance Officer name">
-              <Input name="officer" defaultValue={privacy.officer ?? ""} placeholder="Full name" required minLength={2} maxLength={80} />
-            </Field>
-            <Field label="Grievance email">
-              <Input name="email" type="email" defaultValue={privacy.email ?? ""} placeholder="privacy@yourgym.in" required />
-            </Field>
-            <Field label="Grievance phone">
-              <Input name="phone" type="tel" inputMode="numeric" defaultValue={privacy.phone ?? ""} placeholder="10-digit number" />
-            </Field>
-            <Field label="Keep data after membership ends (months)">
-              <Input name="retainMonths" type="number" min={1} max={120} defaultValue={privacy.retainMonths ?? 24} required className="max-w-[160px]" />
-            </Field>
+        <div className="flex max-w-[860px] flex-col gap-7">
+          <p className="m-0 text-[13px] text-muted">Built to support the Digital Personal Data Protection Act, 2023. This is a working template, not legal advice. Have a lawyer review it before you publish it.</p>
+          <Panel title="Grievance Officer">
+            <p className="m-0 text-[13px] text-muted">Members contact this person about their data. Shown in the privacy notice and member messages.</p>
+            <form action={savePrivacyOfficer} className="flex flex-col gap-[18px]">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <Field label="Grievance Officer name">
+                  <Input name="officer" defaultValue={privacy.settings.officer ?? ""} placeholder="Full name" maxLength={120} />
+                </Field>
+                <Field label="Grievance email">
+                  <Input name="email" type="email" defaultValue={privacy.settings.email ?? ""} placeholder="privacy@yourgym.in" />
+                </Field>
+                <Field label="Grievance phone">
+                  <Input name="phone" type="tel" inputMode="numeric" defaultValue={privacy.settings.phone ?? ""} placeholder="10-digit number" />
+                </Field>
+                <Field label="Keep data after membership ends (months)" hint="0 keeps data until you erase it by hand.">
+                  <Input name="retainMonths" type="number" min={0} max={120} defaultValue={privacy.settings.retainMonths} placeholder="24" />
+                </Field>
+              </div>
+              <div>
+                <Button variant="primary">Save</Button>
+              </div>
+            </form>
+          </Panel>
+          <Panel title="Member rights requests">
+            <p className="m-0 text-[13px] text-muted">
+              {privacy.consent.consented} of {privacy.consent.total} members have given consent. Respond to requests within the time your policy promises.
+            </p>
+            <PrivacyRequestForms options={privacy.options.map((o) => ({ id: o.id, label: o.label }))} />
+            {privacy.requests.length > 0 && (
+              <div className="flex flex-col">
+                {privacy.requests.map((r) => (
+                  <div key={r.id} className="flex justify-between gap-3 border-b border-line py-1.5 text-[13px]">
+                    <span>
+                      {fmtStamp(r.at)} · {r.type} · {r.who}
+                    </span>
+                    <span className="text-accent">{r.status}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+          <Panel title="Privacy notice" id="privacy-policy">
+            <p className="m-0 text-xs text-muted">Last updated {fmtDate(privacy.settings.noticeUpdatedAt ?? todayIso())}</p>
+            <form action={savePrivacyNotice} className="flex flex-col gap-[18px]">
+              {privacy.notice.map((n) => (
+                <div key={n.key} className="flex flex-col gap-1.5">
+                  <h4 className="m-0 text-base font-semibold">{n.title}</h4>
+                  <Textarea name={`n_${n.key}`} rows={3} maxLength={2000} defaultValue={n.text} />
+                </div>
+              ))}
+              <div className="flex flex-col gap-1.5">
+                <h4 className="m-0 text-base font-semibold">Grievance Officer</h4>
+                {privacy.settings.officer || privacy.settings.email || privacy.settings.phone ? (
+                  <p className="m-0 text-sm">{[privacy.settings.officer, privacy.settings.email, privacy.settings.phone].filter(Boolean).join(" · ")}</p>
+                ) : (
+                  <p className="m-0 text-sm text-muted">Not set yet — fill in the Grievance Officer above.</p>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary">Save notice</Button>
+                <ConfirmButton variant="ghost" type="submit" name="reset" value="1" confirm="Replace your edited notice with Fitron's template?">
+                  Reset to template
+                </ConfirmButton>
+              </div>
+            </form>
+          </Panel>
+          <Panel title="Cookie and storage notice" id="cookie-policy">
+            <form action={saveCookieNotice} className="flex flex-col gap-[18px]">
+              <Textarea name="cookieNotice" rows={4} maxLength={1000} defaultValue={privacy.settings.cookieNotice} />
+              <div>
+                <Button variant="primary">Save</Button>
+              </div>
+            </form>
             <div>
-              <Button variant="primary">Save</Button>
+              <ChangeCookieChoice />
             </div>
-          </form>
-        </Panel>
+          </Panel>
+        </div>
       )}
       {tab === "branches" && (
         <Panel title="Branches">
