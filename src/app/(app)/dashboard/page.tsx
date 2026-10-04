@@ -23,6 +23,7 @@ import { dailyBrief, type Alert } from "@/lib/services/insights";
 import { PERIODS, isPeriod, monthLabel, type PeriodKey } from "@/lib/domain/periods";
 import { Notice, cx } from "@/components/ui";
 import { fmtMonthShort, fmtShort, formatRupees, initials } from "@/lib/format";
+import { BranchRow } from "./branch-row";
 import { QuickActions, type QuickKey } from "./quick-actions";
 
 export const metadata = { title: "Dashboard · Fitron" };
@@ -132,7 +133,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
         ))}
       </div>
 
-      {d.branches && u.has("analytics") && <BranchComparison rows={d.branches} fin={d.fin} />}
+      {d.branches && u.has("analytics") && <BranchComparison rows={d.branches} />}
       {d.branches && !u.has("analytics") && (
         <Notice tone="accent">
           Branch comparison (consolidated figures, branch by branch) is on the Enterprise plan.{" "}
@@ -302,6 +303,7 @@ function cards(d: Dashboard, role: string, pLabel: string, period: PeriodKey) {
         { label: "Lead follow-ups", value: num(f.followUps), sub: "due today", href: "/leads?due=1" },
         { label: "Class bookings", value: num(f.bookings), sub: "today", href: "/classes" },
         { label: "Birthdays", value: num(f.birthdays), sub: "today" },
+        { label: "Frozen", value: num(f.frozen), sub: "memberships on hold" },
       ] satisfies Kpi[],
     };
   }
@@ -535,7 +537,7 @@ function Methods({ methods }: { methods: Dashboard["methods"] }) {
   );
 }
 
-function BranchComparison({ rows, fin }: { rows: NonNullable<Dashboard["branches"]>; fin: boolean }) {
+function BranchComparison({ rows }: { rows: NonNullable<Dashboard["branches"]> }) {
   const max = Math.max(1, ...rows.map((r) => r.collected));
   const total = rows.reduce((t, r) => ({ active: t.active + r.active, collected: t.collected + r.collected, expenses: t.expenses + r.expenses }), { active: 0, collected: 0, expenses: 0 });
   const th = "border-b border-line p-2.5 text-left text-[11px] font-normal tracking-[0.08em] text-fg/60 uppercase";
@@ -544,7 +546,7 @@ function BranchComparison({ rows, fin }: { rows: NonNullable<Dashboard["branches
     <section className="flex flex-col gap-3.5 rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm">
       <div>
         <h3 className="m-0 text-lg">Branch comparison</h3>
-        <div className="text-xs text-muted">Consolidated view · switch branch at the top to open one</div>
+        <div className="text-xs text-muted">Consolidated view · click a branch to open it</div>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
@@ -555,14 +557,14 @@ function BranchComparison({ rows, fin }: { rows: NonNullable<Dashboard["branches
               <th className={cx(th, "text-right")}>Checked in today</th>
               <th className={cx(th, "text-right")}>Expiring 7 d</th>
               <th className={cx(th, "min-w-[180px]")}>Collections</th>
-              {fin && <th className={cx(th, "text-right")}>Expenses</th>}
-              {fin && <th className={cx(th, "text-right")}>Net</th>}
+              <th className={cx(th, "text-right")}>Expenses</th>
+              <th className={cx(th, "text-right")}>Net</th>
               <th className={cx(th, "text-right")}>Outstanding</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.id} className="hover:bg-fg/4">
+              <BranchRow key={r.id} id={r.id} name={r.name}>
                 <td className={cx(td, "font-semibold")}>{r.name}</td>
                 <td className={cx(td, "text-right")}>
                   {num(r.active)}
@@ -578,10 +580,10 @@ function BranchComparison({ rows, fin }: { rows: NonNullable<Dashboard["branches
                     <span className="whitespace-nowrap">{inr(r.collected)}</span>
                   </div>
                 </td>
-                {fin && <td className={cx(td, "text-right")}>{inr(r.expenses)}</td>}
-                {fin && <td className={cx(td, "text-right", r.net < 0 && "text-alert")}>{inr(r.net)}</td>}
+                <td className={cx(td, "text-right")}>{inr(r.expenses)}</td>
+                <td className={cx(td, "text-right", r.net < 0 && "text-alert")}>{inr(r.net)}</td>
                 <td className={cx(td, "text-right")}>{inr(r.due)}</td>
-              </tr>
+              </BranchRow>
             ))}
             <tr>
               <td className={cx(td, "font-semibold")}>Total</td>
@@ -589,8 +591,8 @@ function BranchComparison({ rows, fin }: { rows: NonNullable<Dashboard["branches
               <td className={td} />
               <td className={td} />
               <td className={cx(td, "font-semibold")}>{inr(total.collected)}</td>
-              {fin && <td className={cx(td, "text-right font-semibold")}>{inr(total.expenses)}</td>}
-              {fin && <td className={cx(td, "text-right font-semibold")}>{inr(total.collected - total.expenses)}</td>}
+              <td className={cx(td, "text-right font-semibold")}>{inr(total.expenses)}</td>
+              <td className={cx(td, "text-right font-semibold")}>{inr(total.collected - total.expenses)}</td>
               <td className={td} />
             </tr>
           </tbody>

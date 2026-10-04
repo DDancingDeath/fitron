@@ -27,6 +27,16 @@ export async function frozenBlocks(memberIds: string[], today = todayIso()) {
   return out;
 }
 
+/** Members whose freeze is still on hold (running now or scheduled to start later). */
+export async function frozenMemberIds(memberIds: string[], today = todayIso()): Promise<Set<string>> {
+  if (memberIds.length === 0) return new Set();
+  const fs = await db.membershipFreeze.findMany({
+    where: { memberId: { in: memberIds }, endedOn: null, fromDate: { gte: fromIso(addDays(today, -89)) } },
+    select: { memberId: true, fromDate: true, days: true, endedOn: true },
+  });
+  return new Set(fs.filter((f) => freezeOpen(like(f), today)).map((f) => f.memberId));
+}
+
 async function ownMember(u: CurrentUser, memberId: string) {
   const m = await db.member.findFirst({ where: { ...memberScope(u), id: memberId, walkIn: false } });
   if (!m) throw new UserError("Member not found.");
