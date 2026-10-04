@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   experimental: {
-    // Data import sends up to 5,000 CSV rows, and member documents up to 10 MB, to server actions.
-    serverActions: { bodySizeLimit: "12mb" },
+    // Data import sends up to 5,000 CSV rows, member documents up to 10 MB, and backup files
+    // (Settings › Backup › Restore from file) up to 60 MB, to server actions.
+    serverActions: { bodySizeLimit: "64mb" },
   },
   // The invoice PDF reads its font from disk; ship it with the server build.
   outputFileTracingIncludes: {

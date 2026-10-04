@@ -16,6 +16,7 @@ export const NOTIFICATION_PERMS = {
   JOB_FAILED: "settings.manage",
   AI_BRIEF: "ai.use",
   BILLING: "settings.manage",
+  BACKUP_DUE: "settings.manage",
 } as const;
 export type NotificationType = keyof typeof NOTIFICATION_PERMS;
 

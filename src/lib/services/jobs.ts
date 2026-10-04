@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { runAutopayDay } from "./autopay";
+import { backupNudge, createBackup, pruneBackups } from "./backup";
+import { sizeText } from "@/lib/domain/backup";
 import { isUniqueViolation } from "./errors";
 import { notify } from "./notifications";
 import { computeRisk, dailyBrief } from "./insights";
@@ -124,6 +126,20 @@ export const JOBS: Job[] = [
     name: "whatsapp.dispatch",
     label: "Send messages held by quiet hours",
     run: (orgId, _today, now) => dispatchScheduled(orgId, now),
+  },
+  {
+    name: "backup.auto",
+    label: "Backup of all data, kept 30 days",
+    async run(orgId, _today, now) {
+      const b = await createBackup({ orgId, userId: null }, "AUTO", now);
+      const pruned = await pruneBackups(orgId, now);
+      return { size: sizeText(b.size), pruned };
+    },
+  },
+  {
+    name: "backup.nudge",
+    label: "Weekly backup reminder",
+    run: (orgId, _today, now) => backupNudge(orgId, now),
   },
 ];
 

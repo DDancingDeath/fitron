@@ -1,10 +1,10 @@
 /** How serious an audit entry is, from its action, as in the prototype's audit log. */
 export type Severity = "High" | "Medium" | "Low";
 
-/** Reversals, cancellations, deletions, unlocks, overrides and role or access changes. */
-export const HIGH_WORDS = ["reverse", "cancel", "delete", "remove", "unlock", "void", "override", "role", "deactivate", "erase"];
+/** Reversals, cancellations, deletions, restores, unlocks, overrides and role or access changes. */
+export const HIGH_WORDS = ["reverse", "cancel", "delete", "remove", "unlock", "void", "override", "role", "deactivate", "erase", "restore"];
 /** Edits to existing records, locks and settings. */
-export const MEDIUM_WORDS = ["update", "lock", "setting", "restore", "suspend", "price", "transfer"];
+export const MEDIUM_WORDS = ["update", "lock", "setting", "suspend", "price", "transfer"];
 
 export function severityOf(action: string, entity = ""): Severity {
   const a = `${action} ${entity}`.toLowerCase();
@@ -22,7 +22,7 @@ const MODULES: [string, string[]][] = [
   ["POS", ["Product"]],
   ["Leads", ["Lead"]],
   ["Staff & devices", ["User", "Role", "Device"]],
-  ["Settings", ["Setting", "Branch", "MembershipPlan", "Offer", "WhatsAppTemplate"]],
+  ["Settings", ["Setting", "Branch", "MembershipPlan", "Offer", "WhatsAppTemplate", "Backup"]],
 ];
 
 /** The prototype's module for a record type. */

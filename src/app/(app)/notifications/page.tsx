@@ -6,6 +6,7 @@ import {
   BellIcon,
   CakeIcon,
   CalendarXIcon,
+  DatabaseIcon,
   DoorOpenIcon,
   FunnelIcon,
   GearSixIcon,
@@ -39,6 +40,7 @@ const TYPE: Record<string, [string, Icon]> = {
   JOB_FAILED: ["Daily job failed", GearSixIcon],
   AI_BRIEF: ["Fitron AI brief", SparkleIcon],
   BILLING: ["Fitron billing", ArrowsClockwiseIcon],
+  BACKUP_DUE: ["Backup due", DatabaseIcon],
 };
 const ALERTING = /fail|^Low |override/i;
 

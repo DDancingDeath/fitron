@@ -48,6 +48,7 @@ model Organization {
   /// Short code members type into the AI Trainer to link to this gym (Gym Partnership); made on demand
   trainerCode       String?            @unique
   trainerMembers    TrainerMember[]
+  backups           Backup[]
 }
 
 model Branch {
@@ -1095,6 +1096,35 @@ model MemberDocument {
   deleteReason String?
 
   @@index([memberId, status])
+}
+
+// ── Backups (Settings › Backup) ────────────────────────────────────────────
+
+/// A complete copy of one gym's data as a JSON file in private storage (src/lib/services/backup.ts).
+model Backup {
+  id           String       @id @default(cuid())
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  /// MANUAL (Back up now) | AUTO (daily job) | PRE_RESTORE (safety copy taken before a restore)
+  kind         String
+  /// Private storage key: <orgId>/backups/<id>.json
+  storageKey   String       @unique
+  fileName     String
+  size         Int
+  sha256       String
+  /// File format version (src/lib/domain/backup.ts BACKUP_FORMAT)
+  format       Int          @default(1)
+  /// {members, invoices, payments, expenses, ...} as written in the file
+  counts       Json
+  tables       Int
+  rows         Int
+  createdById  String?
+  createdAt    DateTime     @default(now()) @db.Timestamptz
+  downloadedAt DateTime?    @db.Timestamptz
+  restoredAt   DateTime?    @db.Timestamptz
+  restoredById String?
+
+  @@index([orgId, createdAt])
 }
 
 // ── fitron.in website ───────────────────────────────────────────────────────

@@ -40,6 +40,7 @@ export const SETTINGS_TABS: Tab[] = [
   { href: "/settings?tab=wa", label: "WhatsApp" },
   { href: "/settings?tab=int", label: "Integrations & AI" },
   { href: "/settings/import", label: "Migrate & import", perm: "import.run" },
+  { href: "/settings/backup", label: "Backup" },
   { href: "/settings/jobs", label: "Daily jobs" },
   { href: "/settings/billing", label: "Subscription" },
   { href: "/settings?tab=branches", label: "Branches" },
