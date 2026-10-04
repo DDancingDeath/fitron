@@ -9,4 +9,4 @@ export const STATUS_LABEL: Record<MembershipStatus, string> = {
   SUSPENDED: "Suspended",
 };
 /** Member status as the prototype's uppercase tag ("EXPIRING SOON"). */
-export const MemberStatus = ({ status }: { status: MembershipStatus }) => <Tag label={STATUS_LABEL[status].toUpperCase()} />;
+export const MemberStatus = ({ status, className }: { status: MembershipStatus; className?: string }) => <Tag label={STATUS_LABEL[status].toUpperCase()} className={className} />;

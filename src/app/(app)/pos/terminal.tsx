@@ -166,7 +166,7 @@ export function Terminal({ products, members, taxRate }: { products: P[]; member
         <input type="hidden" name="txnRef" value="" />
         <button
           disabled={pending || !lines.length}
-          className="inline-flex min-h-[38px] items-center justify-center rounded-md bg-accent p-3 text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
+          className="inline-flex py-2.5 leading-[1.2] items-center justify-center rounded-md bg-accent p-3 text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45"
         >
           {pending ? "Recording…" : `Charge ${money(total)} and print receipt`}
         </button>

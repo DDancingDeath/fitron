@@ -50,7 +50,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
                 Purchase bill
               </LinkButton>
             )}
-            <a href={csv} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+            <a href={csv} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
               <DownloadSimpleIcon size={16} weight="duotone" />
               Export CSV
             </a>

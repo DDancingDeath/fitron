@@ -64,7 +64,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/whatsap
           <>
             {settings.mode === "connector" && (
               <form action={refreshAction}>
-                <button className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Refresh statuses</button>
+                <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Refresh statuses</button>
               </form>
             )}
             <LinkButton href="/whatsapp/send" variant="primary">
@@ -129,7 +129,7 @@ async function Templates({ u, templates, settings, canSettings }: { u: U; templa
           </div>
           {canSettings && (
             <form action={runAutomationAction}>
-              <button disabled={!due} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
+              <button disabled={!due} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
                 <LightningIcon size={16} weight="duotone" />
                 Send {due} due now
               </button>
@@ -199,7 +199,7 @@ async function RuleDialog({ u, templates, settings, tkey }: { u: U; templates: T
   );
 }
 
-const dialogBtn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+const dialogBtn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
 
 /** "Preview & run": who the rule reaches today, who it skips, and a button to send to them now. */
 async function PreviewDialog({ u, tkey, error }: { u: U; tkey: string; error?: string }) {

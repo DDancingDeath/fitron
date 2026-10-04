@@ -23,7 +23,7 @@ const STYLE_OF: Record<string, number> = {
 export function Tag({ label, children, className }: { label: string; children?: ReactNode; className?: string }) {
   const i = STYLE_OF[label];
   return (
-    <span className={cx("inline-flex items-center rounded-sm border px-2.5 py-[3px] text-[11px] tracking-[0.02em] whitespace-nowrap", i === undefined ? NEUTRAL : STYLES[i], className)}>
+    <span className={cx("inline-flex items-center rounded-[1.5px] border px-2.5 py-[3px] text-[11px] tracking-[0.02em] whitespace-nowrap", i === undefined ? NEUTRAL : STYLES[i], className)}>
       {children ?? label}
     </span>
   );

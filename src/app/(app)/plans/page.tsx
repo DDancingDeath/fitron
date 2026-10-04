@@ -15,7 +15,7 @@ import { changePlanStatus, removePlan, toggleOffer } from "./actions";
 
 export const metadata = { title: "Plans & offers · Fitron" };
 
-const ghost = "inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
+const ghost = "inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
 
 export default async function PlansPage({ searchParams }: PageProps<"/plans">) {
   const u = await requirePermission("plans.manage");

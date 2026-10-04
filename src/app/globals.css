@@ -134,6 +134,10 @@
   --color-neutral-700: var(--neutral-700);
   --color-neutral-900: var(--neutral-900);
   --font-serif: var(--font-source-serif);
+  /* The prototype sets font sizes only and inherits the 1.55 body line-height. */
+  --text-xs--line-height: 1.55;
+  --text-sm--line-height: 1.55;
+  --text-base--line-height: 1.55;
   /* The prototype's corners are nearly square: 1px, 2px, 4px. */
   --radius-sm: 1px;
   --radius-md: 2px;
@@ -154,7 +158,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: var(--font-source-serif), Georgia, serif;
+  font-family: var(--font-source-serif), system-ui, sans-serif;
 }
 
 /* The prototype's base type scale (Broadsheet styles.css): 15px / 1.55 body, tight 600-weight headings. */

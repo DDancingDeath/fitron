@@ -98,14 +98,14 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
           <>
             {!live && (
               <form action={runDueAction}>
-                <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                   <PlayIcon size={16} weight="duotone" />
                   Run today’s debits
                 </button>
               </form>
             )}
             <form action={syncAction.bind(null, fq)}>
-              <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+              <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                 <ArrowsClockwiseIcon size={16} weight="duotone" />
                 Sync with Razorpay
               </button>

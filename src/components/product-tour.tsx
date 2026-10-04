@@ -171,10 +171,10 @@ export function ProductTour({ firstName, email, sections }: { firstName: string;
               ))}
             </div>
             <div className="flex flex-wrap justify-between gap-2">
-              <button type="button" onClick={() => end(false)} className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent hover:bg-accent/10">
+              <button type="button" onClick={() => end(false)} className="inline-flex py-2.5 items-center justify-center gap-1.5 rounded-md border border-transparent px-1.5 text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent hover:bg-accent/10">
                 Skip tour
               </button>
-              <button type="button" onClick={() => go(0)} className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border border-transparent bg-accent px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent-ink hover:bg-accent-hover">
+              <button type="button" onClick={() => go(0)} className="inline-flex py-2.5 items-center justify-center gap-1.5 rounded-md border border-transparent bg-accent px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent-ink hover:bg-accent-hover">
                 <PlayIcon weight="duotone" />
                 Start auto tour
               </button>
@@ -226,7 +226,7 @@ export function ProductTour({ firstName, email, sections }: { firstName: string;
               </div>
             </div>
             <div className="flex items-center justify-between gap-2.5 border-t border-line bg-bg px-[18px] py-3.5">
-              <button type="button" onClick={() => go(i - 1)} className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border border-line px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap hover:bg-fg/7">
+              <button type="button" onClick={() => go(i - 1)} className="inline-flex py-2.5 items-center justify-center gap-1.5 rounded-md border border-line px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap hover:bg-fg/7">
                 <ArrowLeftIcon weight="duotone" />
                 Back
               </button>
@@ -234,7 +234,7 @@ export function ProductTour({ firstName, email, sections }: { firstName: string;
                 {auto ? <PauseIcon weight="duotone" /> : <PlayIcon weight="duotone" />}
                 {auto ? "Pause" : "Auto-play"} · {n - i - 1} left
               </button>
-              <button type="button" onClick={() => go(i + 1)} className="inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md border border-transparent bg-accent px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent-ink hover:bg-accent-hover">
+              <button type="button" onClick={() => go(i + 1)} className="inline-flex py-2.5 items-center justify-center gap-1.5 rounded-md border border-transparent bg-accent px-[18px] text-sm leading-[1.2] font-semibold whitespace-nowrap text-accent-ink hover:bg-accent-hover">
                 {i + 1 >= n ? "Finish tour" : "Next"}
                 <ArrowRightIcon weight="duotone" />
               </button>

@@ -108,7 +108,7 @@ export default async function NotificationsPage() {
         title="Notifications"
         actions={
           <form action={readAll}>
-            <button className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Mark all read</button>
+            <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Mark all read</button>
           </form>
         }
       />

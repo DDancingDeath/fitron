@@ -100,7 +100,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
             <span>
               {todayLong} · {branchLabel}
             </span>
-            {ROLE_TITLE[role] && <span className="rounded-full border border-accent/50 px-2 py-0.5 text-accent">{ROLE_TITLE[role]}</span>}
+            {ROLE_TITLE[role] && <span className="rounded-[10px] border border-accent-300 px-2 py-0.5 text-accent">{ROLE_TITLE[role]}</span>}
           </div>
           <h1 className="mt-2 text-[clamp(30px,4vw,44px)] leading-[1.05] tracking-[-0.01em]">
             Good {greet}, <em className="text-accent">{u.name.split(" ")[0]}.</em>
@@ -111,20 +111,20 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
 
       <QuickActions keys={quick} />
 
-      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-[repeat(auto-fit,minmax(180px,1fr))] lg:gap-3.5">
+      <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,180px),1fr))] gap-3.5">
         {hero.map((k) => (
           <Tile
             key={k.label}
             href={canOpen(u, k.href) ? k.href : undefined}
-            className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-t-2 border-line border-t-accent bg-[linear-gradient(180deg,var(--accent-soft),var(--surface)_60%)] px-[22px] py-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent/60 hover:shadow-md max-lg:p-3.5"
+            className="relative flex flex-col gap-3 overflow-hidden rounded-lg border border-t-2 border-line border-t-accent bg-[linear-gradient(180deg,var(--accent-soft),var(--surface)_60%)] px-[22px] py-5 shadow-sm transition hover:-translate-y-0.5 hover:border-accent-300 hover:shadow-md"
           >
             <span className="flex w-full items-center justify-between">
               <span className="text-xs tracking-[0.04em] text-muted uppercase">{k.label}</span>
-              <span className="grid size-9 place-items-center rounded-md bg-[color-mix(in_srgb,var(--accent)_22%,transparent)] text-accent">
+              <span className="grid size-9 place-items-center rounded-md bg-accent-200 text-accent">
                 <k.icon size={20} weight="duotone" />
               </span>
             </span>
-            <span className={cx("text-[36px] leading-none font-semibold tracking-[-0.01em] tabular-nums max-lg:text-[26px]", k.tone === "alert" && "text-alert", k.tone === "accent" && "text-accent-hover")}>{k.value}</span>
+            <span className={cx("text-[36px] leading-none font-semibold tracking-[-0.01em] tabular-nums", k.tone === "alert" && "text-alert", k.tone === "accent" && "text-accent-hover")}>{k.value}</span>
             <span className="flex flex-wrap items-center gap-1.5 text-[13px] text-muted">
               {k.delta && <span className={cx("rounded-full px-[7px] py-px", k.delta.good ? "bg-accent-soft text-accent-strong" : "bg-alert-soft text-alert-strong")}>{k.delta.text}</span>}
               <span>{k.sub}</span>
@@ -380,7 +380,7 @@ function PeriodPicker({ period, from, to }: { period: PeriodKey; from: string; t
 
 function Section({ title, sub, action, legend, titleSize = "text-lg", children }: { title: ReactNode; sub?: string; action?: ReactNode; legend?: [string, string][]; titleSize?: string; children: ReactNode }) {
   return (
-    <section className="min-w-0 rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm max-lg:p-3.5">
+    <section className="min-w-0 rounded-lg border border-line bg-surface px-[22px] py-5 shadow-sm">
       <div className="mb-3.5 flex items-start justify-between gap-3">
         <div>
           <h3 className={cx("m-0 flex items-center gap-2", titleSize)}>{title}</h3>
@@ -414,7 +414,7 @@ const Tile = ({ href, className, children }: { href?: string; className: string;
   );
 
 const GhostLink = ({ href, children }: { href: string; children: ReactNode }) => (
-  <Link href={href} className="-mt-1.5 -mr-2 inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold whitespace-nowrap text-accent hover:bg-accent/10">
+  <Link href={href} className="-mt-1.5 -mr-2 inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold whitespace-nowrap text-accent hover:bg-accent/10">
     {children}
   </Link>
 );

@@ -17,7 +17,7 @@ export const metadata = { title: "Classes · Fitron" };
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const WD = WEEKDAYS.map((d) => d.slice(0, 3));
 const ghost = "inline-flex min-h-[34px] items-center gap-1.5 rounded-md px-1.5 text-[13px] font-semibold text-accent hover:bg-accent/10";
-const secondary = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
+const secondary = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
 
 /** Fill colour as in the prototype: gold, deeper gold from 70%, pink when full. */
 const toneOf = (n: number, cap: number) => (n >= cap ? 2 : cap && n / cap >= 0.7 ? 1 : 0);

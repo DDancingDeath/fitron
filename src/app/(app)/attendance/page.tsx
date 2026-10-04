@@ -17,7 +17,7 @@ import { checkOutAction, closeDayAction, removeAction } from "./actions";
 
 export const metadata = { title: "Attendance · Fitron" };
 
-const ghost = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
+const ghost = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10";
 const hourLabel = (h: number, long = false) => `${h % 12 || 12}${long ? (h < 12 ? " am" : " pm") : h < 12 ? "a" : "p"}`;
 const VISIT: Record<string, string> = { TRIAL: "Trial", GUEST: "Guest", DAY_PASS: "Day pass" };
 
@@ -217,7 +217,7 @@ export default async function AttendancePage({ searchParams }: PageProps<"/atten
               </Link>
             )}
           </div>
-          <a href={`/attendance/csv?date=${date}`} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+          <a href={`/attendance/csv?date=${date}`} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
             <DownloadSimpleIcon weight="duotone" />
             Export CSV
           </a>

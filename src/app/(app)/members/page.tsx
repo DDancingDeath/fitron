@@ -188,7 +188,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
 
       {deleted.length > 0 && (
         <section className="flex flex-col gap-1.5">
-          <Link href={showDeleted ? "/members" : "/members?deleted=1"} className="-ml-2.5 inline-flex min-h-[38px] items-center gap-1.5 self-start rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">
+          <Link href={showDeleted ? "/members" : "/members?deleted=1"} className="-ml-2.5 inline-flex py-2.5 leading-[1.2] items-center gap-1.5 self-start rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">
             <TrashIcon size={16} weight="duotone" />
             Recently deleted ({deleted.length})
           </Link>
@@ -203,7 +203,7 @@ export default async function MembersPage({ searchParams }: PageProps<"/members"
                 </div>
                 {!d.erasedAt && (
                   <form action={bringBackMember.bind(null, d.id)}>
-                    <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                    <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                       <ArrowCounterClockwiseIcon weight="duotone" />
                       Restore
                     </button>

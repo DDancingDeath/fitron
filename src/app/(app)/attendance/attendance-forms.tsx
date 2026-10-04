@@ -11,7 +11,7 @@ type Block = Extract<DeskResult, { blocked: string }>;
 type Done = Extract<DeskResult, { ok: true }>;
 type Device = { name: string; online: boolean; sync: string };
 
-const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap disabled:opacity-45";
+const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap disabled:opacity-45";
 const primary = `${btn} border-transparent bg-accent text-accent-ink hover:bg-accent-hover`;
 const secondary = `${btn} border-line hover:bg-fg/7`;
 const ghost = `${btn} border-transparent px-1.5 text-accent hover:bg-accent/10`;

@@ -23,7 +23,7 @@ const FILTERS = [
 const KIND: Record<string, string> = { STOCK: "Stock", ASSET: "Asset", EXPENSE: "Expense" };
 /** Whole rupees, unless paise are left over (a 24-paise balance must not read ₹0). */
 const money = (paise: number) => (paise % 100 ? formatInr(paise) : formatRupees(paise));
-const btn2 = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
+const btn2 = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
 
 export default async function PurchasesPage({ searchParams }: PageProps<"/purchases">) {
   const u = await requirePermission("purchases.manage");

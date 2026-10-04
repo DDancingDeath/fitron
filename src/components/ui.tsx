@@ -12,7 +12,7 @@ const btn: Record<Variant, string> = {
   ghost: "border border-transparent px-1.5 text-accent hover:bg-accent/10 active:bg-accent/18",
 };
 const btnBase =
-  "inline-flex min-h-[38px] items-center justify-center gap-1.5 rounded-md text-sm leading-[1.2] font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-45";
+  "inline-flex items-center justify-center gap-1.5 rounded-md py-2.5 text-sm leading-[1.2] font-semibold whitespace-nowrap transition-colors disabled:cursor-not-allowed disabled:opacity-45";
 
 export function Button({ variant = "default", className, ...p }: ComponentProps<"button"> & { variant?: Variant }) {
   return <button className={cx(btnBase, btn[variant], className)} {...p} />;
@@ -98,7 +98,7 @@ export { cx };
 
 // The prototype's .table: uppercase small headers, hairline rows, a faint hover.
 export const TABLE = "w-full border-collapse text-sm";
-export const TH = "border-b border-line p-2.5 text-left text-[11px] font-normal tracking-[0.08em] whitespace-nowrap text-fg/60 uppercase";
+export const TH = "border-b border-line p-2.5 text-left text-[11px] font-bold tracking-[0.08em] whitespace-nowrap text-fg/60 uppercase";
 export const TD = "border-b border-fg/8 p-2.5 align-middle";
 export const TR = "hover:bg-fg/4";
 
@@ -107,7 +107,7 @@ export function Pager({ page, pageSize, total, href }: { page: number; pageSize:
   if (!total) return null;
   const start = (page - 1) * pageSize + 1;
   const end = Math.min(total, page * pageSize);
-  const btn = "inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold";
+  const btn = "inline-flex items-center rounded-md border border-line px-[18px] py-2.5 text-sm leading-[1.2] font-semibold";
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <span className="text-[13px] text-muted">

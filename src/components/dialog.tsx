@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { Notice } from "./ui";
 
-const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
 
 /** The prototype's modal: a card over a dimmed page; clicking outside closes it. Opened by a URL param, closed by a link. */
 export function Dialog({ kicker, title, note, close, error, width = 480, children }: { kicker: string; title: string; note?: string; close: string; error?: string; width?: number; children: ReactNode }) {

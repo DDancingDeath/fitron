@@ -42,7 +42,7 @@ export default async function PlanEndedPage() {
           <SideLogo src={gymLogoUrl(profile.logoKey)} name={profile.name} />
         </div>
         <form action={logout}>
-          <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md px-3 text-sm font-semibold text-accent hover:bg-accent/10">
+          <button className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md px-3 text-sm font-semibold text-accent hover:bg-accent/10">
             <SignOutIcon size={16} weight="duotone" />
             Sign out
           </button>

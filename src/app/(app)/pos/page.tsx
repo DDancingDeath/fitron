@@ -98,7 +98,7 @@ export default async function PosPage({ searchParams }: PageProps<"/pos">) {
                     <td className={TD}>{!p.active ? <Tag label="Not sold" /> : <Tag label={p.stock === null ? "Service" : isLow(p) ? "Low stock" : "In stock"} />}</td>
                     <td className={TD}>
                       {p.stock !== null && (
-                        <Link href={`/pos?restock=${p.id}`} scroll={false} className="inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">
+                        <Link href={`/pos?restock=${p.id}`} scroll={false} className="inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">
                           Restock
                         </Link>
                       )}

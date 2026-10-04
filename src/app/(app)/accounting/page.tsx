@@ -36,7 +36,7 @@ const REVENUE: Record<string, string> = {
 };
 const REV_ORDER = ["Membership revenue", "Renewal revenue", "Personal training", "Registration fees", "Product sales", "Other revenue", "Gain on sale of assets"];
 const LEDGER_LABEL: Record<LedgerKind | "cash", string> = { income: "Income", expense: "Expense", payment: "Payment", receivable: "Receivable", cash: "Cash & bank book" };
-const btn2 = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
+const btn2 = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7";
 const seg = (on: boolean) => cx("px-3 py-[7px] text-[13px]", on ? "bg-accent text-accent-ink" : "hover:bg-fg/7");
 
 export default async function AccountingPage({ searchParams }: PageProps<"/accounting">) {

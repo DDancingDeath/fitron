@@ -283,7 +283,7 @@ export function RuleForm({ tkey, rule, plans, quietFrom, quietTo, dedupDays, clo
       </div>
       <p className="m-0 text-[13px] text-muted">Every run respects the {dedupDays}-day repeat window and invalid numbers are skipped.</p>
       <div className="flex justify-end gap-2.5">
-        <Link href={close} scroll={false} className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+        <Link href={close} scroll={false} className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
           Cancel
         </Link>
         <Button variant="primary" disabled={pending}>

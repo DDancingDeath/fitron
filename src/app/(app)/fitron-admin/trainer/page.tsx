@@ -77,7 +77,7 @@ export default async function TrainerAdminPage({ searchParams }: PageProps<"/fit
                 </option>
               ))}
             </Select>
-            <button className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Search</button>
+            <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Search</button>
           </form>
           {members.rows.length === 0 ? (
             <Empty>No members match.</Empty>
@@ -148,7 +148,7 @@ export default async function TrainerAdminPage({ searchParams }: PageProps<"/fit
                 </option>
               ))}
             </Select>
-            <button className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Filter</button>
+            <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">Filter</button>
           </form>
           {payments.rows.length === 0 ? (
             <Empty>No payments yet.</Empty>

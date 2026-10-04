@@ -10,7 +10,7 @@ import { clearDemo, saveSecurity } from "./actions";
 
 export const metadata = { title: "Go live · Fitron" };
 
-const btn = "inline-flex min-h-[38px] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
+const btn = "inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md border px-[18px] text-sm font-semibold whitespace-nowrap";
 
 export default async function GoLivePage({ searchParams }: PageProps<"/settings/go-live">) {
   const u = await requirePermission("settings.manage");

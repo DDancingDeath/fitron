@@ -52,7 +52,7 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
         actions={
           canWa && (
             <form action={remindRenewalsAction.bind(null, ids, here)}>
-              <button disabled={!rows.length} className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
+              <button disabled={!rows.length} className="inline-flex py-2.5 leading-[1.2] items-center gap-1.5 rounded-md bg-accent px-[18px] text-sm font-semibold text-accent-ink hover:bg-accent-hover disabled:opacity-45">
                 <WhatsappLogoIcon size={17} weight="duotone" />
                 Remind all ({rows.length})
               </button>
@@ -111,10 +111,10 @@ export default async function RenewalsPage({ searchParams }: PageProps<"/renewal
                     <span className="inline-flex items-center gap-1">
                       {canWa && (
                         <form action={remindRenewalAction.bind(null, m.id, here)}>
-                          <button className="inline-flex min-h-[38px] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">Remind</button>
+                          <button className="inline-flex py-2.5 leading-[1.2] items-center rounded-md px-1.5 text-sm font-semibold text-accent hover:bg-accent/10">Remind</button>
                         </form>
                       )}
-                      <Link href={`/members/${m.id}/sell`} className="inline-flex min-h-[38px] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
+                      <Link href={`/members/${m.id}/sell`} className="inline-flex py-2.5 leading-[1.2] items-center rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                         Renew
                       </Link>
                     </span>
