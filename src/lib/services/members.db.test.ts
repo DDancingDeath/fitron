@@ -1,7 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db";
 import { hasDb, makeGym, pick } from "@/test/db";
-import { createMember, deleteMember, getMember, listDeleted, listMembers, restoreMember, updateMember } from "./members";
+import { createMember, deleteMember, getMember, listDeleted, listMembers, restoreMember, summarize, updateMember } from "./members";
+import { sellMembership } from "./billing";
+import { todayIso } from "./time";
 import { createPlan, deletePlan } from "./plans";
 import { UserError } from "./errors";
 import type { MemberInput } from "@/lib/validation/member";
@@ -100,5 +102,17 @@ describe.skipIf(!hasDb)("members (database)", () => {
     expect((await listMembers(admin, { status: "RISK" })).rows.map((r) => r.name)).toContain("Aarav Risky");
     expect((await listMembers(admin, { status: "DUE" })).rows.every((r) => r.outstanding > 0)).toBe(true);
     expect((await listMembers(admin, { pageSize: 2 })).rows).toHaveLength(2);
+  });
+
+  it("reports the start of the membership the plan name comes from", async () => {
+    const admin = pick(await gym.user("Super Admin"), gym.a.id);
+    const bare = await createMember(admin, input({ phone: "9876500071" }));
+    const sold = await createMember(admin, input({ phone: "9876500072" }));
+    const p = await createPlan(admin, { name: "Starter", kind: "Membership", months: 1, price: 100000, regFee: 0, discount: 0, gstApplicable: false, features: [] });
+    const today = todayIso();
+    await sellMembership(admin, sold.id, { planId: p.id, startDate: today, discount: 0, includeRegFee: false, payAmount: 0 });
+    const sums = await summarize([bare.id, sold.id], today);
+    expect(sums.get(sold.id)).toMatchObject({ planName: "Starter", planStart: today });
+    expect(sums.get(bare.id)).toMatchObject({ planName: null, planStart: null });
   });
 });

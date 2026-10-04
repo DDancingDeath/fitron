@@ -9,10 +9,12 @@ describe("audit severity and modules", () => {
     expect(severityOf("member.update")).toBe("Medium");
     expect(severityOf("month.lock")).toBe("Medium");
     expect(severityOf("member.create")).toBe("Low");
+    expect(severityOf("export.members", "Member")).toBe("Low");
   });
   it("groups record types into the prototype's modules", () => {
     expect(moduleOf("Payment")).toBe("Payments");
     expect(moduleOf("MembershipPlan")).toBe("Settings");
+    expect(moduleOf("Expense")).toBe("Accounts");
     expect(moduleOf("Something")).toBe("Other");
     expect(entitiesOf("Invoices")).toEqual(["Invoice"]);
   });
