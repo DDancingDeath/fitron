@@ -14,6 +14,10 @@ describe("default roles", () => {
     }
   });
 
+  it("give payroll to Super Admin, Admin and Accountant only", () => {
+    for (const [role, perms] of Object.entries(DEFAULT_ROLES)) expect((perms as string[]).includes("payroll.manage")).toBe(["Super Admin", "Admin", "Accountant"].includes(role));
+  });
+
   it("keep receptionists and trainers out of accounting", () => {
     expect(DEFAULT_ROLES.Receptionist).not.toContain("accounting.view");
     expect(DEFAULT_ROLES.Trainer).not.toContain("accounting.view");

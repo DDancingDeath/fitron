@@ -80,6 +80,8 @@ async function main() {
         passwordHash,
         emailVerifiedAt: new Date(),
         ptRate: role === "Trainer" ? 40 : 0,
+        salary: ({ Admin: 3000000, Accountant: 2200000, Receptionist: 1500000, Trainer: 1800000 } as Record<string, number>)[role] ?? 0,
+        joinedOn: new Date("2024-04-01T00:00:00.000Z"),
         branches: { create: branches.map((b) => ({ branchId: b.id })) },
       },
     });

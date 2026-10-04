@@ -53,6 +53,10 @@ describe.skipIf(!hasDb)("Fitron branch plan (database)", () => {
     expect((await branchStandings(gym.org.id, today)).branches[3]!.standing.kind).toBe("GRACE");
     await createMember(inD, { name: "Grace Guest", gender: "Female", phone: "9866600001", source: "Walk-in", tags: [] });
     expect((await billingReminders(gym.org.id, today)).sent).toBe(1);
+    // A closed extra branch has nothing to renew.
+    await db.branch.update({ where: { id: fourth }, data: { active: false } });
+    expect((await billingReminders(gym.org.id, today)).sent).toBe(0);
+    await db.branch.update({ where: { id: fourth }, data: { active: true } });
 
     await db.branchSubscription.update({ where: { id: sub.id }, data: { periodEnd: fromIso(addDays(today, -8)) } });
     expect((await branchStandings(gym.org.id, today)).branches[3]!.standing).toEqual({ kind: "READ_ONLY", since: today });

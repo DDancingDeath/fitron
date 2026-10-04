@@ -4,7 +4,10 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import * as z from "zod";
 import { requireFeature, requirePermission } from "@/lib/auth/current";
-import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } from "@/lib/services/settings";
+import { cookies } from "next/headers";
+import { BRANCH_COOKIE, requireUser } from "@/lib/auth/current";
+import { reasonInput } from "@/lib/validation/billing";
+import { deleteBranch, putSetting, saveBranch, setBranchActive, saveGymProfile, saveTax as saveTaxSettings } from "@/lib/services/settings";
 import { getWaSettings, sendTest, setLinked } from "@/lib/services/whatsapp";
 import { connectorLogout, connectorStatus, providerReady } from "@/lib/integrations/whatsapp";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
@@ -28,13 +31,13 @@ import { raiseTicket, resolveTicket } from "@/lib/services/support";
 const back = (params: Record<string, string>) => redirect(`/settings?${new URLSearchParams(params)}`);
 const firstError = (e: z.ZodError) => e.issues.map((i) => `${String(i.path[0] ?? "")}: ${i.message}`)[0] ?? "Check the form.";
 
-async function save<T extends z.ZodType>(schema: T, fd: FormData, section: string, fn: (v: z.infer<T>) => Promise<void>) {
+async function save<T extends z.ZodType>(schema: T, fd: FormData, section: string, fn: (v: z.infer<T>) => Promise<void>, extra: Record<string, string> = {}) {
   const parsed = schema.safeParse(Object.fromEntries(fd));
-  if (!parsed.success) back({ error: firstError(parsed.error), section });
+  if (!parsed.success) back({ error: extra.branch ? (parsed.error.issues[0]?.message ?? "Check the form.") : firstError(parsed.error), section, ...extra });
   try {
     await fn(parsed.data as z.infer<T>);
   } catch (e) {
-    if (e instanceof UserError) back({ error: e.message, section });
+    if (e instanceof UserError) back({ error: e.message, section, ...extra });
     throw e;
   }
   revalidatePath("/", "layout");
@@ -147,7 +150,47 @@ export async function saveBranchAction(id: string | null, fd: FormData) {
   const u = await requirePermission("settings.manage");
   await save(branchInput, fd, "branches", async (v) => {
     await saveBranch(u, id, v);
-  });
+  }, { tab: "branches", branch: id ?? "new" });
+}
+
+const toBranches = (params: Record<string, string> = {}) => redirect(`/settings?${new URLSearchParams({ tab: "branches", ...params })}`);
+
+/** Header switcher cookie: reset to the first open branch (or All) when the picked one is closed or deleted. */
+async function resetBranchCookie(u: Awaited<ReturnType<typeof requirePermission>>, gone: string) {
+  if (u.branch !== gone) return;
+  const open = u.branches.filter((b) => b.active && b.id !== gone);
+  (await cookies()).set(BRANCH_COOKIE, open.length > 1 ? "ALL" : (open[0]?.id ?? "ALL"), { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+}
+
+export async function openBranch(id: string) {
+  const u = await requireUser();
+  if (!u.branches.some((b) => b.id === id && b.active)) toBranches({ error: "That branch isn’t open." });
+  (await cookies()).set(BRANCH_COOKIE, id, { httpOnly: true, sameSite: "lax", path: "/", maxAge: 60 * 60 * 24 * 365 });
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
+}
+
+export async function setBranchActiveAction(id: string, active: boolean) {
+  const u = await requirePermission("settings.manage");
+  try {
+    await setBranchActive(u, id, active);
+  } catch (e) {
+    if (e instanceof UserError) toBranches({ error: e.message });
+    throw e;
+  }
+  if (!active) await resetBranchCookie(u, id);
+  revalidatePath("/", "layout");
+  toBranches({ saved: "branches" });
+}
+
+export async function deleteBranchAction(id: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("settings.manage");
+  const r = await formAction(fd, reasonInput, (d) => deleteBranch(u, id, d.reason), "Branch deleted.");
+  if (r?.ok) {
+    await resetBranchCookie(u, id);
+    revalidatePath("/", "layout");
+  }
+  return r;
 }
 
 export async function saveAccess(fd: FormData) {

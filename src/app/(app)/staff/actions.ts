@@ -2,7 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requirePermission } from "@/lib/auth/current";
+import { requirePermission, requireUser, upgradePath } from "@/lib/auth/current";
+import { advanceInput, salaryInput, salaryPayInput } from "@/lib/validation/payroll";
+import { paySalary, recordAdvance, setSalary } from "@/lib/services/payroll";
+import { formatRupees } from "@/lib/format";
 import { staffInput } from "@/lib/validation/staff";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
 import { createStaff, setStaffActive, updateStaff } from "@/lib/services/staff";
@@ -33,4 +36,61 @@ export async function toggleStaff(id: string, active: boolean): Promise<void> {
     throw e;
   }
   revalidatePath("/staff");
+}
+
+const back = (fd: FormData, msg: string) => {
+  const tab = String(fd.get("tab") ?? "");
+  const month = String(fd.get("month") ?? "");
+  const q = new URLSearchParams();
+  if (tab === "pay") q.set("tab", "pay");
+  if (tab === "pay" && /^\d{4}-\d{2}$/.test(month)) q.set("month", month);
+  q.set("ok", msg);
+  redirect(`/staff?${q}`);
+};
+const refuse = (fd: FormData, e: unknown): FormState => {
+  if (e instanceof UserError) return failed(fd, { message: e.message, errors: e.field ? { [e.field]: [e.message] } : undefined });
+  throw e;
+};
+
+export async function saveSalary(id: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await requireUser();
+  if (!u.can("payroll.manage") && !u.can("staff.manage")) redirect("/dashboard?denied=1");
+  if (!u.has("staff")) redirect(upgradePath(u, "staff"));
+  const parsed = salaryInput.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
+  try {
+    await setSalary(u, id, parsed.data);
+  } catch (e) {
+    return refuse(fd, e);
+  }
+  revalidatePath("/staff");
+  back(fd, "Salary saved");
+}
+
+export async function saveAdvance(id: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("payroll.manage");
+  const parsed = advanceInput.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
+  try {
+    await recordAdvance(u, id, parsed.data);
+  } catch (e) {
+    return refuse(fd, e);
+  }
+  revalidatePath("/staff");
+  back(fd, "Advance recorded. It will be deducted at the next salary.");
+}
+
+export async function savePayment(id: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("payroll.manage");
+  const parsed = salaryPayInput.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
+  let msg: string;
+  try {
+    const r = await paySalary(u, id, parsed.data);
+    msg = `Salary paid to ${r.name} · ${formatRupees(r.row.net)} added to expenses`;
+  } catch (e) {
+    return refuse(fd, e);
+  }
+  revalidatePath("/staff");
+  back(fd, msg);
 }

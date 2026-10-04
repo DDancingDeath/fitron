@@ -31,4 +31,11 @@ describe("audit severity and modules", () => {
     expect(moduleOf("Something")).toBe("Other");
     expect(entitiesOf("Invoices")).toEqual(["Invoice"]);
   });
+
+  it("rates role changes and branch close or delete high, and files branches under Settings", () => {
+    expect(severityOf("branch.deactivate")).toBe("High");
+    expect(severityOf("branch.delete")).toBe("High");
+    expect(severityOf("staff.role")).toBe("High");
+    expect(moduleOf("Branch")).toBe("Settings");
+  });
 });

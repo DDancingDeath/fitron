@@ -23,6 +23,7 @@ model Organization {
   invoices          Invoice[]
   payments          Payment[]
   expenses          Expense[]
+  salaryPayments    SalaryPayment[]
   settings          Setting[]
   sequences         Sequence[]
   auditLogs         AuditLog[]
@@ -55,57 +56,76 @@ model Organization {
 }
 
 model Branch {
-  id          String       @id @default(cuid())
-  orgId       String
-  org         Organization @relation(fields: [orgId], references: [id])
-  name        String
-  address     String
-  phone       String
-  gstin       String?
-  users       UserBranch[]
-  members     Member[]
-  memberships Membership[]
-  invoices    Invoice[]
-  payments    Payment[]
-  expenses    Expense[]
-  monthLocks  MonthLock[]
-  attendance  Attendance[]
-  leads       Lead[]
-  classSlots  ClassSlot[]
-  products    Product[]
-  assets      Asset[]
-  purchases   Purchase[]
-  createdAt   DateTime     @default(now()) @db.Timestamptz
+  id             String          @id @default(cuid())
+  orgId          String
+  org            Organization    @relation(fields: [orgId], references: [id])
+  name           String
+  address        String
+  phone          String
+  gstin          String?
+  /// Short name for the switcher and dialog titles
+  short          String?
+  /// Opening hours, free text
+  hours          String?
+  manager        String?
+  /// Per-branch invoice prefix; the invoice sequence stays org-wide
+  invoicePrefix  String?
+  /// false = closed: hidden from the switcher and from new records, data kept
+  active         Boolean         @default(true)
+  deactivatedAt  DateTime?       @db.Timestamptz
+  users          UserBranch[]
+  members        Member[]
+  memberships    Membership[]
+  invoices       Invoice[]
+  payments       Payment[]
+  expenses       Expense[]
+  salaryPayments SalaryPayment[]
+  monthLocks     MonthLock[]
+  attendance     Attendance[]
+  leads          Lead[]
+  classSlots     ClassSlot[]
+  products       Product[]
+  assets         Asset[]
+  purchases      Purchase[]
+  createdAt      DateTime        @default(now()) @db.Timestamptz
 
   @@index([orgId])
+  @@index([orgId, active])
 }
 
 // ── Staff and roles ────────────────────────────────────────────────────────
 
 model User {
-  id              String       @id @default(cuid())
+  id              String          @id @default(cuid())
   orgId           String
-  org             Organization @relation(fields: [orgId], references: [id])
+  org             Organization    @relation(fields: [orgId], references: [id])
   name            String
-  email           String       @unique
+  email           String          @unique
   phone           String
   passwordHash    String
   roleId          String
-  role            Role         @relation(fields: [roleId], references: [id])
+  role            Role            @relation(fields: [roleId], references: [id])
   branches        UserBranch[]
   sessions        Session[]
-  ptRate          Int          @default(0)
+  ptRate          Int             @default(0)
   shift           String?
   /// Profile photo in private storage; set by the user on My profile
   photoKey        String?
-  active          Boolean      @default(true)
-  lastLoginAt     DateTime?    @db.Timestamptz
+  active          Boolean         @default(true)
+  lastLoginAt     DateTime?       @db.Timestamptz
   /// Null until the user clicks the link in the verification email
-  emailVerifiedAt DateTime?    @db.Timestamptz
+  emailVerifiedAt DateTime?       @db.Timestamptz
   authTokens      AuthToken[]
-  createdAt       DateTime     @default(now()) @db.Timestamptz
-  updatedAt       DateTime     @updatedAt @db.Timestamptz
-  deletedAt       DateTime?    @db.Timestamptz
+  /// Monthly salary in paise; 0 = not set
+  salary          Int             @default(0)
+  joinedOn        DateTime?       @db.Date
+  /// Bank account / UPI for salary
+  payAccount      String?
+  salaryPayments  SalaryPayment[] @relation("SalaryStaff")
+  salaryPaid      SalaryPayment[] @relation("SalaryPaidBy")
+  createdAt       DateTime        @default(now()) @db.Timestamptz
+  updatedAt       DateTime        @updatedAt @db.Timestamptz
+  deletedAt       DateTime?       @db.Timestamptz
 }
 
 /// One-time links sent by email. `id` is the SHA-256 of the token in the link.
@@ -411,10 +431,54 @@ model Expense {
   assetId       String?
   purchaseId    String?
   purchase      Purchase?       @relation(fields: [purchaseId], references: [id])
+  salaryPayment SalaryPayment?
   createdAt     DateTime        @default(now()) @db.Timestamptz
 
   @@index([branchId, date])
   @@index([purchaseId])
+}
+
+/// One row per salary paid or advance given; immutable.
+model SalaryPayment {
+  id           String       @id @default(cuid())
+  /// PR-1, PR-2…
+  code         String
+  orgId        String
+  org          Organization @relation(fields: [orgId], references: [id])
+  branchId     String
+  branch       Branch       @relation(fields: [branchId], references: [id])
+  userId       String
+  user         User         @relation("SalaryStaff", fields: [userId], references: [id])
+  /// SALARY | ADVANCE
+  kind         String
+  /// YYYY-MM, SALARY only
+  month        String?
+  date         DateTime     @db.Date
+  base         Int          @default(0)
+  days         Int          @default(0)
+  commission   Int          @default(0)
+  bonus        Int          @default(0)
+  deductions   Int          @default(0)
+  /// Advance recovered in this salary
+  advance      Int          @default(0)
+  /// SALARY: net pay; ADVANCE: amount given
+  net          Int
+  /// ADVANCE only: how much later salaries have taken back
+  recovered    Int          @default(0)
+  /// ADVANCE only: the salary month that fully recovered it
+  settledMonth String?
+  method       String
+  reference    String?
+  note         String?
+  expenseId    String?      @unique
+  expense      Expense?     @relation(fields: [expenseId], references: [id])
+  paidById     String
+  paidBy       User         @relation("SalaryPaidBy", fields: [paidById], references: [id])
+  createdAt    DateTime     @default(now()) @db.Timestamptz
+
+  @@unique([userId, kind, month])
+  @@index([orgId, kind, month])
+  @@index([userId, kind, settledMonth])
 }
 
 /// Rent, Utilities, Salaries…

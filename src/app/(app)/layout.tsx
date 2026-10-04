@@ -78,7 +78,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const groups = NAV.map((g) => ({
     ...g,
     items: g.items
-      .filter((i) => (!i.perm || u.can(i.perm)) && (ai.enabled || i.icon !== "ai"))
+      .filter((i) => (!i.perm || u.can(i.perm)) && (!i.anyPerm || i.anyPerm.some((p) => u.can(p))) && (ai.enabled || i.icon !== "ai"))
       .map((i) => (i.feature && !u.has(i.feature) ? { ...i, locked: true, href: upgradePath(u, i.feature) } : { ...i, badge: i.count ? counts[i.count] : undefined })),
   })).filter((g) => g.items.length);
   const branchName = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
@@ -101,7 +101,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           <MobileNav groups={groups} orgName={gymName} branchName={branchName} logo={logo} />
           <GlobalSearch />
           <div className="flex flex-none items-center gap-1.5 sm:gap-2.5 lg:ml-auto">
-            <BranchSwitcher branches={u.branches} value={u.branch} />
+            <BranchSwitcher branches={u.branches.filter((b) => b.active)} value={u.branch} />
             <ThemeToggle />
             <BellLink unread={counts.notifications ?? 0} />
             <UserMenu

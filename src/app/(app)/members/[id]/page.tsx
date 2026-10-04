@@ -511,7 +511,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
                   Choose
                 </option>
                 {u.branches
-                  .filter((b) => b.id !== m.branchId)
+                  .filter((b) => b.id !== m.branchId && b.active)
                   .map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.name}

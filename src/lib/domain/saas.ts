@@ -34,17 +34,20 @@ export type Standing =
   | { kind: "INCLUDED" }
   | { kind: "PAID"; until: IsoDate }
   | { kind: "GRACE"; until: IsoDate; readOnlyFrom: IsoDate }
-  | { kind: "READ_ONLY"; since: IsoDate | null };
+  | { kind: "READ_ONLY"; since: IsoDate | null }
+  | { kind: "CLOSED" };
 
 /**
  * Where each branch stands. The oldest `included` (3 unless the plan says otherwise) are included; every other branch needs a paid period.
  * After it ends there are 7 days' grace, then the branch is read-only: records stay, but no new
  * members or invoices until it is paid for again.
  */
-export function standings(branches: { id: string }[], paidUntil: Map<string, IsoDate>, today: IsoDate, included = INCLUDED_BRANCHES): Map<string, Standing> {
+export function standings(branches: { id: string; active?: boolean }[], paidUntil: Map<string, IsoDate>, today: IsoDate, included = INCLUDED_BRANCHES): Map<string, Standing> {
   const out = new Map<string, Standing>();
-  branches.forEach((b, i) => {
-    if (i < included) return out.set(b.id, { kind: "INCLUDED" });
+  let seat = 0;
+  branches.forEach((b) => {
+    if (b.active === false) return out.set(b.id, { kind: "CLOSED" });
+    if (seat++ < included) return out.set(b.id, { kind: "INCLUDED" });
     const until = paidUntil.get(b.id) ?? null;
     if (until && until >= today) return out.set(b.id, { kind: "PAID", until });
     const readOnlyFrom = until ? addDays(until, GRACE_DAYS + 1) : null;

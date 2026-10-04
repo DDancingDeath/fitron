@@ -24,6 +24,7 @@ describe("plan features", () => {
 
   it("maps every gym plan on the price list, and only real permissions", () => {
     for (const p of PLANS) if (p.product !== "AI_TRAINER") expect(PLAN_FEATURES[p.key], p.key).toBeDefined();
+    expect(PERMISSION_FEATURE["payroll.manage"]).toBe("staff");
     for (const k of Object.keys(PERMISSION_FEATURE)) expect(k in PERMISSIONS, k).toBe(true);
     // What Starter keeps: the basics every gym needs to bill and track members.
     const open = (Object.keys(PERMISSIONS) as (keyof typeof PERMISSIONS)[]).filter((k) => !PERMISSION_FEATURE[k]);

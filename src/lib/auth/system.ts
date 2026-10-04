@@ -9,7 +9,7 @@ import { PERMISSIONS, type Permission } from "./permissions";
  * mandate) or else the gym's first Super Admin; audit rows say the action was automatic.
  */
 export async function systemUser(orgId: string, actAs?: string): Promise<CurrentUser> {
-  const org = await db.organization.findUniqueOrThrow({ where: { id: orgId }, include: { branches: { select: { id: true, name: true }, orderBy: { createdAt: "asc" } } } });
+  const org = await db.organization.findUniqueOrThrow({ where: { id: orgId }, include: { branches: { select: { id: true, name: true, active: true }, orderBy: { createdAt: "asc" } } } });
   const owner =
     (actAs && (await db.user.findFirst({ where: { id: actAs, orgId }, select: { id: true } }))) ||
     (await db.user.findFirst({ where: { orgId, role: { name: "Super Admin" } }, orderBy: { createdAt: "asc" }, select: { id: true } })) ||

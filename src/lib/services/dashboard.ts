@@ -232,7 +232,7 @@ async function branchComparison(
     db.attendance.groupBy({ by: ["branchId"], where: { branchId: { in: u.branchIds }, date: fromIso(today) }, _count: true }),
     fin ? db.expense.groupBy({ by: ["branchId"], where: { orgId: u.orgId, branchId: { in: u.branchIds }, status: "ACTIVE", capital: false, date: between(range) }, _sum: { amount: true } }) : [],
   ]);
-  return u.branches.map((b) => {
+  return u.branches.filter((b) => b.active).map((b) => {
     const mine = M.filter((m) => m.branchId === b.id);
     const col = sum(payments.filter((p) => p.branchId === b.id), (p) => p.amount);
     const ex = expenses.find((e) => e.branchId === b.id)?._sum.amount ?? 0;

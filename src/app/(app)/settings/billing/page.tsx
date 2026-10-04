@@ -22,6 +22,7 @@ function StandingBadge({ s }: { s: Standing }) {
   if (s.kind === "INCLUDED") return <Badge>Included</Badge>;
   if (s.kind === "PAID") return <Badge tone="ok">Paid till {fmtDate(s.until)}</Badge>;
   if (s.kind === "GRACE") return <Badge tone="accent">Grace till {fmtDate(s.readOnlyFrom)}</Badge>;
+  if (s.kind === "CLOSED") return <Badge>Closed</Badge>;
   return <Badge tone="alert">Read-only</Badge>;
 }
 
@@ -59,7 +60,8 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
   const toCheck = admin ? await db.branchSubscription.count({ where: { mode: "UPI", status: "SUBMITTED" } }) : 0;
   const y = branchPrice("YEARLY");
   const m = branchPrice("MONTHLY");
-  const extra = branches.filter((b) => b.standing.kind !== "INCLUDED").length;
+  const openBranches = branches.filter((b) => b.standing.kind !== "CLOSED");
+  const extra = openBranches.filter((b) => b.standing.kind !== "INCLUDED").length;
   const s = plan.standing;
   const renewing = s.kind === "PAID" || s.kind === "GRACE";
 
@@ -110,7 +112,7 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
               </div>
             )}
           </Card>
-          <Card title={`Branches · ${branches.length - extra} included${extra ? ` + ${extra} extra` : ""}`}>
+          <Card title={`Branches · ${openBranches.length - extra} included${extra ? ` + ${extra} extra` : ""}`}>
             <ul className="divide-y divide-line text-sm">
               {branches.map((b) => (
                 <li key={b.id} className="flex flex-col gap-2 py-3">
@@ -124,7 +126,7 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
                     </p>
                   )}
                   {b.standing.kind === "READ_ONLY" && <p className="text-muted">Records are kept and can be viewed, but no new members or invoices until it is renewed.</p>}
-                  {b.standing.kind !== "INCLUDED" && terms.extraBranches && (
+                  {b.standing.kind !== "INCLUDED" && b.standing.kind !== "CLOSED" && terms.extraBranches && (
                     <PayButton what={{ kind: "BRANCH", branchId: b.id }} label="Renew" prices={prices(branchPrice)} success="Paid. The branch is renewed." />
                   )}
                 </li>
@@ -241,23 +243,23 @@ export default async function BillingPage({ searchParams }: PageProps<"/settings
           </Card>
         </div>
         <div className="flex flex-col gap-4">
-          <Card title="Add another branch">
+          <Card title="Add another branch" id="add-branch">
             {!terms.extraBranches ? (
               <p className="text-sm">{plan.name} is for one branch. Enterprise includes 3 branches, and more cost {formatInr(m.base)} a month each.</p>
             ) : freeSlots.length > 0 ? (
               <p className="text-sm">
                 You have {freeSlots.length} paid branch slot
                 {freeSlots.length === 1 ? "" : "s"} ready.{" "}
-                <Link href="/settings" className="text-accent">
+                <Link href="/settings?tab=branches&branch=new" className="text-accent">
                   Add the branch in Settings
                 </Link>
                 .
               </p>
-            ) : branches.length < terms.includedBranches ? (
+            ) : openBranches.length < terms.includedBranches ? (
               <p className="text-sm">
-                You can add {terms.includedBranches - branches.length} more branch
-                {terms.includedBranches - branches.length === 1 ? "" : "es"} at no cost.{" "}
-                <Link href="/settings" className="text-accent">
+                You can add {terms.includedBranches - openBranches.length} more branch
+                {terms.includedBranches - openBranches.length === 1 ? "" : "es"} at no cost.{" "}
+                <Link href="/settings?tab=branches&branch=new" className="text-accent">
                   Add it in Settings
                 </Link>
                 .

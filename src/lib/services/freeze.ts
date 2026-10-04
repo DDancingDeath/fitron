@@ -74,7 +74,7 @@ export async function unfreezeMembership(u: CurrentUser, memberId: string) {
 export async function transferMember(u: CurrentUser, memberId: string, toBranchId: string, reason?: string) {
   const m = await ownMember(u, memberId);
   if (toBranchId === m.branchId) throw new UserError("Choose a different branch.", "to");
-  if (!u.branches.some((b) => b.id === toBranchId)) throw new UserError("Choose one of your branches.", "to");
+  if (!u.branches.some((b) => b.id === toBranchId && b.active)) throw new UserError("Choose one of your branches.", "to");
   await db.$transaction(async (tx) => {
     const after = await tx.member.update({ where: { id: m.id }, data: { branchId: toBranchId } });
     await audit(tx, { orgId: u.orgId, userId: u.id, action: "member.transfer", entity: "Member", entityId: m.id, before: { branchId: m.branchId }, after: { branchId: after.branchId, reason: reason ?? null } });

@@ -21,7 +21,7 @@ export type CurrentUser = {
   role: string;
   perms: ReadonlySet<string>;
   /** Branches this user may work in. */
-  branches: { id: string; name: string }[];
+  branches: { id: string; name: string; active: boolean }[];
   /** The branch picked in the header, or "ALL" for users who can see every branch. */
   branch: string;
   /** Branch ids that queries must be limited to right now. */
@@ -50,13 +50,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
 
   const perms = new Set(user.role.permissions.map((rp) => rp.permission.key));
   const branches = perms.has("branches.all")
-    ? await db.branch.findMany({ where: { orgId: user.orgId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true } })
-    : user.branches.map((ub) => ({ id: ub.branch.id, name: ub.branch.name }));
+    ? await db.branch.findMany({ where: { orgId: user.orgId }, orderBy: { createdAt: "asc" }, select: { id: true, name: true, active: true } })
+    : user.branches.map((ub) => ({ id: ub.branch.id, name: ub.branch.name, active: ub.branch.active }));
 
   const picked = (await cookies()).get(BRANCH_COOKIE)?.value;
-  const canAll = branches.length > 1;
+  const open = branches.filter((b) => b.active);
+  const canAll = open.length > 1;
   const branch =
-    picked && branches.some((b) => b.id === picked) ? picked : canAll && (!picked || picked === "ALL") ? "ALL" : (branches[0]?.id ?? "");
+    picked && open.some((b) => b.id === picked) ? picked : canAll ? "ALL" : (open[0]?.id ?? branches[0]?.id ?? "");
   const branchIds = branch === "ALL" ? branches.map((b) => b.id) : [branch];
   const plan = await gymPlan(user.orgId);
   const planView: GymPlanView = { key: plan.key, name: plan.name, custom: plan.terms.custom };
@@ -117,4 +118,4 @@ export async function requireFeature(f: Feature, opts: { allowBlocked?: boolean 
 }
 
 /** The branch new records go into: the picked branch, or the first one when "All" is picked. */
-export const writeBranch = (u: CurrentUser) => (u.branch === "ALL" ? u.branches[0]?.id : u.branch);
+export const writeBranch = (u: CurrentUser) => (u.branch === "ALL" ? (u.branches.find((b) => b.active) ?? u.branches[0])?.id : u.branch);
