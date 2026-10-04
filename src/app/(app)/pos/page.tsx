@@ -117,7 +117,7 @@ export default async function PosPage({ searchParams }: PageProps<"/pos">) {
           <form action={restockAction.bind(null, restock.id)} className="flex flex-col gap-3.5">
             <div className="grid grid-cols-2 gap-3">
               <label className="flex flex-col gap-[5px] text-sm">
-                <span className="text-xs text-fg/70">Quantity received</span>
+                <span className="text-xs text-fg/70">Quantity</span>
                 <Input name="qty" type="number" min={1} defaultValue={Math.max((restock.reorderLevel ?? 0) * 2 - (restock.stock ?? 0), 1)} required />
               </label>
               <label className="flex flex-col gap-[5px] text-sm">

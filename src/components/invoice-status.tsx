@@ -1,7 +1,7 @@
 import type { InvoiceStatus } from "@/lib/domain/billing";
 import { Tag } from "./tag";
 
-const LABEL: Record<InvoiceStatus, string> = { PAID: "Paid", PARTIALLY_PAID: "Partly paid", UNPAID: "Unpaid", CANCELLED: "Cancelled" };
+const LABEL: Record<InvoiceStatus, string> = { PAID: "Paid", PARTIALLY_PAID: "Partially paid", UNPAID: "Unpaid", CANCELLED: "Cancelled" };
 const TAG: Record<InvoiceStatus, string> = { PAID: "PAID", PARTIALLY_PAID: "PARTIALLY PAID", UNPAID: "UNPAID", CANCELLED: "CANCELLED" };
 
 export const INVOICE_STATUS_LABEL = LABEL;

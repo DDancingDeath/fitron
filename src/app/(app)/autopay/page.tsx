@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowsClockwiseIcon, PlayIcon, PlusIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
+import { ArrowsClockwiseIcon, PlayIcon, PlugsIcon, PlusIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { autopayStats, getAutopaySettings, listMandates } from "@/lib/services/autopay";
@@ -11,9 +11,9 @@ import { addDays } from "@/lib/domain/dates";
 import { invoiceTotals } from "@/lib/domain/billing";
 import { Dialog } from "@/components/dialog";
 import { LinkButton, ListHeader, Notice, TABLE, TD, TH, cx } from "@/components/ui";
-import { fmtDate, fmtTime, formatRupees, initials } from "@/lib/format";
+import { fmtDate, fmtStamp, fmtTime, formatRupees, initials } from "@/lib/format";
 import { MandateForm } from "./autopay-forms";
-import { retryAction, rowAction, runDueAction } from "./actions";
+import { retryAction, rowAction, runDueAction, syncAction } from "./actions";
 
 export const metadata = { title: "UPI autopay · Fitron" };
 
@@ -48,6 +48,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
   const noticed = new Set(notices.map((n) => n.memberId));
   const lastRun = await db.jobRun.findFirst({ where: { orgId: u.orgId, name: "autopay", finishedAt: { not: null } }, orderBy: { finishedAt: "desc" }, select: { day: true, finishedAt: true } });
 
+  const lastSync = settings.lastSyncAt ? new Date(settings.lastSyncAt) : null;
   const next = (m: (typeof mandates)[number]) => (m.nextDebitOn ? toIso(m.nextDebitOn) : null);
   const active = mandates.filter((m) => m.status === "Active");
   const in7 = active.filter((m) => (next(m) ?? "9") <= addDays(today, 7));
@@ -76,8 +77,8 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
     : [
         "Member approves the mandate once in their UPI app (use Approve now in demo mode).",
         "A pre-debit notice goes out on WhatsApp 24 hours before each debit.",
-        "Debits run automatically on the renewal date and create the renewal, invoice and payment.",
-        `Failed debits are retried up to ${settings.retries} times, ${settings.retryGap} days apart, or collected by hand at the desk.`,
+        "Debits run automatically at 6:30 am on the renewal date and create the renewal, invoice and payment.",
+        `Failed debits retry ${settings.retries} times, ${settings.retryGap} days apart, then halt for manual collection.`,
       ];
   const missing = live ? razorpayReady() : null;
   const fq = f === "All" ? "" : f;
@@ -103,12 +104,12 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
                 </button>
               </form>
             )}
-            {live && (
-              <LinkButton href="/settings?tab=int">
+            <form action={syncAction.bind(null, fq)}>
+              <button className="inline-flex min-h-[38px] items-center gap-1.5 rounded-md border border-line px-[18px] text-sm font-semibold hover:bg-fg/7">
                 <ArrowsClockwiseIcon size={16} weight="duotone" />
-                Razorpay settings
-              </LinkButton>
-            )}
+                Sync with Razorpay
+              </button>
+            </form>
             <LinkButton href={`${href(f)}${fq ? "&" : "?"}do=new`} variant="primary" scroll={false}>
               <PlusIcon size={16} weight="duotone" />
               New mandate
@@ -127,7 +128,17 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
         ))}
       </div>
 
-      {missing && <Notice tone="alert">Live mode, but {missing}</Notice>}
+      {missing && (
+        <Notice tone="alert">
+          <span className="flex flex-wrap items-center justify-between gap-3">
+            <span className="inline-flex items-center gap-2">
+              <PlugsIcon size={18} weight="duotone" />
+              Razorpay keys are not set on the server, so new mandates and debit results cannot be synced with Razorpay.
+            </span>
+            <LinkButton href="/settings?tab=int">Settings</LinkButton>
+          </span>
+        </Notice>
+      )}
       {str("msg") && <Notice tone="ok">{str("msg")}</Notice>}
 
       <div className="grid items-start gap-x-12 gap-y-6 [grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))]">
@@ -138,6 +149,11 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
               <li key={h}>{h}</li>
             ))}
           </ol>
+          {live && (
+            <div className="mt-2.5 text-[12.5px] text-muted">
+              Last sync with Razorpay: {lastSync ? `${toIso(new Date(lastSync.getTime() + 330 * 60_000)) === today ? "Today" : fmtStamp(lastSync)}, ${fmtTime(lastSync)} · ${settings.lastSync?.applied ? `${settings.lastSync.applied} update${settings.lastSync.applied === 1 ? "" : "s"}` : "up to date"}` : "never"}
+            </div>
+          )}
           {!live && (
             <div className="mt-2.5 text-[12.5px] text-muted">
               Last automatic run: {lastRun ? `${lastRun.day === today ? "Today" : fmtDate(lastRun.day)}, ${fmtTime(lastRun.finishedAt)}` : "not yet today"}
@@ -214,7 +230,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
                     {m.planName} · {cycle(m.months)}
                   </td>
                   <td className={cx(TD, "text-right font-semibold whitespace-nowrap")}>{formatRupees(m.amount)}</td>
-                  <td className={cx(TD, "whitespace-nowrap", m.status === "Active" && d && d <= addDays(today, 2) && "font-semibold")}>{m.status === "Active" && d ? fmtDate(d) : "—"}</td>
+                  <td className={cx(TD, "whitespace-nowrap", m.status === "Active" && d && d <= addDays(today, 2) && "font-semibold")}>{m.status === "Active" && d ? fmtDate(d) : m.status === "Failed" && m.nextRetryOn ? `Retry ${fmtDate(toIso(m.nextRetryOn))}` : "—"}</td>
                   <td className={cx(TD, "text-center")}>{stats.debits.get(m.id) ?? 0}</td>
                   <td className={cx(TD, "max-w-[260px] text-[12.5px] text-fg/85")}>{m.lastResult ?? ""}</td>
                   <td className={TD}>
@@ -229,7 +245,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
                           <button className={cx(small, "bg-accent text-accent-ink hover:bg-accent-hover")}>Approve now</button>
                         </form>
                       )}
-                      {bad && m.mode === "demo" && (
+                      {bad && (
                         <form action={retryAction.bind(null, m.id, fq)}>
                           <button className={cx(small, "border border-line hover:bg-fg/7")}>Retry now</button>
                         </form>

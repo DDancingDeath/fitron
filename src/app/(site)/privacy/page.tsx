@@ -57,6 +57,12 @@ export default function PrivacyPage() {
         <p>Passwords are hashed with Argon2, connections use HTTPS, sensitive biometric templates are encrypted, staff access is limited by role, and every change in Gym Accounting is written to an audit log.</p>
       </section>
       <section>
+        <h2 id="dpa">Data Processing terms</h2>
+        <p>For your members&apos; and staff&apos;s personal data, your gym is the Data Fiduciary and FITRON is the Data Processor under the Digital Personal Data Protection Act, 2023. FITRON processes that data only on your instructions, to run the console for you.</p>
+        <p>You will collect and enter members&apos; data lawfully, with their consent where the law requires it, keep it accurate, and respond to your members&apos; requests to access, correct or erase their data.</p>
+        <p>FITRON will keep the data secure, process it only to provide the service, keep it confidential, tell you without undue delay about any breach affecting it, help you answer members&apos; requests, and delete or return it when your account ends.</p>
+      </section>
+      <section>
         <h2 id="children">Children</h2>
         <p>The AI Trainer is for people aged 18 and over. We do not knowingly process children&apos;s data without verifiable parental consent.</p>
       </section>

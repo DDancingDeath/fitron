@@ -24,7 +24,7 @@ export function LeadForm({ id, values = {}, staff, interests, meId }: { id?: str
         <Field label="Mobile" error={e.phone}>
           <Input name="phone" inputMode="tel" defaultValue={v("phone")} required />
         </Field>
-        <Field label="Heard about us from" error={e.source}>
+        <Field label="Source" error={e.source}>
           <Select name="source" defaultValue={v("source") ?? "Walk-in"}>
             {SOURCES.map((s) => (
               <option key={s}>{s}</option>
@@ -42,7 +42,7 @@ export function LeadForm({ id, values = {}, staff, interests, meId }: { id?: str
         <Field label="Follow up on" error={e.followUpOn} hint="Defaults to tomorrow.">
           <Input name="followUpOn" type="date" defaultValue={v("followUpOn")} />
         </Field>
-        <Field label="Trial on" error={e.trialOn}>
+        <Field label="Trial date (optional)" error={e.trialOn}>
           <Input name="trialOn" type="date" defaultValue={v("trialOn")} />
         </Field>
         <Field label="Follow-up by" error={e.ownerId}>

@@ -13,7 +13,7 @@ export default async function NewStaff({ searchParams }: PageProps<"/staff/new">
   const defaultRole = typeof want === "string" ? roles.find((r) => r.name === want)?.id : undefined;
   return (
     <>
-      <PageHeader title="Add staff member" />
+      <PageHeader title="Add staff" />
       <StaffForm roles={roles} branches={branches} defaultRole={defaultRole} />
     </>
   );

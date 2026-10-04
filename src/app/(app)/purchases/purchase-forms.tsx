@@ -185,7 +185,7 @@ export function PurchaseForm({ products, categories, vendors, today, startType }
         )}
         {paid === "none" && <input type="hidden" name="method" value="Bank Transfer" />}
         {paid === "part" && (
-          <Field label="Amount paid now (₹)" error={e.paidAmount}>
+          <Field label="Paid now (₹)" error={e.paidAmount}>
             <Input name="paidAmount" inputMode="decimal" defaultValue={sent.paidAmount} required />
           </Field>
         )}
@@ -195,10 +195,10 @@ export function PurchaseForm({ products, categories, vendors, today, startType }
       </div>
       <div className="flex flex-wrap items-center gap-4">
         <Button variant="primary" disabled={pending}>
-          {pending ? "Recording…" : "Record bill"}
+          {pending ? "Saving…" : "Save purchase"}
         </Button>
         <span className="text-sm">
-          Total incl. GST <strong className="tabular-nums">{formatInr(total)}</strong>
+          Bill total <strong className="tabular-nums">{formatInr(total)}</strong>
         </span>
       </div>
       <p className="text-sm text-muted">Stock lines add to product stock. Equipment goes to the asset register, not profit and loss. Anything unpaid shows under supplier dues.</p>
@@ -227,7 +227,7 @@ export function PayVendorForm({ id, balance, today, billDate }: { id: string; ba
             ))}
           </Select>
         </Field>
-        <Field label="Reference" error={e.reference}>
+        <Field label="Reference / UTR" error={e.reference}>
           <Input name="reference" defaultValue={v.reference} placeholder="UTR or cheque no." />
         </Field>
       </div>

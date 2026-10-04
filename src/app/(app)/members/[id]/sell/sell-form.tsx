@@ -86,7 +86,7 @@ export function SellForm({
               </Select>
             </Field>
           )}
-          <Field label="Starts on" error={e.startDate} hint={plan ? `Ends ${fmtDate(membershipEndDate(start, plan.months))}` : undefined}>
+          <Field label="Start date" error={e.startDate} hint={plan ? `Ends ${fmtDate(membershipEndDate(start, plan.months))}` : undefined}>
             <Input name="startDate" type="date" value={start} onChange={(ev) => setStart(ev.target.value)} required />
           </Field>
           <Field label="Discount (₹)" error={e.discount}>
@@ -117,7 +117,7 @@ export function SellForm({
       </Card>
       <Card title="Collect now">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="Amount (₹)" error={e.payAmount} hint="Enter 0 to invoice without collecting">
+          <Field label="Amount received now (₹)" error={e.payAmount} hint="Enter 0 to invoice without collecting">
             <Input name="payAmount" inputMode="decimal" value={payValue} onChange={(ev) => setPay(ev.target.value)} />
           </Field>
           <Field label="Method" error={e.payMethod}>
@@ -134,7 +134,7 @@ export function SellForm({
       </Card>
       <div className="flex gap-2">
         <Button variant="primary" disabled={pending || !plan}>
-          {pending ? "Saving…" : isNew ? "Create membership" : "Renew membership"}
+          {pending ? "Saving…" : isNew ? "Create membership" : "Renew and generate invoice"}
         </Button>
         <LinkButton href={`/members/${memberId}`}>Cancel</LinkButton>
       </div>

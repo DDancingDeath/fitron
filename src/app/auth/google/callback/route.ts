@@ -5,8 +5,7 @@ import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
 import { GOOGLE_BACK, GOOGLE_FLOWS, GOOGLE_FLOW_COOKIE, GOOGLE_SIGNUP_COOKIE, exchangeCode, sign, unsign, type GoogleFlow, type GoogleProfile } from "@/lib/integrations/google";
-import { audit } from "@/lib/services/audit";
-import { appUrl } from "@/lib/services/accounts";
+import { appUrl, recordSignIn } from "@/lib/services/accounts";
 import { signInTrainerWithGoogle } from "@/lib/services/trainer-google";
 
 // Google sends the visitor back here. The state must match the one we set in /auth/google,
@@ -63,7 +62,7 @@ export async function GET(req: NextRequest) {
 /**
  * Google has verified the email, so an unconfirmed account counts as confirmed now. Its password
  * was never proven to belong to this person (anyone can sign up with someone else's address and
- * wait), so it is replaced and any other sessions end; they can set their own with "Forgot your password?".
+ * wait), so it is replaced and any other sessions end; they can set their own with "Forgot password?".
  */
 async function staffIn(userId: string, verifiedAt: Date | null, next: string) {
   if (!verifiedAt) {
@@ -71,8 +70,6 @@ async function staffIn(userId: string, verifiedAt: Date | null, next: string) {
     await db.user.update({ where: { id: userId }, data: { emailVerifiedAt: new Date(), passwordHash: await hashPassword(randomBytes(24).toString("base64url")) } });
   }
   await createSession(userId);
-  const who = await db.user.findUnique({ where: { id: userId }, select: { orgId: true } });
-  if (who) await db.$transaction((tx) => audit(tx, { orgId: who.orgId, userId, action: "auth.login", entity: "Session", entityId: userId, after: { via: "google" } }));
-  await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
+  await recordSignIn(userId, "google");
   return to(next);
 }

@@ -3,7 +3,6 @@ import { DownloadSimpleIcon, PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { ACCOUNTING_TABS, SectionTabs } from "@/components/section-tabs";
 import { listAssets } from "@/lib/services/assets";
-import { fyLabel, fyOf } from "@/lib/domain/assets";
 import { monthLabel } from "@/lib/domain/periods";
 import { Tag } from "@/components/tag";
 import { LinkButton, ListHeader, TABLE, TD, TH, cx } from "@/components/ui";
@@ -34,7 +33,7 @@ export default async function AssetsPage({ searchParams }: PageProps<"/assets">)
     ["Gross block", formatRupees(gross), `${all.length} asset${all.length === 1 ? "" : "s"} in use`],
     ["Accumulated depreciation", formatRupees(acc), `to ${monthLabel(today)}`],
     ["Net book value", formatRupees(gross - acc), "what the equipment is worth on the books"],
-    [`Depreciation ${fyLabel(fyOf(today.slice(0, 7)))}`, formatRupees(all.reduce((s, a) => s + a.info.fyDep, 0)), "charged to P&L"],
+    ["Depreciation this FY", formatRupees(all.reduce((s, a) => s + a.info.fyDep, 0)), "charged to P&L"],
   ];
   const branchLabel = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
 

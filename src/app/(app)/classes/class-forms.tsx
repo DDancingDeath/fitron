@@ -41,10 +41,10 @@ export function ClassForm({ id, values = {}, trainers }: { id?: string; values?:
             ))}
           </Select>
         </Field>
-        <Field label="Starts at" error={e.startTime}>
+        <Field label="Start time" error={e.startTime}>
           <Input name="startTime" type="time" defaultValue={v("startTime") ?? "06:30"} required />
         </Field>
-        <Field label="Length (minutes)" error={e.durationMin}>
+        <Field label="Duration (min)" error={e.durationMin}>
           <Input name="durationMin" type="number" min={10} max={240} defaultValue={v("durationMin") ?? "45"} required />
         </Field>
         <Field label="Places" error={e.capacity}>

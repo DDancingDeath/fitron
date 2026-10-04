@@ -14,7 +14,7 @@ describe("Settings › Integrations & AI texts", () => {
 
   it("autopay defaults and clamping", () => {
     expect(withAutopayDefaults(null)).toEqual({ mode: "demo", retries: 3, retryGap: 2 });
-    expect(withAutopayDefaults({ mode: "live", retries: 9, retryGap: 0, connOk: true })).toMatchObject({ mode: "live", retries: 5, retryGap: 1, connOk: true });
+    expect(withAutopayDefaults({ mode: "live", retries: 99, retryGap: 0, connOk: true })).toMatchObject({ mode: "live", retries: 10, retryGap: 1, connOk: true });
   });
 
   it("device status: online within 5 minutes, offline after, waiting without a sync", () => {

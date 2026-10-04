@@ -5,12 +5,14 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/services/audit";
+import { recordSignIn } from "@/lib/services/accounts";
 import { getCurrentUser } from "@/lib/auth/current";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, idleSignOut } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
 import { rateLimit } from "@/lib/rate-limit";
-import type { FormState } from "@/lib/validation/common";
+import { fieldErrors, type FormState } from "@/lib/validation/common";
+import { signupStep1Schema } from "@/lib/validation/site";
 
 const loginInput = z.object({
   email: z.email({ error: "Enter your email." }).transform((s) => s.toLowerCase().trim()),
@@ -33,18 +35,17 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
 
   const user = await db.user.findFirst({ where: { email: parsed.data.email, active: true, deletedAt: null } });
   const ok = await verifyPassword(user?.passwordHash ?? (await getDummyHash()), parsed.data.password);
-  if (!user || !ok) return { email, message: "That email and password don't match." };
+  if (!user || !ok) return { email, message: "Email or password is incorrect." };
   if (!user.emailVerifiedAt) return { email, unverified: true, message: "Confirm your email first: open the link we sent you." };
 
   await createSession(user.id);
-  await db.$transaction((tx) => audit(tx, { orgId: user.orgId, userId: user.id, action: "auth.login", entity: "Session", entityId: user.id, after: { via: "password" } }));
-  await db.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+  await recordSignIn(user.id, "email");
   redirect(safeNext(formData.get("next")));
 }
 
 export async function logout() {
   const me = await getCurrentUser().catch(() => null);
-  if (me) await db.$transaction((tx) => audit(tx, { orgId: me.orgId, userId: me.id, action: "auth.logout", entity: "Session", entityId: me.id }));
+  if (me) await db.$transaction((tx) => audit(tx, { orgId: me.orgId, userId: me.id, action: "auth.logout", entity: "User", entityId: me.id }));
   await destroySession();
   redirect("/login");
 }
@@ -54,4 +55,20 @@ export async function idleLogout(minutes: number) {
   const m = Math.max(1, Math.min(1440, Math.floor(Number(minutes) || 0)));
   await idleSignOut(m);
   redirect(`/login?idle=${m}`);
+}
+
+/** Create account, step 1: check the owner's details and that the email is free before asking about the gym. */
+export async function continueSignup(_: FormState, fd: FormData): Promise<FormState> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ?? "local";
+  if (!rateLimit(`signup-check:${ip}`, 10, 10 * 60_000)) return { message: "Too many tries in a few minutes. Wait a little and try again.", nonce: Math.random().toString(36).slice(2) };
+  const parsed = signupStep1Schema.safeParse(Object.fromEntries(fd));
+  if (!parsed.success) {
+    const errors = fieldErrors(parsed.error);
+    return { errors, message: Object.values(errors).flat()[0] ?? "Check the highlighted fields.", nonce: Math.random().toString(36).slice(2) };
+  }
+  if (await db.user.findUnique({ where: { email: parsed.data.email }, select: { id: true } })) {
+    const message = "An account with this email exists. Sign in instead.";
+    return { message, errors: { email: [message] }, nonce: Math.random().toString(36).slice(2) };
+  }
+  return { ok: true, nonce: Math.random().toString(36).slice(2) };
 }

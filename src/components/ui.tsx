@@ -31,7 +31,7 @@ export const Textarea = ({ className, ...p }: ComponentProps<"textarea">) => (
   <textarea className={cx(inputCls, "min-h-20", className)} {...p} />
 );
 
-export function Field({ label, error, hint, children, className }: { label: string; error?: string[]; hint?: string; children: ReactNode; className?: string }) {
+export function Field({ label, error, hint, children, className }: { label: ReactNode; error?: string[]; hint?: string; children: ReactNode; className?: string }) {
   return (
     <label className={cx("flex flex-col gap-[5px] text-sm", className)}>
       <span className="text-xs text-fg/70">{label}</span>

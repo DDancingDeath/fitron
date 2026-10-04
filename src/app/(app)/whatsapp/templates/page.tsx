@@ -35,7 +35,7 @@ export default async function TemplatesPage() {
           <div key={t.key} className="flex flex-col gap-2.5 rounded-lg border border-line bg-surface p-[18px]">
             <div className="flex items-center justify-between gap-2">
               <div className="text-[11px] tracking-[0.08em] text-muted uppercase">{t.trigger}</div>
-              <span className="text-xs text-muted">{t.autoSend ? "Auto-send on" : "Sent by staff"}</span>
+              <span className="text-xs text-muted">{t.autoSend ? "Auto-send on" : "Auto-send off"}</span>
             </div>
             <div className="text-lg font-semibold">{t.name}</div>
             <div className="max-h-[170px] overflow-auto rounded-md bg-bg px-3 py-2.5 text-[13px] whitespace-pre-wrap">{t.body}</div>

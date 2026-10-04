@@ -44,3 +44,9 @@ export function waNumber(phone: string | null | undefined) {
 
 /** Rupees for message text: 4720 paise×100 → "4,720" or "4,720.50". */
 export const rupeesText = (paise: number) => (paise / 100).toLocaleString("en-IN", { minimumFractionDigits: paise % 100 ? 2 : 0, maximumFractionDigits: 2 });
+
+/** One line of the automation run log: "3 Oct, 7:02 am · All scheduled rules · 4 sent, 1 skipped" (older records had no name or skipped). */
+export function runLine(r: { ts: string; name?: string; sent: number; skipped?: number; held?: number }, fts: (ts: string) => string) {
+  const extra = `${r.skipped ? `, ${r.skipped} skipped` : ""}${r.held ? `, ${r.held} held` : ""}`;
+  return `${fts(r.ts)} · ${r.name || "All scheduled rules"} · ${r.sent} sent${extra}`;
+}

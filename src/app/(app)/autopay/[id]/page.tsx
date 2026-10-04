@@ -6,6 +6,7 @@ import { getMandate } from "@/lib/services/autopay";
 import { Badge, Card, PageHeader } from "@/components/ui";
 import { fmtDate, fmtStamp, fmtTime, formatInr } from "@/lib/format";
 import { MandateButton } from "../autopay-forms";
+import { retryAction } from "../actions";
 import { MANDATE_TONE } from "../tone";
 
 export const metadata = { title: "Autopay mandate · Fitron" };
@@ -41,6 +42,11 @@ export default async function MandatePage({ params }: PageProps<"/autopay/[id]">
         actions={
           <>
             {m.status === "Pending" && m.mode === "demo" && <MandateButton id={m.id} action="approve-demo" label="Approve (demo)" variant="primary" />}
+            {["Failed", "Halted"].includes(m.status) && (
+              <form action={retryAction.bind(null, m.id, "")}>
+                <button className="inline-flex min-h-10 items-center rounded-md border border-line px-4 text-sm font-semibold hover:bg-fg/7">Retry now</button>
+              </form>
+            )}
             {m.status === "Active" && <MandateButton id={m.id} action="pause" label="Pause" />}
             {["Paused", "Halted", "Failed"].includes(m.status) && <MandateButton id={m.id} action="resume" label="Resume" variant="primary" />}
             {m.status !== "Cancelled" && <MandateButton id={m.id} action="cancel" label="Cancel autopay" variant="danger" confirm="Cancel this autopay? The member will have to approve a new one to restart." />}
@@ -52,6 +58,7 @@ export default async function MandatePage({ params }: PageProps<"/autopay/[id]">
           <dl className="divide-y divide-line text-sm">
             <Row label="Member" value={u.can("members.view") ? <Link href={`/members/${m.member.id}`} className="text-accent">{m.member.name} ({m.member.code})</Link> : `${m.member.name} (${m.member.code})`} />
             <Row label="Next debit" value={m.nextDebitOn && ["Active", "Pending"].includes(m.status) ? fmtDate(m.nextDebitOn) : null} />
+            <Row label="Next retry" value={m.nextRetryOn && m.status === "Failed" ? fmtDate(m.nextRetryOn) : null} />
             <Row label="Last result" value={m.lastResult} />
             <Row label="Failed attempts" value={String(m.retries)} />
             <Row label="Approval link" value={m.shortUrl ? <a href={m.shortUrl} target="_blank" rel="noreferrer" className="text-accent">{m.shortUrl}</a> : m.mode === "demo" ? "Demo: no real link" : null} />

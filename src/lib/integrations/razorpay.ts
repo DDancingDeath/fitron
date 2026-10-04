@@ -47,6 +47,14 @@ export const createSubscription = (a: { planId: string; startAt?: Date; notes: R
 export const subscriptionAction = (id: string, action: "pause" | "resume" | "cancel") =>
   rzp<Subscription>("POST", `/subscriptions/${id}/${action}`, action === "pause" ? { pause_at: "now" } : action === "resume" ? { resume_at: "now" } : { cancel_at_cycle_end: 0 });
 
+export type SubscriptionState = { id: string; status: string; charge_at?: number | null; paid_count?: number; current_end?: number | null; ended_at?: number | null; notes?: Record<string, string> };
+export const getSubscription = (id: string) => rzp<SubscriptionState>("GET", `/subscriptions/${encodeURIComponent(id)}`);
+
+export type SubscriptionInvoice = { id: string; status: string; payment_id?: string | null; amount?: number; paid_at?: number | null };
+export const listSubscriptionInvoices = (id: string) => rzp<{ items?: SubscriptionInvoice[] }>("GET", `/invoices?subscription_id=${encodeURIComponent(id)}&count=100`);
+
+export const getPayment = (id: string) => rzp<{ id: string; status: string; error_description?: string | null }>("GET", `/payments/${encodeURIComponent(id)}`);
+
 /** Razorpay signs the raw request body with the webhook secret (HMAC-SHA256, hex). */
 export function verifyWebhook(rawBody: string, signature: string | null, secret = env("RAZORPAY_WEBHOOK_SECRET")) {
   if (!secret || !signature) return false;

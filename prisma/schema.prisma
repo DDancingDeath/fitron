@@ -858,6 +858,8 @@ model AutopayMandate {
   /// Pending | Active | Paused | Failed | Halted | Cancelled
   status         String         @default("Pending")
   nextDebitOn    DateTime?      @db.Date
+  /// Demo mode: the scheduled retry after a failed simulated debit.
+  nextRetryOn    DateTime?      @db.Date
   retries        Int            @default(0)
   lastResult     String?
   createdById    String

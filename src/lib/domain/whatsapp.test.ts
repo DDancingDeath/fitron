@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TEMPLATES, placeholders, REMINDER_KEYS, render, rupeesText, waNumber } from "./whatsapp";
+import { DEFAULT_TEMPLATES, placeholders, REMINDER_KEYS, render, rupeesText, runLine, waNumber } from "./whatsapp";
 
 describe("whatsapp templates", () => {
   it("fills variables and blanks unknown ones", () => {
@@ -28,5 +28,18 @@ describe("whatsapp templates", () => {
   it("formats rupees", () => {
     expect(rupeesText(472000)).toBe("4,720");
     expect(rupeesText(472050)).toBe("4,720.50");
+  });
+});
+
+describe("runLine", () => {
+  const fts = () => "3 Oct, 7:02 am";
+  it("formats a run with skipped messages", () => {
+    expect(runLine({ ts: "x", name: "All scheduled rules", sent: 4, skipped: 1 }, fts)).toBe("3 Oct, 7:02 am · All scheduled rules · 4 sent, 1 skipped");
+  });
+  it("omits skipped when zero", () => {
+    expect(runLine({ ts: "x", name: "Expiry reminder · 7 days", sent: 2, skipped: 0 }, fts)).toBe("3 Oct, 7:02 am · Expiry reminder · 7 days · 2 sent");
+  });
+  it("renders legacy records without a name", () => {
+    expect(runLine({ ts: "x", sent: 5 }, fts)).toBe("3 Oct, 7:02 am · All scheduled rules · 5 sent");
   });
 });

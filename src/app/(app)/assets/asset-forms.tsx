@@ -36,7 +36,7 @@ export function AssetForm({ id, values, today, fromPurchase }: { id?: string; va
         <Field label="Purchase date" error={e.purchaseDate}>
           <Input name="purchaseDate" type="date" max={today} defaultValue={v.purchaseDate ?? today} readOnly={fromPurchase} required />
         </Field>
-        <Field label="Cost incl. GST (₹)" error={e.cost}>
+        <Field label="Total cost incl. GST (₹)" error={e.cost}>
           <Input name="cost" inputMode="decimal" defaultValue={v.cost} readOnly={fromPurchase} required />
         </Field>
         <Field label="Salvage value (₹)" error={e.salvage} hint="What it will be worth at the end. Usually 0.">
@@ -64,11 +64,11 @@ export function AssetForm({ id, values, today, fromPurchase }: { id?: string; va
           </Select>
         </Field>
         {method === "WDV" ? (
-          <Field label="Rate (% a year)" error={e.rate} hint={`Income-tax default for ${category.toLowerCase()}: ${rate}%`}>
+          <Field label="WDV rate (% per year)" error={e.rate} hint={`Income-tax default for ${category.toLowerCase()}: ${rate}%`}>
             <Input name="rate" inputMode="decimal" key={`r-${category}`} defaultValue={v.rate || String(rate)} required />
           </Field>
         ) : (
-          <Field label="Useful life (years)" error={e.life} hint={`Typical for ${category.toLowerCase()}: ${life} years`}>
+          <Field label="Useful life (years, SLM)" error={e.life} hint={`Typical for ${category.toLowerCase()}: ${life} years`}>
             <Input name="life" type="number" min={1} key={`l-${category}`} defaultValue={v.life || String(life)} required />
           </Field>
         )}
@@ -141,7 +141,7 @@ export function DisposeForm({ id, today, minDate }: { id: string; today: string;
       </div>
       <div>
         <Button variant="danger" disabled={pending}>
-          {pending ? "Saving…" : type === "SOLD" ? "Record sale" : "Record as scrapped"}
+          {pending ? "Saving…" : type === "SOLD" ? "Mark as sold" : "Mark as scrapped"}
         </Button>
       </div>
     </form>

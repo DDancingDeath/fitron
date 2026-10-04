@@ -5,7 +5,7 @@ import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
 import { getWaSettings, listMessages, listTemplates, templateRule } from "@/lib/services/whatsapp";
 import { automationPreview, dispatchScheduled, lastAutomationRun, previewTemplate, ruleSentence } from "@/lib/services/wa-automation";
-import { VARS } from "@/lib/domain/whatsapp";
+import { VARS, runLine } from "@/lib/domain/whatsapp";
 import { isScheduled } from "@/lib/domain/wa-rules";
 import { todayIso } from "@/lib/services/time";
 import { Tag } from "@/components/tag";
@@ -58,7 +58,7 @@ export default async function WhatsAppPage({ searchParams }: PageProps<"/whatsap
   return (
     <div className="flex flex-col gap-6">
       <ListHeader
-        kicker={PROVIDER[settings.mode]}
+        kicker={`${PROVIDER[settings.mode]}${settings.mode === "connector" && settings.linked?.number ? ` · ${settings.linked.number}` : ""}`}
         title="WhatsApp"
         actions={
           <>
@@ -142,19 +142,16 @@ async function Templates({ u, templates, settings, canSettings }: { u: U; templa
               {r.name} <span className="text-xs text-muted">· {r.time}</span>
             </span>
             <span>
-              <strong>{r.send.length}</strong> to send<span className="text-muted"> · {r.skipped.length} skipped</span>
+              <strong>{r.send.length}</strong> to send{r.skipped.length > 0 && <span className="text-muted"> · {r.skipped.length} skipped</span>}
             </span>
           </div>
         ))}
         {!rows.length && <div className="text-sm text-muted">Nothing due today from scheduled rules.</div>}
         {last.runs
-          .filter((x) => x.name)
           .slice(0, 6)
           .map((x, i) => (
             <div key={`${x.ts}-${x.key}-${i}`} className="text-xs text-muted">
-              {fmtShort(new Date(x.ts))}, {fmtTime(new Date(x.ts))} · {x.name} · {x.sent} sent
-              {x.skipped ? `, ${x.skipped} skipped` : ""}
-              {x.held ? `, ${x.held} held` : ""}
+              {runLine(x, (ts) => `${fmtShort(new Date(ts))}, ${fmtTime(new Date(ts))}`)}
             </div>
           ))}
       </section>

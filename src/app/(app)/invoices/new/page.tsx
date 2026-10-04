@@ -5,7 +5,7 @@ import { todayIso } from "@/lib/services/time";
 import { PageHeader } from "@/components/ui";
 import { InvoiceForm } from "./invoice-form";
 
-export const metadata = { title: "New invoice · Fitron" };
+export const metadata = { title: "Create invoice · Fitron" };
 
 export default async function NewInvoicePage({ searchParams }: PageProps<"/invoices/new">) {
   const u = await requirePermission("invoices.create");
@@ -16,7 +16,7 @@ export default async function NewInvoicePage({ searchParams }: PageProps<"/invoi
   ]);
   return (
     <>
-      <PageHeader title="New invoice" subtitle="For personal training, products or other charges. Use Renew on a member's page for memberships." />
+      <PageHeader title="Create invoice" subtitle="For personal training, products or other charges. Use Renew on a member's page for memberships." />
       <InvoiceForm
         members={members.map((m) => ({ id: m.id, label: `${m.name} · ${m.code} · ${m.phone}` }))}
         memberId={typeof member === "string" ? member : undefined}

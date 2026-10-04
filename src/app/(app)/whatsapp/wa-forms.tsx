@@ -101,7 +101,7 @@ export function CampaignForm({ audiences }: { audiences: { key: string; label: s
           ))}
         </Select>
       </Field>
-      <Field label="Message" hint="{{member_name}}, {{expiry_date}}, {{pending_amount}} and {{gym_name}} are filled in for each member.">
+      <Field label="Campaign message" hint="{{member_name}}, {{expiry_date}}, {{pending_amount}} and {{gym_name}} are filled in for each member.">
         <Textarea name="body" rows={5} defaultValue={"Hi {{member_name}}, "} required />
       </Field>
       <div>

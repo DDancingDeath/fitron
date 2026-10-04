@@ -48,7 +48,7 @@ export function MemberForm({ id, values = {}, trainers }: { id?: string; values?
           <Field label="Occupation" error={e.occupation}>
             <Input name="occupation" defaultValue={v("occupation")} />
           </Field>
-          <Field label="How did they hear about you?" error={e.source}>
+          <Field label="How did you hear about us?" error={e.source}>
             <Select name="source" defaultValue={v("source") ?? ""} required>
               <option value="" disabled>
                 Choose
@@ -73,7 +73,7 @@ export function MemberForm({ id, values = {}, trainers }: { id?: string; values?
       </Card>
       <Card title="Address">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="House / street" error={e.house}>
+          <Field label="House / flat no." error={e.house}>
             <Input name="house" defaultValue={v("house")} />
           </Field>
           <Field label="Area" error={e.area}>
@@ -121,7 +121,7 @@ export function MemberForm({ id, values = {}, trainers }: { id?: string; values?
           <Field label="Notes" error={e.notes} className="sm:col-span-2">
             <Textarea name="notes" defaultValue={v("notes")} />
           </Field>
-          <Field label="Staff-only notes" error={e.staffNotes} className="sm:col-span-2">
+          <Field label="Internal staff notes" error={e.staffNotes} className="sm:col-span-2">
             <Textarea name="staffNotes" defaultValue={v("staffNotes")} />
           </Field>
         </div>

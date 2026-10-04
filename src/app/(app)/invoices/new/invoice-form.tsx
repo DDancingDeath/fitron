@@ -110,7 +110,7 @@ export function InvoiceForm({ members, memberId, today, taxRate }: { members: { 
       </Card>
       <div className="flex gap-2">
         <Button variant="primary" disabled={pending}>
-          {pending ? "Saving…" : "Create invoice"}
+          {pending ? "Saving…" : "Generate invoice"}
         </Button>
         <LinkButton href="/invoices">Cancel</LinkButton>
       </div>

@@ -82,7 +82,7 @@ export default async function StaffPage({ searchParams }: PageProps<"/staff">) {
                 <span className="grid size-11 flex-none place-items-center rounded-full bg-accent-soft font-semibold text-accent">{initials(s.name)}</span>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-base font-semibold">{s.name}</div>
-                  <div className="text-xs text-muted">{s.lastLoginAt ? `Last sign-in ${fmtStamp(s.lastLoginAt)}` : "Never signed in"}</div>
+                  <div className="text-xs text-muted">{s.lastLoginAt ? `Last active: ${fmtStamp(s.lastLoginAt)}` : "Last active: —"}</div>
                 </div>
                 {s.active ? <span className="rounded-sm border border-accent-500 bg-accent-soft px-2.5 py-[3px] text-[11px] whitespace-nowrap text-accent-strong">{s.role.name}</span> : <Tag label="Deactivated" />}
               </div>

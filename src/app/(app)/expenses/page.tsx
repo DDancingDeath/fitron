@@ -160,7 +160,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/expense
       </div>
 
       {s("do") === "add" && (
-        <Dialog kicker="Expenses" title="Add expense" close={here} note="Expenses are voided with a reason, never deleted. Equipment you'll use for years belongs in Fixed assets.">
+        <Dialog kicker="Accounts" title="Add expense" close={here} note="Expenses are voided with a reason, never deleted. Equipment you'll use for years belongs in Fixed assets.">
           <ExpenseForm categories={cats} today={today} />
         </Dialog>
       )}

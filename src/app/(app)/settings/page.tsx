@@ -292,7 +292,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           </p>
           <Panel title="WhatsApp" id="whatsapp">
             <form action={saveWhatsApp} className="flex flex-col gap-3 text-sm">
-              <Field label="How messages are sent">
+              <Field label="Sending mode">
                 <Select name="mode" key={wa.mode} defaultValue={wa.mode}>
                   <option value="demo">Demo: log only, send nothing</option>
                   <option value="cloud">WhatsApp Cloud API (official)</option>
@@ -347,10 +347,10 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                   <Input value="Razorpay UPI Autopay" disabled readOnly aria-label="Autopay provider" />
                 </Field>
                 <Field label="Retries on failure">
-                  <Input name="retries" type="number" min={0} max={5} step={1} required defaultValue={autopay.retries} />
+                  <Input name="retries" type="number" min={1} max={10} step={1} required defaultValue={autopay.retries} />
                 </Field>
                 <Field label="Days between retries">
-                  <Input name="retryGap" type="number" min={1} max={7} step={1} required defaultValue={autopay.retryGap} />
+                  <Input name="retryGap" type="number" min={1} max={30} step={1} required defaultValue={autopay.retryGap} />
                 </Field>
               </div>
               <p className="text-muted">Existing mandates keep the mode they were created in.</p>
