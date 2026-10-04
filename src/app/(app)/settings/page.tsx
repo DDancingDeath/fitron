@@ -1,6 +1,6 @@
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
-import { getGymProfile, getSetting } from "@/lib/services/settings";
+import { getGymProfile, getPrivacy, getSetting } from "@/lib/services/settings";
 import { getTax } from "@/lib/services/tax";
 import { nextInvoiceNumber } from "@/lib/services/billing";
 import { Button, Field, Input, LinkButton, Notice, Select, Textarea } from "@/components/ui";
@@ -8,7 +8,7 @@ import { gymLogoUrl } from "@/components/gym-logo";
 import { LogoForm } from "./logo-form";
 import { TaxForm } from "./tax-form";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
-import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveNumbering, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
+import { makeTrainerCode, saveAi, saveAutopay, saveBranchAction, saveGym, saveNumbering, savePrivacy, saveReminders, saveWhatsApp, sendTestAction, simulateLinkAction, testAutopayConnection, unlinkAction } from "./actions";
 import { getReminderSettings, getWaSettings, listTemplates } from "@/lib/services/whatsapp";
 import { reminderSchedule } from "@/lib/services/reminders";
 import { LinkWatcher } from "./link-watcher";
@@ -49,9 +49,10 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             autopay: "int",
             ai: "int",
             branches: "branches",
+            privacy: "privacy",
           } as Record<string, string>
         )[section ?? ""];
-  const tab = ["gym", "billing", "reminders", "wa", "int", "branches"].includes(asked ?? "") ? asked! : "gym";
+  const tab = ["gym", "billing", "reminders", "wa", "int", "branches", "privacy"].includes(asked ?? "") ? asked! : "gym";
   const [gym, tax, nextInvoice, numbering, branches, wa, autopay] = await Promise.all([
     getGymProfile(u.orgId),
     getTax(u.orgId),
@@ -87,6 +88,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
           };
         })()
       : null;
+  const privacy = tab === "privacy" ? await getPrivacy(u.orgId) : null;
   const trainerCode = tab === "gym" ? (await db.organization.findUniqueOrThrow({ where: { id: u.orgId }, select: { trainerCode: true } })).trainerCode : null;
   const integrations =
     tab === "int"
@@ -414,6 +416,28 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             </form>
           </Panel>
         </div>
+      )}
+      {tab === "privacy" && privacy && (
+        <Panel title="Privacy & DPDP" className="max-w-[560px]">
+          <p className="text-sm text-muted">Members can ask who handles their data. The grievance officer is named on the member consent and in data requests.</p>
+          <form action={savePrivacy} className="flex flex-col gap-[18px]">
+            <Field label="Grievance Officer name">
+              <Input name="officer" defaultValue={privacy.officer ?? ""} placeholder="Full name" required minLength={2} maxLength={80} />
+            </Field>
+            <Field label="Grievance email">
+              <Input name="email" type="email" defaultValue={privacy.email ?? ""} placeholder="privacy@yourgym.in" required />
+            </Field>
+            <Field label="Grievance phone">
+              <Input name="phone" type="tel" inputMode="numeric" defaultValue={privacy.phone ?? ""} placeholder="10-digit number" />
+            </Field>
+            <Field label="Keep data after membership ends (months)">
+              <Input name="retainMonths" type="number" min={1} max={120} defaultValue={privacy.retainMonths ?? 24} required className="max-w-[160px]" />
+            </Field>
+            <div>
+              <Button variant="primary">Save</Button>
+            </div>
+          </form>
+        </Panel>
       )}
       {tab === "branches" && (
         <Panel title="Branches">

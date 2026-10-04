@@ -131,3 +131,12 @@ export const aiInput = z.object({
   autoWinback: z.preprocess((v) => v === "on", z.boolean()),
 });
 export type AiInput = z.infer<typeof aiInput>;
+
+/** Settings › Privacy & DPDP: the grievance officer (required under DPDP) and the retention period. */
+export const privacyInput = z.object({
+  officer: z.string().trim().min(2, { error: "Enter the grievance officer's name." }).max(80),
+  email: z.email({ error: "Enter a valid grievance email." }).trim().toLowerCase(),
+  phone: z.preprocess((v) => (typeof v === "string" && v.trim() === "" ? undefined : v), indianPhone.optional()),
+  retainMonths: z.coerce.number().int().min(1, { error: "Keep data for at least 1 month." }).max(120, { error: "At most 120 months." }),
+});
+export type PrivacyInput = z.infer<typeof privacyInput>;

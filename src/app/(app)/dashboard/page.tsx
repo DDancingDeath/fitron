@@ -1,3 +1,4 @@
+import { getGymProfile } from "@/lib/services/settings";
 import Image from "next/image";
 import Link from "next/link";
 import { canOpen } from "@/lib/nav";
@@ -59,6 +60,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   // Fitron AI on the dashboard: the org-wide switches from Settings › Integrations & AI, on top of role and plan.
   const ai = u.can("ai.use") ? await getAiSettings(u.orgId) : null;
   const aiOn = !!ai?.enabled;
+  const gymName = sp.cleared ? (await getGymProfile(u.orgId)).name : "";
   const brief: Alert[] | null = aiOn && ai!.dailyBrief ? await dailyBrief(u, d.today) : null;
   const winback = aiOn && ai!.autoWinback && u.can("whatsapp.send");
 
@@ -83,6 +85,7 @@ export default async function DashboardPage({ searchParams }: PageProps<"/dashbo
   return (
     <div className="flex flex-col gap-7">
       {sp.denied && <Notice tone="alert">Your role doesn&apos;t have access to that page.</Notice>}
+      {sp.cleared && <Notice tone="ok">Demo data cleared. Fitron is live for {gymName}.</Notice>}
       {sp.ai === "off" && <Notice>Fitron AI is switched off. A Super Admin can turn it on in Settings › Integrations &amp; AI.</Notice>}
       {typeof sp.locked === "string" && sp.locked in FEATURES && (
         <Notice tone="accent">

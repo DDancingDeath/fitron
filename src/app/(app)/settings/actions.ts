@@ -8,7 +8,7 @@ import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } fr
 import { getWaSettings, sendTest, setLinked } from "@/lib/services/whatsapp";
 import { connectorLogout, connectorStatus, providerReady } from "@/lib/integrations/whatsapp";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
-import { aiInput, autopayInput, branchInput, gymInput, numberingInput, reminderInput, taxInput } from "@/lib/validation/settings";
+import { aiInput, autopayInput, branchInput, gymInput, numberingInput, privacyInput, reminderInput, taxInput } from "@/lib/validation/settings";
 import { checkAutopayConnection } from "@/lib/services/autopay";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
@@ -37,6 +37,14 @@ export async function saveGym(fd: FormData) {
   const u = await requirePermission("settings.manage");
   await save(gymInput, fd, "gym", async (v) => {
     await saveGymProfile(u, v);
+  });
+}
+
+/** Settings › Privacy & DPDP (Setting `privacy`, audited). */
+export async function savePrivacy(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  await save(privacyInput, fd, "privacy", async (v) => {
+    await putSetting(u, "privacy", { officer: v.officer, email: v.email, phone: v.phone ?? "", retainMonths: v.retainMonths });
   });
 }
 

@@ -3,10 +3,10 @@ import { headers } from "next/headers";
 import { ArrowsClockwiseIcon, DoorOpenIcon, FingerprintIcon, InfoIcon, LockKeyIcon, MagnifyingGlassIcon, PlusIcon, ScanSmileyIcon } from "@phosphor-icons/react/dist/ssr";
 import { requireFeature, requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
-import { listDevices, recentAccess } from "@/lib/services/biometric";
+import { isDeviceOnline, listDevices, recentAccess } from "@/lib/services/biometric";
 import { getAccessRules } from "@/lib/services/attendance";
 import { memberScope } from "@/lib/services/members";
-import { daysAgo, fromIso, todayIso } from "@/lib/services/time";
+import { fromIso, todayIso } from "@/lib/services/time";
 import { AutoFilter } from "@/components/auto-filter";
 import { Button, Field, Input, LinkButton, Notice, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
 import { ConfirmButton } from "@/components/confirm-button";
@@ -24,7 +24,6 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
   const sp = await searchParams;
   const s = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const q = s("q")?.trim();
-  const fiveMin = daysAgo(5 / 1440);
   const [devices, log, branches, rules, today, enrolled] = await Promise.all([
     listDevices(u),
     recentAccess(u, 40),
@@ -41,7 +40,7 @@ export default async function DevicesPage({ searchParams }: PageProps<"/settings
   });
   const host = (await headers()).get("host") ?? "your-fitron-domain";
   const branchName = (id: string | null) => branches.find((b) => b.id === id)?.name ?? "—";
-  const isOnline = (d: { lastSeenAt: Date | null }) => !!d.lastSeenAt && d.lastSeenAt >= fiveMin;
+  const isOnline = (d: { lastSeenAt: Date | null }) => isDeviceOnline(d);
   const count = (r: string) => today.find((x) => x.result === r)?._count._all ?? 0;
   const tpl = (id: string, type: string) => {
     const e = enrolled.find((x) => x.memberId === id && x.type === type);

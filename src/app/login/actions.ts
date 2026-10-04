@@ -5,7 +5,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { createSession, destroySession } from "@/lib/auth/session";
+import { createSession, destroySession, idleSignOut } from "@/lib/auth/session";
 import { safeNext } from "@/lib/auth/next";
 import { rateLimit } from "@/lib/rate-limit";
 import type { FormState } from "@/lib/validation/common";
@@ -42,4 +42,11 @@ export async function login(_: LoginState, formData: FormData): Promise<LoginSta
 export async function logout() {
   await destroySession();
   redirect("/login");
+}
+
+/** The browser sat idle for the configured minutes (Settings › Go live › Security): sign out and say why. */
+export async function idleLogout(minutes: number) {
+  const m = Math.max(1, Math.min(1440, Math.floor(Number(minutes) || 0)));
+  await idleSignOut(m);
+  redirect(`/login?idle=${m}`);
 }

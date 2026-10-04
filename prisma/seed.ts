@@ -29,7 +29,15 @@ async function main() {
   // Roles and categories are refreshed every run, so older databases pick up new ones.
   const roles = await ensureRoles(db);
   await ensureExpenseCategories(db);
-  const existing = await db.organization.findFirst({ where: { name: "Power Haus Gym (demo)" } });
+  // The demo gym is found by its flag, its name, or (after a rename and a "Clear demo data") its kept owner account.
+  const existing = await db.organization.findFirst({
+    where: { OR: [{ demo: true }, { name: "Power Haus Gym (demo)" }, { users: { some: { email: "sumit@demo.fitron.in" } } }] },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing && !existing.demo) {
+    console.log("Demo data was cleared on this gym; roles and categories refreshed, nothing re-seeded.");
+    return;
+  }
   if (existing) {
     const added = await seedFrontDesk(existing.id);
     const assets = await seedAssets(existing.id);
@@ -38,7 +46,7 @@ async function main() {
     console.log(`Demo gym already exists; roles and categories refreshed${added ? ", front-desk demo data added" : ""}${assets ? ", assets and purchases added" : ""}${mandates ? ", autopay mandates added" : ""}${running ? ", a year of running costs added" : ""}.`);
     return;
   }
-  const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)" } });
+  const org = await db.organization.create({ data: { name: "Power Haus Gym (demo)", demo: true } });
   const [city, chas] = await Promise.all([
     db.branch.create({ data: { orgId: org.id, name: "City Centre", address: "C-7, Sector 4, City Centre, Bokaro", phone: "7319742490", gstin: "20ABCDE1234F1Z5" } }),
     db.branch.create({ data: { orgId: org.id, name: "Chas", address: "Main Road, Chas, Bokaro", phone: "7250981134" } }),
