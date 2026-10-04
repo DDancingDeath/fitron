@@ -2,7 +2,9 @@ import Link from "next/link";
 import { requirePermission } from "@/lib/auth/current";
 import { IMPORT_KINDS, IMPORTS, type ImportKind } from "@/lib/domain/import";
 import { getMigration, getOpening } from "@/lib/services/importer";
-import { Badge, Card, Notice, PageHeader, cx } from "@/components/ui";
+import { DownloadSimpleIcon } from "@phosphor-icons/react/dist/ssr";
+import { Badge, Card, LinkButton, Notice, PageHeader, cx } from "@/components/ui";
+import { EXPORT_KINDS, EXPORTS } from "@/lib/services/exports";
 import { SETTINGS_TABS, SectionTabs } from "@/components/section-tabs";
 import { fmtStamp } from "@/lib/format";
 import { todayIso } from "@/lib/services/time";
@@ -16,6 +18,7 @@ export default async function ImportPage({ searchParams }: PageProps<"/settings/
   const [mig, opening] = await Promise.all([getMigration(u.orgId), getOpening(u.orgId)]);
   const kind = (IMPORT_KINDS as readonly string[]).includes(String(step)) ? (step as ImportKind) : null;
   const branch = u.branch === "ALL" ? null : u.branches.find((b) => b.id === u.branch);
+  const exports = EXPORT_KINDS.filter((k) => u.can(EXPORTS[k].perm));
   const steps = [...IMPORT_KINDS.map((k) => [k, IMPORTS[k].label, IMPORTS[k].blurb] as const), ["opening", "Opening balances", "Cash in hand and bank balance on the day you switch, so the cash and bank books start right."] as const];
   return (
     <>
@@ -64,6 +67,21 @@ export default async function ImportPage({ searchParams }: PageProps<"/settings/
         </Card>
       )}
       <p className="mt-6 text-sm text-muted">Need help moving? Email support@fitron.in with your export and we&apos;ll do it for you, free, within two working days.</p>
+      <Card title="Export all data" className="mt-6">
+        <p className="mb-4 text-sm text-muted">Everything in the branches you can see, as CSV files that open in Excel. Each download is noted in the audit log.</p>
+        {exports.length ? (
+          <div className="flex flex-wrap gap-2.5">
+            {exports.map((k) => (
+              <LinkButton key={k} href={`/settings/export/${k}`} prefetch={false} download>
+                <DownloadSimpleIcon size={17} weight="duotone" />
+                {EXPORTS[k].label}
+              </LinkButton>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted">Your role can&apos;t export records.</p>
+        )}
+      </Card>
     </>
   );
 }

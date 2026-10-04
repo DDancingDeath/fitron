@@ -2,9 +2,13 @@ import "server-only";
 import { db } from "@/lib/db";
 import type { Prisma } from "@/generated/prisma/client";
 import { runAutopayDay } from "./autopay";
+import { backupNudge, createBackup, pruneBackups } from "./backup";
+import { sizeText } from "@/lib/domain/backup";
 import { isUniqueViolation } from "./errors";
 import { notify } from "./notifications";
-import { computeRisk } from "./insights";
+import { computeRisk, dailyBrief } from "./insights";
+import { getAiSettings } from "./ai-settings";
+import { systemUser } from "@/lib/auth/system";
 import { syncDevices } from "./biometric";
 import { billingReminders } from "./saas";
 import { fromIso, istInstant, toIso, todayIso } from "./time";
@@ -26,6 +30,26 @@ export const JOBS: Job[] = [
     name: "members.risk",
     label: "Churn risk for every member",
     run: (orgId, today) => computeRisk(orgId, today),
+  },
+  {
+    name: "ai.brief",
+    label: "Fitron AI daily brief",
+    async run(orgId, today): Promise<Result> {
+      const ai = await getAiSettings(orgId);
+      if (!ai.enabled || !ai.dailyBrief) return { alerts: 0, note: "off" };
+      const sys = await systemUser(orgId);
+      const alerts = await dailyBrief(sys, today);
+      if (alerts.length) {
+        const n = alerts.length;
+        let text = `Today's brief: ${alerts
+          .slice(0, 3)
+          .map((a) => a.title)
+          .join(" · ")}${n > 3 ? ` and ${n - 3} more` : ""}`;
+        if (ai.autoWinback && (await db.member.count({ where: { orgId, deletedAt: null, walkIn: false, suspended: false, riskScore: { gte: 60 } } }))) text += " · win-back message ready to review";
+        await db.$transaction((tx) => notify(tx, { orgId, type: "AI_BRIEF", text, link: "/ai" }));
+      }
+      return { alerts: alerts.length };
+    },
   },
   {
     name: "attendance.close",
@@ -102,6 +126,20 @@ export const JOBS: Job[] = [
     name: "whatsapp.dispatch",
     label: "Send messages held by quiet hours",
     run: (orgId, _today, now) => dispatchScheduled(orgId, now),
+  },
+  {
+    name: "backup.auto",
+    label: "Backup of all data, kept 30 days",
+    async run(orgId, _today, now) {
+      const b = await createBackup({ orgId, userId: null }, "AUTO", now);
+      const pruned = await pruneBackups(orgId, now);
+      return { size: sizeText(b.size), pruned };
+    },
+  },
+  {
+    name: "backup.nudge",
+    label: "Weekly backup reminder",
+    run: (orgId, _today, now) => backupNudge(orgId, now),
   },
 ];
 

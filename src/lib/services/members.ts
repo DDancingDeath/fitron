@@ -34,6 +34,8 @@ export type MemberRow = {
   area: string | null;
   branchId: string;
   planName: string | null;
+  /** Start of the membership planName was taken from. */
+  planStart: string | null;
   latestEnd: string | null;
   outstanding: number;
   status: MembershipStatus;
@@ -52,8 +54,8 @@ export async function summarize(memberIds: string[], today = todayIso()) {
       select: { memberId: true, total: true, dueDate: true, payments: { select: { amount: true, status: true } } },
     }),
   ]);
-  const out = new Map<string, { latestEnd: string | null; planName: string | null; outstanding: number }>();
-  for (const id of memberIds) out.set(id, { latestEnd: null, planName: null, outstanding: 0 });
+  const out = new Map<string, { latestEnd: string | null; planName: string | null; planStart: string | null; outstanding: number }>();
+  for (const id of memberIds) out.set(id, { latestEnd: null, planName: null, planStart: null, outstanding: 0 });
   const covering = new Set<string>();
   for (const m of memberships) {
     const s = out.get(m.memberId)!;
@@ -62,9 +64,11 @@ export async function summarize(memberIds: string[], today = todayIso()) {
     // Current plan: the membership covering today; otherwise the one ending last.
     if (start <= today && end >= today) {
       s.planName = m.plan.name;
+      s.planStart = start;
       covering.add(m.memberId);
     } else if (!covering.has(m.memberId) && (!s.latestEnd || end >= s.latestEnd)) {
       s.planName = m.plan.name;
+      s.planStart = start;
     }
     if (!s.latestEnd || end > s.latestEnd) s.latestEnd = end;
   }

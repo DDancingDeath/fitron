@@ -5,6 +5,7 @@ import { claude, type Block, type Msg } from "@/lib/integrations/anthropic";
 import { runTool, TOOL_DEFS } from "./ai-tools";
 import { UserError } from "./errors";
 import { getSetting } from "./settings";
+import { getAiSettings } from "./ai-settings";
 import { sendCampaign } from "./whatsapp";
 import { audit } from "./audit";
 import { todayIso } from "./time";
@@ -23,6 +24,7 @@ export const toolLabel = (n: string) => TOOL_LABEL[n] ?? n;
 
 async function systemPrompt(u: CurrentUser) {
   const gym = (await getSetting<{ name?: string }>(u.orgId, "gym"))?.name ?? u.orgName;
+  const { autoWinback } = await getAiSettings(u.orgId);
   const branch = u.branch === "ALL" ? "all branches" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
   return [
     `You are Fitron AI, the assistant inside Fitron, gym management software used by ${gym} in India.`,
@@ -31,6 +33,7 @@ async function systemPrompt(u: CurrentUser) {
     "Money is in Indian rupees; write amounts like ₹12,500. Keep answers short and practical: lead with the answer, then at most a few bullet points.",
     "You cannot change anything yourself. To message members, call propose_action; the user confirms before anything is sent. Never claim a message was sent.",
     "Reply in the language the user writes in (English, Hindi or Hinglish).",
+    `Win-back suggestions are ${autoWinback ? "on: when members are at risk, offer to draft a win-back message via propose_action" : "off: do not propose win-back messages unless the user explicitly asks"}.`,
   ].join("\n");
 }
 

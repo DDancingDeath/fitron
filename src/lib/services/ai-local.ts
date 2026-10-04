@@ -7,6 +7,7 @@ import { listMembers } from "./members";
 import { weekSchedule, weekStart } from "./classes";
 import { fromIso, todayIso } from "./time";
 import type { ChatEvent } from "./ai";
+import { getAiSettings } from "./ai-settings";
 
 /**
  * Fitron AI without a model (no ANTHROPIC_API_KEY): the prototype's built-in answers (A.aiLocal),
@@ -53,7 +54,10 @@ export async function* localChat(u: CurrentUser, question: string): AsyncGenerat
     yield { type: "tool", name: "list_members" };
     const risky = await db.member.findMany({ where: { orgId: u.orgId, branchId: { in: u.branchIds }, deletedAt: null, walkIn: false, suspended: false, riskScore: { gte: 35 } }, orderBy: { riskScore: "desc" }, select: { id: true, code: true, name: true, riskReasons: true } });
     if (!risky.length) return yield { type: "text", text: "No members are at risk right now. Scores update every night from visits, expiry and dues." };
-    yield { type: "text", text: `${risky.length} members are at risk of not renewing:\n${risky.slice(0, 6).map((m) => `- ${m.name} (${m.code}): ${m.riskReasons.join(", ").toLowerCase()}`).join("\n")}\n\nI can send them the win-back message. Nothing goes out until you confirm.` };
+    const list = `${risky.length} members are at risk of not renewing:\n${risky.slice(0, 6).map((m) => `- ${m.name} (${m.code}): ${m.riskReasons.join(", ").toLowerCase()}`).join("\n")}`;
+    // Win-back drafts only when Settings › Integrations & AI says so; the list itself is always shown.
+    if (!(await getAiSettings(u.orgId)).autoWinback) return yield { type: "text", text: `${list}\n\nSwitch on win-back suggestions in Settings › Integrations & AI and I will draft the message for you.` };
+    yield { type: "text", text: `${list}\n\nI can send them the win-back message. Nothing goes out until you confirm.` };
     const p = await propose(u, risky.map((m) => m.id), BODY.winback, `Win-back message to ${risky.length} members at risk`);
     if (p) yield p;
     return;
@@ -117,13 +121,14 @@ export async function aiBrief(u: CurrentUser): Promise<BriefCard[]> {
   const scope = { orgId: u.orgId, branchId: { in: u.branchIds } };
   const out: BriefCard[] = [];
   if (u.can("members.view")) {
+    const { autoWinback } = await getAiSettings(u.orgId);
     const rows = (await listMembers(u, { all: true })).rows;
     const risky = await db.member.findMany({ where: { ...scope, deletedAt: null, walkIn: false, suspended: false, riskScore: { gte: 35 } }, orderBy: { riskScore: "desc" }, select: { name: true, riskReasons: true } });
     out.push({
       icon: "risk",
       title: `${risky.length} members at risk of not renewing`,
       text: risky.length ? `${risky.slice(0, 3).map((m) => `${m.name.split(" ")[0]} (${(m.riskReasons[0] ?? "low activity").toLowerCase()})`).join(", ")}${risky.length > 3 ? ` and ${risky.length - 3} more.` : "."}` : "Nobody is drifting away right now.",
-      action: risky.length && u.can("whatsapp.send") ? { label: "Review win-back messages", ask: "Which members are at risk?" } : undefined,
+      action: risky.length && autoWinback && u.can("whatsapp.send") ? { label: "Review win-back messages", ask: "Which members are at risk?" } : undefined,
     });
     const soon = rows.filter((r) => r.latestEnd && daysBetween(r.latestEnd, today) >= 0 && daysBetween(r.latestEnd, today) <= 7);
     const onAutopay = soon.length ? await db.autopayMandate.count({ where: { memberId: { in: soon.map((r) => r.id) }, status: "Active" } }) : 0;

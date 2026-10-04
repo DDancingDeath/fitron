@@ -1,5 +1,7 @@
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import { requirePermission } from "@/lib/auth/current";
+import { aiOn } from "@/lib/services/ai-settings";
 import { aiBrief } from "@/lib/services/ai-local";
 import { todayIso } from "@/lib/services/time";
 import { AiWorkspace } from "./chat";
@@ -10,6 +12,7 @@ const longDate = (iso: string) => new Date(`${iso}T00:00:00Z`).toLocaleDateStrin
 
 export default async function AiPage() {
   const u = await requirePermission("ai.use");
+  if (!(await aiOn(u.orgId))) redirect("/dashboard?ai=off");
   const brief = await aiBrief(u);
   return (
     <div className="flex flex-col gap-6">

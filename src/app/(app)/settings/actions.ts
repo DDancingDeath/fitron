@@ -8,7 +8,8 @@ import { putSetting, saveBranch, saveGymProfile, saveTax as saveTaxSettings } fr
 import { getWaSettings, sendTest, setLinked } from "@/lib/services/whatsapp";
 import { connectorLogout, connectorStatus, providerReady } from "@/lib/integrations/whatsapp";
 import { removeGymLogo, setGymLogo } from "@/lib/services/gym-logo";
-import { branchInput, gymInput, numberingInput, reminderInput, taxInput } from "@/lib/validation/settings";
+import { aiInput, autopayInput, branchInput, gymInput, numberingInput, reminderInput, taxInput } from "@/lib/validation/settings";
+import { checkAutopayConnection } from "@/lib/services/autopay";
 import { accessInput } from "@/lib/validation/frontdesk";
 import { UserError } from "@/lib/services/errors";
 import { ensureTrainerCode } from "@/lib/services/trainer-gym";
@@ -107,10 +108,29 @@ export async function saveReminders(fd: FormData) {
   back({ saved: "reminders" });
 }
 
+/** Settings › Integrations & AI › UPI autopay: mode, retries and the gap between them (the provider is Razorpay only). */
 export async function saveAutopay(fd: FormData) {
   const u = await requirePermission("settings.manage");
-  await save(z.object({ mode: z.enum(["demo", "live"]) }), fd, "autopay", async (v) => {
+  await save(autopayInput, fd, "autopay", async (v) => {
     await putSetting(u, "autopay", v);
+  });
+}
+
+/** "Test connection": one audited check against Razorpay with the server keys; demo mode has nothing to test. */
+export async function testAutopayConnection() {
+  const u = await requirePermission("settings.manage");
+  if (!u.has("autopay")) back({ error: "UPI autopay is on the Professional plan.", section: "autopay" });
+  await checkAutopayConnection(u);
+  revalidatePath("/settings");
+  back({ saved: "autopay" });
+}
+
+/** Settings › Integrations & AI › Fitron AI: the three switches drive the sidebar, the dashboard brief and win-back drafts. */
+export async function saveAi(fd: FormData) {
+  const u = await requirePermission("settings.manage");
+  if (!u.has("ai")) back({ error: "Fitron AI is on the Professional plan.", section: "ai" });
+  await save(aiInput, fd, "ai", async (v) => {
+    await putSetting(u, "ai", v);
   });
 }
 

@@ -14,6 +14,7 @@ import { AskAi } from "@/components/ask-ai";
 import { navCounts } from "@/lib/services/shell";
 import { getGymProfile } from "@/lib/services/settings";
 import { getSubscriptionSettings } from "@/lib/services/subscription";
+import { getAiSettings } from "@/lib/services/ai-settings";
 import { gymLogoUrl } from "@/components/gym-logo";
 import { gymPlan } from "@/lib/services/saas";
 import { PLANS } from "@/lib/domain/pricing";
@@ -25,7 +26,7 @@ const fromPrice = formatInr(Math.min(...PLANS.filter((p) => p.product === "GYM_A
 
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const u = await requireUser();
-  const [counts, plan, profile, sub] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId), getSubscriptionSettings(u.orgId)]);
+  const [counts, plan, profile, sub, ai] = await Promise.all([navCounts(u), gymPlan(u.orgId), getGymProfile(u.orgId), getSubscriptionSettings(u.orgId), getAiSettings(u.orgId)]);
   const gymName = profile.name || u.orgName;
   const logo = gymLogoUrl(profile.logoKey);
   const s = plan.standing;
@@ -71,10 +72,11 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
             ? { alert: true, body: <>Your FITRON plan has ended. Your data is safe; pay to keep adding members and invoices.</>, cta: "Choose a plan" }
             : null;
   // Sections the role may use stay listed even when the plan doesn't open them: locked, leading to the plans.
+  // Fitron AI disappears altogether when a Super Admin switched it off (Settings › Integrations & AI).
   const groups = NAV.map((g) => ({
     ...g,
     items: g.items
-      .filter((i) => !i.perm || u.can(i.perm))
+      .filter((i) => (!i.perm || u.can(i.perm)) && (ai.enabled || i.icon !== "ai"))
       .map((i) => (i.feature && !u.has(i.feature) ? { ...i, locked: true, href: upgradePath(u, i.feature) } : { ...i, badge: i.count ? counts[i.count] : undefined })),
   })).filter((g) => g.items.length);
   const branchName = u.branch === "ALL" ? "All branches (consolidated)" : (u.branches.find((b) => b.id === u.branch)?.name ?? "");
@@ -115,7 +117,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         {banner && <TrialBanner alert={banner.alert} cta={canPay ? banner.cta : undefined}>{banner.body}</TrialBanner>}
         <main id="ft-main" className="mx-auto w-full max-w-[1400px] flex-1 px-4 pt-4 pb-20 lg:px-10">{children}</main>
       </div>
-      {u.can("ai.use") && <AskAi />}
+      {u.can("ai.use") && ai.enabled && <AskAi />}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowsClockwiseIcon, PlayIcon, PlusIcon, XIcon } from "@phosphor-icons/react/dist/ssr";
 import { requirePermission } from "@/lib/auth/current";
 import { db } from "@/lib/db";
-import { autopayStats, getAutopayMode, listMandates } from "@/lib/services/autopay";
+import { autopayStats, getAutopaySettings, listMandates } from "@/lib/services/autopay";
 import { memberOptions } from "@/lib/services/members";
 import { getTax } from "@/lib/services/tax";
 import { fromIso, todayIso, toIso } from "@/lib/services/time";
@@ -41,8 +41,8 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
   const str = (k: string) => (typeof sp[k] === "string" ? (sp[k] as string) : undefined);
   const f = FILTERS.some(([k]) => k === str("f")) ? str("f")! : "All";
   const today = todayIso();
-  const [mode, mandates] = await Promise.all([getAutopayMode(u.orgId), listMandates(u)]);
-  const live = mode === "live";
+  const [settings, mandates] = await Promise.all([getAutopaySettings(u.orgId), listMandates(u)]);
+  const live = settings.mode === "live";
   const stats = await autopayStats(u, mandates, today);
   const notices = await db.whatsAppMessage.findMany({ where: { memberId: { in: mandates.map((m) => m.memberId) }, templateKey: "autopay", sentAt: { gte: fromIso(addDays(today, -1)) } }, select: { memberId: true } });
   const noticed = new Set(notices.map((n) => n.memberId));
@@ -77,7 +77,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
         "Member approves the mandate once in their UPI app (use Approve now in demo mode).",
         "A pre-debit notice goes out on WhatsApp 24 hours before each debit.",
         "Debits run automatically on the renewal date and create the renewal, invoice and payment.",
-        "Failed debits can be retried here, or collected by hand at the desk.",
+        `Failed debits are retried up to ${settings.retries} times, ${settings.retryGap} days apart, or collected by hand at the desk.`,
       ];
   const missing = live ? razorpayReady() : null;
   const fq = f === "All" ? "" : f;
@@ -104,7 +104,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
               </form>
             )}
             {live && (
-              <LinkButton href="/settings">
+              <LinkButton href="/settings?tab=int">
                 <ArrowsClockwiseIcon size={16} weight="duotone" />
                 Razorpay settings
               </LinkButton>
