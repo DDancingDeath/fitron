@@ -278,7 +278,7 @@ export default async function AutopayPage({ searchParams }: PageProps<"/autopay"
       {!rows.length && <div className="text-sm text-muted">No mandates match this filter.</div>}
 
       {newOpen && tax && (
-        <Dialog kicker="UPI autopay" title="New mandate" close={href(f)} note="The member gets the approval link on WhatsApp. Each cycle debits the plan price with GST and renews the membership.">
+        <Dialog kicker="UPI autopay" title="New mandate" close={href(f)} form note="The member gets the approval link on WhatsApp. Each cycle debits the plan price with GST and renews the membership.">
           <MandateForm
             members={members}
             plans={plans.map((p) => ({ id: p.id, label: `${p.name} · ${formatRupees(invoiceTotals([{ qty: 1, rate: p.price, discount: p.discount, taxRate: tax.enabled && p.gstApplicable ? tax.rate : 0 }]).total)} ${cycle(p.months).toLowerCase()}` }))}

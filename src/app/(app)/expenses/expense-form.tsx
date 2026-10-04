@@ -2,11 +2,11 @@
 
 import { useActionState } from "react";
 import { addExpense, voidIt } from "./actions";
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, LinkButton, Notice, Select } from "@/components/ui";
 import { ReasonForm } from "@/components/reason-form";
 import { METHODS } from "@/lib/validation/billing";
 
-export function ExpenseForm({ categories, today }: { categories: { id: string; name: string; group: string }[]; today: string }) {
+export function ExpenseForm({ categories, today, close }: { categories: { id: string; name: string; group: string }[]; today: string; close: string }) {
   const [state, action, pending] = useActionState(addExpense, undefined);
   const e = state?.errors ?? {};
   const sent = state?.ok ? undefined : (state?.values as Record<string, string> | undefined);
@@ -56,7 +56,11 @@ export function ExpenseForm({ categories, today }: { categories: { id: string; n
           <Input name="billNo" defaultValue={sent?.billNo} />
         </Field>
       </div>
-      <div>
+      <p className="m-0 text-[13px] text-muted">Expenses are voided with a reason, never deleted. Equipment you&apos;ll use for years belongs in Fixed assets.</p>
+      <div className="flex justify-end gap-2">
+        <LinkButton href={close} variant="ghost" scroll={false}>
+          Cancel
+        </LinkButton>
         <Button variant="primary" disabled={pending}>
           {pending ? "Saving…" : "Save expense"}
         </Button>
