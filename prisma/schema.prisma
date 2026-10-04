@@ -240,6 +240,7 @@ model Member {
   attendance         Attendance[]
   bookings           Booking[]
   progress           ProgressLog[]
+  records            PersonalRecord[]
   lead               Lead?
   waMessages         WhatsAppMessage[]
   mandates           AutopayMandate[]
@@ -250,6 +251,8 @@ model Member {
   createdAt          DateTime          @default(now()) @db.Timestamptz
   updatedAt          DateTime          @updatedAt @db.Timestamptz
   deletedAt          DateTime?         @db.Timestamptz
+  deletedById        String?
+  deleteReason       String?
   /// Personal data stripped (DPDP erasure); set with deletedAt. Restore is refused.
   erasedAt           DateTime?         @db.Timestamptz
 
@@ -1502,4 +1505,20 @@ model SupportTicketReply {
   createdAt DateTime      @default(now()) @db.Timestamptz
 
   @@index([ticketId, createdAt])
+}
+
+model PersonalRecord {
+  id          String   @id @default(cuid())
+  orgId       String
+  memberId    String
+  member      Member   @relation(fields: [memberId], references: [id])
+  /// e.g. Bench press
+  lift        String
+  weightKg    Decimal  @db.Decimal(5, 1)
+  reps        Int      @default(1)
+  date        DateTime @db.Date
+  createdById String
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([memberId, lift])
 }

@@ -29,7 +29,13 @@ import { DOC_KINDS, listDocuments } from "@/lib/services/documents";
 import { memberBiometrics } from "@/lib/services/biometric";
 import { memberVisits } from "@/lib/services/attendance";
 import { memberBookings } from "@/lib/services/classes";
-import { listDiets, listWorkouts, progressFor } from "@/lib/services/programs";
+import { listDiets, listRecords, listWorkouts, progressFor } from "@/lib/services/programs";
+import { listTrainers } from "@/lib/services/staff";
+import { bestRecords } from "@/lib/domain/programs";
+import { memberPhotoUrl } from "@/components/avatar";
+import { MemberPhotoForm } from "./photo-form";
+import { measureAction, removeRecordAction, sendPlanAction } from "../fitness-actions";
+import { PlusIcon } from "@phosphor-icons/react/dist/ssr";
 import { listMessages, listTemplates } from "@/lib/services/whatsapp";
 import { trainerStatusFor } from "@/lib/services/trainer-gym";
 import { findPlan } from "@/lib/domain/pricing";
@@ -42,7 +48,7 @@ import { MemberStatus } from "@/components/status";
 import { Tag } from "@/components/tag";
 import { ConfirmButton } from "@/components/confirm-button";
 import { Dialog, DialogButtons } from "@/components/dialog";
-import { Button, Input, Notice, Select, TABLE, TD, TH, TR, cx } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, Textarea, TABLE, TD, TH, TR, cx } from "@/components/ui";
 import { fmtDate, fmtShort, fmtStamp, fmtTime, formatRupees, initials } from "@/lib/format";
 import { remindDueAction } from "../../reminder-actions";
 import {
@@ -58,7 +64,7 @@ import {
   unfreezeAction,
   uploadDocumentAction,
 } from "../actions";
-import { AssignForm, ProgressForm } from "./fitness";
+import { AssignForm, RecordForm } from "./fitness";
 import { SendOneForm } from "../../whatsapp/wa-forms";
 
 export const metadata = { title: "Member · Fitron" };
@@ -98,13 +104,15 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
   const canWa = u.can("whatsapp.send");
   const canPrograms = u.can("programs.manage");
   const canBio = u.can("members.edit") && !m.walkIn;
-  const [history, visits, bookings, workouts, diets, progress, freeze, templates, messages, docs] = await Promise.all([
+  const [history, visits, bookings, workouts, diets, progress, records, trainers, freeze, templates, messages, docs] = await Promise.all([
     canMoney ? memberHistory(u, m.id) : null,
     memberVisits(m.id, 200),
     u.can("classes.manage") ? memberBookings(m.id) : null,
     listWorkouts(u),
     listDiets(u),
     progressFor(m.id),
+    listRecords(m.id),
+    listTrainers(u),
     openFreeze(m.id, today),
     canWa ? listTemplates(u.orgId) : [],
     canWa ? listMessages(u, { memberId: m.id }) : null,
@@ -132,7 +140,7 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
     actions.push({ label: "Collect payment", icon: HandCoinsIcon, cls: expired ? "secondary" : "primary", href: openInvoices[0] ? `/invoices/${openInvoices.at(-1)!.id}#collect` : "/receivables" });
   if (u.can("memberships.renew")) actions.push({ label: m.latestEnd ? "Renew membership" : "Sell membership", icon: ArrowsClockwiseIcon, cls: expired || !m.latestEnd ? "primary" : "secondary", href: `${here}/sell` });
   if (u.can("invoices.create")) actions.push({ label: "Create invoice", icon: FilePlusIcon, cls: "secondary", href: `/invoices/new?member=${m.id}` });
-  if (u.can("members.delete")) actions.push({ label: "Delete member", icon: TrashIcon, cls: "ghost", form: removeMember.bind(null, m.id), confirm: `Delete ${m.name}? Their invoices and payments are kept, and the member can be restored from "Recently deleted".` });
+  if (u.can("members.delete")) actions.push({ label: "Delete member", icon: TrashIcon, cls: "ghost", href: `${here}?do=delete` });
   if (canFreeze) actions.push({ label: "Freeze", icon: SnowflakeIcon, cls: "ghost", href: `${here}?do=freeze` });
   if (freeze && u.can("memberships.renew")) actions.push({ label: "Unfreeze", icon: SunIcon, cls: "ghost", form: unfreezeAction.bind(null, m.id) });
   if (canTransfer) actions.push({ label: "Transfer branch", icon: ArrowsLeftRightIcon, cls: "ghost", href: `${here}?do=transfer` });
@@ -228,7 +236,11 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
       {str("msg") && <Notice tone="ok">{str("msg")}</Notice>}
 
       <div className="flex flex-wrap items-center gap-6">
-        <div className="grid size-24 place-items-center rounded-full bg-neutral-200 text-[32px] font-semibold">{initials(m.name)}</div>
+        {m.photoKey ? (
+          <div role="img" aria-label="Member photo" className="size-24 rounded-full bg-neutral-200 bg-cover bg-center" style={{ backgroundImage: `url(${memberPhotoUrl(m.id, m.photoKey)})` }} />
+        ) : (
+          <div className="grid size-24 place-items-center rounded-full bg-neutral-200 text-[32px] font-semibold">{initials(m.name)}</div>
+        )}
         <div className="min-w-[240px] flex-1">
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="m-0 text-[28px] lg:text-[38px]">{m.name}</h1>
@@ -242,6 +254,8 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
           </div>
         </div>
       </div>
+
+      {u.can("members.edit") && !m.walkIn && <MemberPhotoForm memberId={m.id} hasPhoto={!!m.photoKey} />}
 
       <div className="flex flex-wrap gap-2">
         {actions.map((a) =>
@@ -408,10 +422,10 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
           <section className="flex flex-col gap-3">
             <h4 className="m-0 text-lg">Program</h4>
             {canPrograms || u.can("members.edit") ? (
-              <AssignForm memberId={m.id} workouts={workouts.filter((w) => w.active || w.id === m.workoutPlanId)} diets={diets.filter((d) => d.active || d.id === m.dietPlanId)} workoutId={m.workoutPlanId} dietId={m.dietPlanId} />
+              <AssignForm memberId={m.id} trainers={trainers} workouts={workouts.filter((w) => w.active || w.id === m.workoutPlanId)} diets={diets.filter((d) => d.active || d.id === m.dietPlanId)} trainerId={m.trainerId} workoutId={m.workoutPlanId} dietId={m.dietPlanId} />
             ) : (
               <p className="text-sm">
-                Workout: {workouts.find((w) => w.id === m.workoutPlanId)?.name ?? "None"} · Diet: {diets.find((d) => d.id === m.dietPlanId)?.name ?? "None"}
+                Trainer: {m.trainerName ?? "—"} · Workout: {workouts.find((w) => w.id === m.workoutPlanId)?.name ?? "None"} · Diet: {diets.find((d) => d.id === m.dietPlanId)?.name ?? "None"}
               </p>
             )}
             {workouts
@@ -427,9 +441,27 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
                   ))}
                 </div>
               ))}
+            {canWa && (
+              <div className="flex flex-wrap gap-2">
+                <form action={sendPlanAction.bind(null, m.id)}>
+                  <button className={BTN.secondary}>
+                    <WhatsappLogoIcon size={16} weight="duotone" />
+                    Send plan on WhatsApp
+                  </button>
+                </form>
+              </div>
+            )}
           </section>
           <section className="flex flex-col gap-3">
-            <h4 className="m-0 text-lg">Progress</h4>
+            <div className="flex items-center justify-between gap-3">
+              <h4 className="m-0 text-lg">Progress</h4>
+              {canPrograms && (
+                <Link href={`${here}?tab=fitness&do=measure`} className={BTN.secondary}>
+                  <PlusIcon size={16} weight="bold" />
+                  Log measurement
+                </Link>
+              )}
+            </div>
             {progress.length > 0 ? (
               <>
                 <ProgressStats progress={progress} />
@@ -442,7 +474,33 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
             ) : (
               <p className="m-0 text-sm text-muted">No measurements logged yet.</p>
             )}
-            {canPrograms && <ProgressForm memberId={m.id} today={today} />}
+            {(canPrograms || records.length > 0) && (
+              <>
+                <h4 className="mt-2 mb-0 text-base">Personal records</h4>
+                {records.length === 0 && <p className="m-0 text-sm text-muted">No personal records yet.</p>}
+                {bestRecords(records).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between gap-3 py-1 text-sm">
+                    <span>{r.lift}</span>
+                    <span className="flex items-center gap-2">
+                      <span>
+                        <strong>
+                          {r.weightKg} kg{r.reps > 1 ? ` × ${r.reps}` : ""}
+                        </strong>{" "}
+                        <span className="text-xs text-muted">{fmtDate(r.date)}</span>
+                      </span>
+                      {canPrograms && (
+                        <form action={removeRecordAction.bind(null, m.id, r.id)}>
+                          <ConfirmButton variant="ghost" confirm="Remove this record?">
+                            Remove
+                          </ConfirmButton>
+                        </form>
+                      )}
+                    </span>
+                  </div>
+                ))}
+                {canPrograms && <RecordForm memberId={m.id} today={today} />}
+              </>
+            )}
           </section>
         </div>
       )}
@@ -473,6 +531,43 @@ export default async function MemberPage({ params, searchParams }: PageProps<"/m
             invoices={(history?.invoices ?? []).filter((i) => i.status !== "CANCELLED").map((i) => ({ id: i.id, number: i.number }))}
           />
         </div>
+      )}
+
+      {str("do") === "measure" && canPrograms && tab === "fitness" && (
+        <Dialog kicker={m.name} title="Log measurement" close={`${here}?tab=fitness`} error={str("err")}>
+          <form action={measureAction.bind(null, m.id)} className="flex flex-col gap-3.5">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Date">
+                <Input name="date" type="date" max={today} defaultValue={today} required />
+              </Field>
+              <Field label="Weight (kg)">
+                <Input name="weightKg" inputMode="decimal" defaultValue={progress.find((p) => p.weightKg != null)?.weightKg ?? ""} />
+              </Field>
+              <Field label="Body fat (%)">
+                <Input name="bodyFat" inputMode="decimal" />
+              </Field>
+              <Field label="Waist (cm)">
+                <Input name="waistCm" inputMode="decimal" />
+              </Field>
+              <Field label="Notes" className="col-span-2">
+                <Textarea name="notes" />
+              </Field>
+            </div>
+            <DialogButtons close={`${here}?tab=fitness`} label="Save" />
+          </form>
+        </Dialog>
+      )}
+
+      {str("do") === "delete" && u.can("members.delete") && (
+        <Dialog kicker={m.name} title={`Delete ${m.name}?`} close={here} error={str("err")}>
+          <p className="m-0 text-sm">The member is removed from lists, renewals, reminders and door access. Invoices, payments and attendance stay in your books and reports. You can restore them from Members › Recently deleted.</p>
+          <form action={removeMember.bind(null, m.id)} className="flex flex-col gap-3.5">
+            <Field label="Reason (recorded in the audit log) *">
+              <Textarea name="reason" required minLength={3} className="min-h-[70px]" autoFocus />
+            </Field>
+            <DialogButtons close={here} label="Delete member" cancelLabel="Keep it" danger />
+          </form>
+        </Dialog>
       )}
 
       {str("do") === "freeze" && canFreeze && (

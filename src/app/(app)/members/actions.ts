@@ -3,9 +3,11 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/auth/current";
+import { db } from "@/lib/db";
 import { memberInput } from "@/lib/validation/member";
 import { failed, fieldErrors, type FormState } from "@/lib/validation/common";
-import { createMember, deleteMember, restoreMember, setSuspended, updateMember } from "@/lib/services/members";
+import { simpleAction } from "@/lib/form-action";
+import { checkPhoto, createMember, deleteMember, removeMemberPhoto, restoreMember, setMemberPhoto, setSuspended, updateMember } from "@/lib/services/members";
 import { UserError } from "@/lib/services/errors";
 import { freezeMembership, transferMember, unfreezeMembership } from "@/lib/services/freeze";
 import { sendTemplate } from "@/lib/services/whatsapp";
@@ -14,7 +16,7 @@ import { fmtDate } from "@/lib/format";
 import { enrol, eraseBiometrics } from "@/lib/services/biometric";
 import { DOC_KINDS, deleteDocument, replaceDocument, uploadDocument } from "@/lib/services/documents";
 
-const read = (fd: FormData) => Object.fromEntries([...fd.keys()].map((k) => [k, fd.get(k)]));
+const read = (fd: FormData) => Object.fromEntries([...fd.entries()].filter(([, v]) => typeof v === "string"));
 
 async function handle(fd: FormData, fn: () => Promise<unknown>): Promise<FormState> {
   try {
@@ -31,9 +33,14 @@ export async function saveMember(id: string | null, _: FormState, fd: FormData):
   const parsed = memberInput.safeParse(read(fd));
   if (!parsed.success) return failed(fd, { errors: fieldErrors(parsed.error), message: "Check the highlighted fields." });
   let newId = id;
+  const photoEntry = fd.get("photo");
+  const photo = photoEntry instanceof File && photoEntry.size > 0 ? photoEntry : null;
   const res = await handle(fd, async () => {
+    if (photo) await checkPhoto(photo);
     if (id) await updateMember(u, id, parsed.data);
     else newId = (await createMember(u, parsed.data, { leadId: (fd.get("leadId") as string) || undefined })).id;
+    if (id && fd.get("removePhoto") === "on" && !photo) await removeMemberPhoto(u, id);
+    if (photo) await setMemberPhoto(u, newId!, photo);
   });
   if (!res?.ok) return res;
   revalidatePath("/members");
@@ -46,11 +53,28 @@ export async function toggleSuspend(id: string, suspend: boolean) {
   revalidatePath(`/members/${id}`);
 }
 
-export async function removeMember(id: string) {
+export async function changeMemberPhoto(memberId: string, _: FormState, fd: FormData): Promise<FormState> {
+  const u = await requirePermission("members.edit");
+  const r =
+    fd.get("intent") === "remove"
+      ? await simpleAction(() => removeMemberPhoto(u, memberId), "Photo removed.")
+      : await simpleAction(() => setMemberPhoto(u, memberId, fd.get("photo") as File), "Photo updated.");
+  revalidatePath(`/members/${memberId}`);
+  return r;
+}
+
+export async function removeMember(id: string, fd: FormData) {
   const u = await requirePermission("members.delete");
-  await deleteMember(u, id);
+  const reason = String(fd.get("reason") ?? "").trim();
+  const name = (await db.member.findFirst({ where: { id, orgId: u.orgId }, select: { name: true } }))?.name ?? "Member";
+  try {
+    await deleteMember(u, id, reason);
+  } catch (e) {
+    if (e instanceof UserError) redirect(`/members/${id}?${new URLSearchParams({ do: "delete", err: e.message })}`);
+    throw e;
+  }
   revalidatePath("/members");
-  redirect("/members");
+  redirect(`/members?${new URLSearchParams({ msg: `${name} deleted. Restore from Recently deleted.` })}`);
 }
 
 export async function bringBackMember(id: string) {

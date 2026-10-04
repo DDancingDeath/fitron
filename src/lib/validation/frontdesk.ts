@@ -124,6 +124,15 @@ export const progressInput = z
   .refine((p) => p.weightKg || p.bodyFat || p.waistCm || p.notes, { error: "Enter at least one measurement.", path: ["weightKg"] });
 export type ProgressInput = z.infer<typeof progressInput>;
 
+const liftWeight = z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number({ error: "Enter the weight." }).positive({ error: "Enter the weight." }).max(500, { error: "Enter the weight." }));
+export const recordInput = z.object({
+  lift: z.string().trim().min(1, { error: "Enter the lift." }).max(60),
+  weightKg: liftWeight,
+  reps: z.preprocess((v) => (v === "" || v == null ? undefined : v), z.coerce.number().int().min(1).max(100).default(1)),
+  date: z.iso.date({ error: "Pick a date." }).refine((d) => d <= new Date(Date.now() + 5.5 * 3600_000).toISOString().slice(0, 10), { error: "The date can't be in the future." }),
+});
+export type RecordInput = z.infer<typeof recordInput>;
+
 export const guestInput = z.object({ name: z.string().trim().min(2, { error: "Enter the guest's name." }).max(120), phone: optionalPhone });
 
 export const accessInput = z.object({

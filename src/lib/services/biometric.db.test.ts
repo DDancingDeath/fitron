@@ -102,7 +102,7 @@ describe.skipIf(!hasDb)("Biometric door devices (database)", () => {
 
   it("deletes biometric data when the member is deleted", async () => {
     const pin = (await db.member.findUniqueOrThrow({ where: { id: active } })).devicePin!;
-    await deleteMember(admin, active);
+    await deleteMember(admin, active, "test cleanup");
     expect(await db.biometricTemplate.count({ where: { memberId: active } })).toBe(0);
     expect((await call(poll, `getrequest?SN=${serial}`)).text).toContain(`DATA DELETE USERINFO PIN=${pin}`);
     const m = await db.member.findUniqueOrThrow({ where: { id: active } });

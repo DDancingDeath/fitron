@@ -20,7 +20,7 @@ type Mod = { name: string; entities: string[]; actionPrefixes: string[] };
 /** The prototype's modules, in its order. */
 export const MODULES: Mod[] = [
   { name: "Access", entities: ["Session"], actionPrefixes: ["auth.", "profile.password", "staff.role"] },
-  { name: "Members", entities: ["Member", "Membership", "MemberDocument", "Document", "ProgressLog", "Lead"], actionPrefixes: [] },
+  { name: "Members", entities: ["Member", "Membership", "MemberDocument", "Document", "ProgressLog", "PersonalRecord", "Lead"], actionPrefixes: [] },
   { name: "Invoices", entities: ["Invoice"], actionPrefixes: [] },
   { name: "Payments", entities: ["Payment", "AutopayMandate"], actionPrefixes: [] },
   { name: "Accounts", entities: ["Expense", "MonthLock", "Asset", "Purchase", "SalaryPayment"], actionPrefixes: [] },
